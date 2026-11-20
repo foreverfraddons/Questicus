@@ -17,6 +17,10 @@ local QUALITY = { [0] = "9d9d9d", "ffffff", "1eff00", "0070dd", "a335ee", "ff800
 local ej = {}
 local function ejName(s) return (s or ""):lower():gsub("^the ", ""):gsub("[^%w]", "") end
 local function ejInstance(dname)
+  if not EJ_GetNumTiers then      -- the Adventure Guide loads on demand
+    local load = (C_AddOns and C_AddOns.LoadAddOn) or LoadAddOn
+    if load then pcall(load, "Blizzard_EncounterJournal") end
+  end
   if not (EJ_GetNumTiers and EJ_SelectTier and EJ_GetInstanceByIndex) then return end
   local want = ejName(dname)
   local okT, nt = pcall(EJ_GetNumTiers)
@@ -253,6 +257,14 @@ local function slot(i)
   s.model = CreateFrame("PlayerModel", nil, s)
   s.model:SetPoint("TOP", 0, -4)
   s.model:SetSize(46, 46)
+  -- a model set while it wasn't drawn yet stays empty: set it again when it shows
+  s.model:SetScript("OnShow", function(m)
+    local nid = BT.modelNid and BT.modelNid[m]
+    if nid and m.SetCreature then
+      pcall(m.SetCreature, m, nid)
+      if m.SetPortraitZoom then pcall(m.SetPortraitZoom, m, 1) end
+    end
+  end)
   -- the tick sits on its own layer above the portrait (a 3D portrait would cover a plain texture)
   s.top = CreateFrame("Frame", nil, s)
   s.top:SetAllPoints(s)
@@ -293,6 +305,8 @@ local function portrait(s, b)
     pcall(SetPortraitTextureFromCreatureDisplayID, s.icon, b.display)
   elseif b.nid and s.model.SetCreature then
     s.icon:Hide()
+    BT.modelNid = BT.modelNid or {}
+    BT.modelNid[s.model] = b.nid
     s.model:Show()
     pcall(s.model.SetCreature, s.model, b.nid)
     if s.model.SetPortraitZoom then pcall(s.model.SetPortraitZoom, s.model, 1) end
@@ -362,6 +376,11 @@ function BT:Show(e)
   bar.list = BT:List(e)
   BT.Front(bar)
   BT:Refresh()
+  -- portraits (3D models, the Adventure Guide's pictures) aren't ready on the frame they're first set:
+  -- draw again once the window is on screen
+  local function again() if bar.e == e and bar:IsShown() then bar.list = BT:List(e); BT:Refresh() end end
+  Q.After(0.05, again)
+  Q.After(0.6, again)
   return bar.list
 end
 
