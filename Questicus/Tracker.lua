@@ -201,11 +201,29 @@ function TR:Refresh()
   frame.scroll:SetShown(not c.collapsed)
   frame.grip:SetShown(not c.collapsed and not c.locked)
   frame.collapse.t:SetTexture(c.collapsed and "Interface\\Buttons\\Arrow-Down-Up" or "Interface\\Buttons\\Arrow-Up-Up")
-  if not TR.sizing then frame:SetHeight(h) end
+  if not TR.sizing and not TR.moving then
+    TR:PinTop()
+    frame:SetHeight(h)
+  end
   frame.title:SetText(Q.Color(T.HEX.accent, "Quests") .. Q.Color(T.HEX.dim, ("  %d/%d"):format(QS.logCount or 0, QS.MaxLog())) ..
     (focus and Q.Color(T.HEX.gold, "  focus") or ""))
   frame.scroll:SetVerticalScroll(math.min(frame.scroll:GetVerticalScroll() or 0, math.max(0, y - (h - 36))))
   TR:Thumb()
+end
+
+-- hold the window by its top right corner, so folding, unfolding or the list growing changes only
+-- the bottom edge (the title bar stays where you put it)
+function TR:PinTop()
+  if not frame then return end
+  local top, right = frame:GetTop(), frame:GetRight()
+  local ut, ur = UIParent:GetTop(), UIParent:GetRight()
+  if not (top and right and ut and ur) then return end
+  local s1, s2 = frame:GetEffectiveScale() or 1, UIParent:GetEffectiveScale() or 1
+  local x = right * s1 / s2 - ur
+  local y = top * s1 / s2 - ut
+  frame:ClearAllPoints()
+  frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", x, y)
+  cfg().at = { "TOPRIGHT", x, y }
 end
 
 -- the scroll bar: a slim thumb on the right when the list is longer than the window
@@ -471,20 +489,20 @@ function TR:Build()
     b:SetScript("OnLeave", function(s) s.t:SetAlpha(0.75); GameTooltip:Hide() end)
     return b
   end
-  frame.cog = tbtn("Interface\\Icons\\Trade_Engineering", "Tracker settings", function() TR:Settings() end)
-  frame.add = tbtn("Interface\\PaperDollInfoFrame\\Character-Plus", "Add a quest to your route", function() TR:Search() end, frame.cog)
-  -- fold the whole tracker to its title bar
+  -- fold the whole tracker to its title bar (far right; the title bar stays put)
   frame.collapse = tbtn("Interface\\Buttons\\Arrow-Up-Up", "Fold the tracker (just the title) / open it", function()
     c.collapsed = not c.collapsed or nil
     TR:Refresh()
-  end, frame.add)
+  end)
+  frame.cog = tbtn("Interface\\Icons\\Trade_Engineering", "Tracker settings", function() TR:Settings() end, frame.collapse)
+  frame.add = tbtn("Interface\\PaperDollInfoFrame\\Character-Plus", "Add a quest to your route", function() TR:Search() end, frame.cog)
   frame.fold = tbtn("Interface\\Buttons\\UI-MinusButton-Up", "Fold / unfold all quests", function()
     Q.char.trackCollapsed = Q.char.trackCollapsed or {}
     local any = next(Q.char.trackCollapsed) ~= nil
     wipe(Q.char.trackCollapsed)
     if not any then for id in pairs(QS.log) do Q.char.trackCollapsed[id] = true end end
     TR:Refresh()
-  end, frame.collapse)
+  end, frame.add)
   local sc = CreateFrame("ScrollFrame", nil, frame)
   sc:SetPoint("TOPLEFT", 6, -28)
   sc:SetPoint("BOTTOMRIGHT", -6, 6)
@@ -498,6 +516,8 @@ function TR:Build()
     TR:Thumb()
   end)
   frame.scroll = sc
+  frame.bar:HookScript("OnDragStart", function() TR.moving = true end)
+  frame.bar:HookScript("OnDragStop", function() TR.moving = nil; TR:PinTop() end)
   frame.thumb = frame:CreateTexture(nil, "OVERLAY")
   frame.thumb:SetWidth(3)
   frame.thumb:SetTexture("Interface\\Buttons\\WHITE8x8")
