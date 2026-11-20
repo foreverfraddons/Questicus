@@ -57,7 +57,7 @@ function PT:Stop(save)
     QuesticusCollect.patrol["c:" .. rec.npc] = { [rec.map] = rec.pts }
     D:ForgetPatrol("c" .. rec.npc)
     Q:Print(("patrol path of %s saved (%d points) - shown on the map and sent to ForeverDB with your recordings"):format(rec.name, n))
-    if Q.Pins and Q.Pins.RefreshWorld then Q.Pins:RefreshWorld() end
+    if Q.Pins and Q.Pins.RefreshWorld then Q.Pins:RefreshWorld(true) end
   elseif save then
     Q:Print("not enough of the path yet - follow the mob a bit longer")
     return

@@ -271,7 +271,7 @@ function D:RemoveSpot(key, p)
   if D.ForgetPatrol then D:ForgetPatrol(key) end
   Q:Print(("removed a spot of %s - gone from your map and routes, and from ForeverDB once your recordings are synced (/qc spots undo puts it back)"):format(D:Name(key)))
   if Q.Planner then Q.Planner:Reset(); Q.Planner:Replan(0.2) end
-  if Q.Pins and Q.Pins.RefreshWorld then Q.Pins:RefreshWorld() end
+  if Q.Pins and Q.Pins.RefreshWorld then Q.Pins:RefreshWorld(true) end
   return true
 end
 Q:Command("spots", "spots you removed with Ctrl-click (/qc spots undo puts the last one back, /qc spots reset all)", function(arg)

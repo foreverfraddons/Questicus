@@ -84,7 +84,7 @@ local function hideGuiding()
   if Q.Arrow and Q.Arrow.Update then pcall(Q.Arrow.Update, Q.Arrow) end
   if Q.Waypoint then Q.Waypoint:Clear() end
   if Q.Pins then
-    if Q.Pins.RefreshWorld then Q.Pins:RefreshWorld() end
+    if Q.Pins.RefreshWorld then Q.Pins:RefreshWorld(true) end
     if Q.Pins.RefreshMinimap then Q.Pins:RefreshMinimap() end
   end
 end

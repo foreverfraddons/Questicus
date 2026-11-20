@@ -127,7 +127,34 @@ local function availableQuests()
   return available
 end
 
-function PN:RefreshWorld()
+-- What the drawing depends on. The same as last time: nothing is redrawn (the icons, quest areas
+-- and lines stay as drawn). It changes with the map shown, the canvas size, your settings, the quest
+-- log (accepting / handing in), and the route steps on the map (the step you're on and the next two,
+-- with their open objectives). Moving only redraws the line from you (PN:DrawLeg).
+local function signature(mapID, cw, ch)
+  local pins = Q.db.pins
+  local parts = { mapID or 0, math.floor((cw or 0) + 0.5), math.floor((ch or 0) + 0.5),
+    pins.size or 1, tostring(pins.world), tostring(pins.objectives), tostring(pins.others),
+    tostring(pins.areas), tostring(pins.areasNext), tostring(Q.prefs.collectibles),
+    tostring(D:Ready()), tostring(Q.char.surveyDone), QS.logCount or 0,
+    Q.OnTaxi() and "t" or "g", Q.Guide.focus or 1 }
+  if D:Ready() and Q.char.surveyDone then
+    for _, e in ipairs(PN.RouteSteps()) do
+      local st = e.step
+      local pt = e.point
+      parts[#parts + 1] = ("%s:%s:%s:%s:%s"):format(e.index, st.type or "", table.concat(st.quests or {}, ","),
+        pt and math.floor((pt.x or 0) + 0.5) or "-", pt and math.floor((pt.y or 0) + 0.5) or "-")
+      if st.type == "complete" then parts[#parts + 1] = #P.StepPoints(st) end
+    end
+  end
+  return table.concat(parts, "|")
+end
+
+-- the next draw happens whatever the signature says (a spot removed, a patrol recorded, a loading screen)
+function PN:Invalidate() PN.sig = nil end
+
+function PN:RefreshWorld(force)
+  if force then PN.sig = nil end
   if not (WorldMapFrame and WorldMapFrame:IsShown()) then return end
   local sc = WorldMapFrame.ScrollContainer
   canvas = sc and sc.Child
@@ -157,6 +184,17 @@ function PN:RefreshWorld()
   PN.overlay:SetFrameLevel(math.min(9000, lvl))
   PN.overlay:Show()
   if not wpool then wpool = pool(PN.overlay, 18) end
+  do
+    local sig = signature(WorldMapFrame:GetMapID(), canvas:GetWidth(), canvas:GetHeight())
+    if sig == PN.sig then
+      local cs = canvasScale(sc)
+      if lastScale and math.abs(cs - lastScale) > lastScale * 1e-4 then PN:Rescale(cs) end
+      PN:DrawLeg()
+      return
+    end
+    PN.sig = sig
+    PN.draws = (PN.draws or 0) + 1
+  end
   wpool:Release()
   PN:ReleasePatrolHits()
   PN:ReleaseAreas()
@@ -164,6 +202,8 @@ function PN:RefreshWorld()
   local mapID = WorldMapFrame:GetMapID()
   if not (Q.db.pins.world and D:Ready() and Q.char.surveyDone) then
     lastMap, lastScale, lastW, lastH = mapID, canvasScale(sc), canvas:GetWidth(), canvas:GetHeight()
+    PN.leg = nil
+    PN:DrawLeg()
     return
   end
   local cs = canvasScale(sc)
@@ -286,9 +326,10 @@ function PN:RefreshWorld()
     end
     local x, y
     if pt then x, y = onMap(pt, mapID) end
+    if k == 1 then PN.leg = x and { pt = pt, col = col, mapID = mapID, cw = cw, ch = ch } or nil end
     if x then
-      -- line from the previous point (you, then the step before)
-      if px and not (Q.OnTaxi() or (IsFlying and IsFlying())) then   -- no route lines while flying
+      -- line from the step before (the line from you to the step you're on: PN:DrawLeg)
+      if k > 1 and px and not (Q.OnTaxi() or (IsFlying and IsFlying())) then   -- no route lines while flying
         local legs = { { x, y } }
         if k == 1 and prev and Q.Nav then
           -- the first leg follows the less obstructed path (Nav.lua)
@@ -331,6 +372,56 @@ function PN:RefreshWorld()
     end
   end
   for i = li + 1, #PN.lines do PN.lines[i].bg:Hide(); PN.lines[i].fg:Hide() end
+  PN:DrawLeg()
+end
+
+-- the line from you to the step you're on (along the less obstructed path, Nav.lua): the only part
+-- of the map drawing that follows you as you move
+PN.legLines = {}
+function PN:DrawLeg()
+  local used = 0
+  local L = PN.leg
+  local here = D:PlayerPos()
+  if L and canvas and here and L.mapID == lastMap and Q.db.pins.world and not (Q.OnTaxi() or (IsFlying and IsFlying())) then
+    local px, py = onMap(here, L.mapID)
+    local x, y = onMap(L.pt, L.mapID)
+    if px and x then
+      local legs = { { x, y } }
+      if Q.Nav then
+        local path = Q.Nav:Route(here, L.pt)
+        if path and #path > 1 then
+          legs = {}
+          for _, wpt in ipairs(path) do
+            local wx, wy = onMap(wpt, L.mapID)
+            if wx then legs[#legs + 1] = { wx, wy } end
+          end
+        end
+      end
+      local cs = lastScale or 1
+      local ax, ay = px, py
+      for _, leg in ipairs(legs) do
+        used = used + 1
+        local l = PN.legLines[used]
+        if not l then
+          l = { bg = PN.overlay:CreateLine(nil, "OVERLAY", nil, 6), fg = PN.overlay:CreateLine(nil, "OVERLAY", nil, 7) }
+          l.bg:SetColorTexture(0, 0, 0, 0.75)
+          PN.legLines[used] = l
+        end
+        local a1, b1, a2, b2 = ax * L.cw, -ay * L.ch, leg[1] * L.cw, -leg[2] * L.ch
+        for _, ln in ipairs({ l.bg, l.fg }) do
+          ln:SetStartPoint("TOPLEFT", canvas, a1, b1)
+          ln:SetEndPoint("TOPLEFT", canvas, a2, b2)
+          ln:Show()
+        end
+        l.fg:SetColorTexture(L.col[1], L.col[2], L.col[3], 0.95)
+        l.px = 5
+        l.fg:SetThickness(5 / cs)
+        l.bg:SetThickness(8 / cs)
+        ax, ay = leg[1], leg[2]
+      end
+    end
+  end
+  for i = used + 1, #PN.legLines do PN.legLines[i].bg:Hide(); PN.legLines[i].fg:Hide() end
 end
 
 -- ------------------------------------------------------------------ quest log objectives (Questie-style)
@@ -703,6 +794,12 @@ function PN:Rescale(cs)
   end
   if wpool then for i = 1, wpool.used do fix(wpool.list[i]) end end
   for i = 1, hitsUsed do fix(hits[i]) end
+  for _, l in ipairs(PN.legLines) do
+    if l.px and l.fg:IsShown() then
+      l.fg:SetThickness(l.px / cs)
+      l.bg:SetThickness((l.px + 3) / cs)
+    end
+  end
   for _, l in ipairs(PN.lines) do
     if l.px and l.fg:IsShown() then
       l.fg:SetThickness(l.px / cs)
@@ -741,6 +838,7 @@ local function hookWorldMap()
     local here = D:PlayerPos()
     local moved = here and (not PN.lastHere or D.Dist(here, PN.lastHere) > 8)
     if moved then PN.lastHere = here end
+    -- (only the line from you is redrawn, unless the route's steps on the map changed: signature())
     if moved or not lastMap then PN:RefreshWorld() end
   end)
 end
@@ -1026,6 +1124,8 @@ end
 Q:On("QC_READY", function() hookWorldMap(); startMinimap() end)
 -- taking off / landing: lines go away / come back right away
 local function flightChanged() Q.After(0.3, function() PN:RefreshMinimap(); PN:RefreshWorld() end) end
+-- after a loading screen: drawn again once
+Q:On("PLAYER_ENTERING_WORLD", function() PN:Invalidate() end)
 Q:On("PLAYER_CONTROL_LOST", flightChanged)
 Q:On("PLAYER_CONTROL_GAINED", flightChanged)
 Q:On("QC_PLAN_UPDATED", function() available = nil; PN:RefreshWorld() end)

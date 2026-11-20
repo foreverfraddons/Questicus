@@ -4,7 +4,11 @@
 -- Write for players: what was added, what changed, what was fixed - no code talk.
 local Q = Questicus
 Q.Changelog = {
-  { v = "next" },
+  { v = "next",
+    changed = {
+      "The world map no longer redraws quest areas and icons all the time. They're drawn once and only redrawn when your route changes, you accept or hand in a quest, or after a loading screen. Only the line from you to your current step follows you as you move.",
+    },
+  },
   { v = "0.9.16",
     fixed = {
       "Map icons no longer flash big for a moment while you zoom or drag the world map, or when quest areas are redrawn.",
