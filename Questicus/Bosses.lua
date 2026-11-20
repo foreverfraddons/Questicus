@@ -312,6 +312,10 @@ function BT:Show(e)
       GameTooltip:Show()
     end)
     bar.mode:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    -- the title stops before the count and the buttons (cut with ... when the window is narrow)
+    bar.title:SetPoint("RIGHT", bar.mode, "LEFT", -6, 0)
+    bar.title:SetJustifyH("LEFT")
+    bar.title:SetWordWrap(false)
   end
   bar.e = e
   bar.list = BT:List(e)
@@ -386,7 +390,11 @@ function BT:Refresh()
     for i = #list + 1, #lrows do lrows[i]:Hide() end
     bar.count:SetText(#list > 0 and (done .. "/" .. #list) or "")
     bar.none:SetText(#list == 0 and "No boss data for this dungeon yet." or "")
-    bar:SetWidth(220)
+    local w = 200
+    for _, r in ipairs(lrows) do
+      if r:IsShown() and r.name.GetStringWidth then w = math.max(w, (r.name:GetStringWidth() or 0) + 44) end
+    end
+    bar:SetWidth(math.min(340, math.max(260, w)))
     bar:SetHeight(30 + math.max(1, #list) * 19 + 34)
     return
   end
