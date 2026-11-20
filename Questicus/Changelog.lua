@@ -2,6 +2,8 @@
 -- Newest first. Put changes for the coming release in the "next" entry: the release workflow
 -- (tools/changelog.py) turns "next" into the real version number and writes CHANGELOG.md from this file.
 -- Write for players: what was added, what changed, what was fixed - no code talk.
+-- One line per change: another try at the same fix rewords its line, it doesn't add one. A CurseForge
+-- update goes out once "next" holds 10 lines (release.yml, MIN_CHANGES).
 local Q = Questicus
 Q.Changelog = {
   { v = "next" },
