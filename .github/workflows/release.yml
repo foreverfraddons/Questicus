@@ -76,6 +76,12 @@ jobs:
           (cd /tmp/upstream && git sparse-checkout set --no-cone '/OpenMap/Media/Textures/Forever/' '/OpenMap/Media/Textures/GroupRing.tga')
           python3 tools/sync_maps.py art /tmp/upstream
           du -sh Questicus/Media/Textures
+          # the packager leaves out files git doesn't track: commit the art here (this commit is never
+          # pushed - the repo stays small) and move the release tag onto it, so the package is still the release
+          git add -f Questicus/Media/Textures
+          git commit -qm "Questicus Maps art (OpenMap $TAG) - packaging only"
+          git tag -f "${{ steps.ver.outputs.tag }}"
+          git ls-files Questicus/Media/Textures | wc -l
 
       - name: Package and upload (CurseForge + GitHub release)
         if: steps.check.outputs.go == 'true'
