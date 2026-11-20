@@ -48,6 +48,7 @@ local function pool(parent, size)
       self.list[self.used] = b
     end
     b:SetFrameLevel((self.parent:GetFrameLevel() or 1) + 5)
+    b.lvlOff = 5
     b:Show()
     return b
   end
@@ -152,6 +153,43 @@ local function signature(mapID, cw, ch)
   return table.concat(parts, "|")
 end
 
+-- Questicus' layer over the map's art; the game's waypoint / super-tracked pin (the yellow diamond
+-- at the place Questicus pinned) goes under it, so the step icon and its number stay readable.
+-- Checked again whenever the game moves or re-adds that pin (it lays its pins out by itself).
+local WP_TEMPLATES = { "WaypointLocationPinTemplate", "SuperTrackedPinTemplate" }
+local function eachWaypointPin(fn)
+  if not (WorldMapFrame and WorldMapFrame.EnumeratePinsByTemplate) then return end
+  for _, tmpl in ipairs(WP_TEMPLATES) do
+    local ok, it = pcall(WorldMapFrame.EnumeratePinsByTemplate, WorldMapFrame, tmpl)
+    if ok and it then for pin in it do fn(pin) end end
+  end
+end
+local MAX_LEVEL = 9800
+function PN:FixLevel()
+  if not (PN.overlay and canvas) then return end
+  local lvl = (canvas:GetFrameLevel() or 1) + 2500
+  local OMA = PN.openMap and (_G.QuesticusMapAPI or _G.OpenMapAPI)
+  if OMA then lvl = math.max(lvl, (tonumber(OMA.ArtTopLevel()) or 0) + 20) end
+  eachWaypointPin(function(pin)
+    local pl = pin.GetFrameLevel and pin:GetFrameLevel() or 0
+    if pl >= lvl and pl + 10 <= MAX_LEVEL then lvl = pl + 10 end
+  end)
+  lvl = math.min(MAX_LEVEL, lvl)
+  local old = PN.overlay:GetFrameLevel() or lvl
+  if old ~= lvl then
+    PN.overlay:SetFrameLevel(lvl)
+    -- (each icon keeps its own distance above the layer: step icon over its ring over the dots)
+    if wpool then
+      for i = 1, #wpool.list do local b = wpool.list[i]; b:SetFrameLevel(lvl + (b.lvlOff or 5)) end
+    end
+    if PN.areaLayer then PN.areaLayer:SetFrameLevel(math.max(1, lvl - 1)) end
+  end
+  -- a waypoint pin still at or above our layer (the game puts it high): down under it
+  eachWaypointPin(function(pin)
+    if pin.SetFrameLevel and (pin:GetFrameLevel() or 0) >= lvl then pcall(pin.SetFrameLevel, pin, lvl - 1) end
+  end)
+end
+
 -- the next draw happens whatever the signature says (a spot removed, a patrol recorded, a loading screen)
 function PN:Invalidate() PN.sig = nil end
 
@@ -168,22 +206,7 @@ function PN:RefreshWorld(force)
     PN.overlay:SetAllPoints(canvas)
   end
   PN.overlay:SetFrameStrata(WorldMapFrame:GetFrameStrata() or "HIGH")
-  local lvl = (canvas:GetFrameLevel() or 1) + 2500
-  local OMA = PN.openMap and (_G.QuesticusMapAPI or _G.OpenMapAPI)
-  if OMA then lvl = math.max(lvl, (tonumber(OMA.ArtTopLevel()) or 0) + 20) end
-  -- the game's waypoint (and super-tracked) pin goes under Questicus' overlay
-  if WorldMapFrame.EnumeratePinsByTemplate then
-    for _, tmpl in ipairs({ "WaypointLocationPinTemplate", "SuperTrackedPinTemplate" }) do
-      local ok, it = pcall(WorldMapFrame.EnumeratePinsByTemplate, WorldMapFrame, tmpl)
-      if ok and it then
-        for pin in it do
-          local pl = pin.GetFrameLevel and pin:GetFrameLevel() or 0
-          if pl >= lvl then lvl = pl + 10 end
-        end
-      end
-    end
-  end
-  PN.overlay:SetFrameLevel(math.min(9000, lvl))
+  PN:FixLevel()
   PN.overlay:Show()
   if not wpool then wpool = pool(PN.overlay, 18) end
   do
@@ -356,12 +379,14 @@ function PN:RefreshWorld(force)
       style(ring, DOT, size * (k == 1 and 1.9 or 1.5), col[1], col[2], col[3], 0.9)
       place(ring, x, y)
       ring:SetFrameLevel(ring:GetFrameLevel() + 1)
+      ring.lvlOff = 6
       local b = wpool:Get()
       local icon = (s.type == "accept" and ICON.accept) or (s.type == "turnin" and ICON.turnin) or
         (s.type == "buy" and ICON.buy) or ICON[s.type] or ICON.kill
       style(b, icon, size * (k == 1 and 1.3 or 1.0), 1, 1, 1, 1, tostring(e.index))
       if k == 1 and PN.leg then PN.leg.ring, PN.leg.icon = ring, b end
       b:SetFrameLevel(ring:GetFrameLevel() + 2)
+      b.lvlOff = 8
       b.tip = { Q.Guide.StepText(s), PN.LABELS[k] .. " - step " .. e.index .. " of your route",
         "Click to point the arrow here" }
       if pt.key and (pt.key:sub(1, 1) == "c" or pt.key:sub(1, 1) == "o") then b.spot = { pt.key, pt } end
@@ -855,6 +880,7 @@ local function hookWorldMap()
     acc = acc + el
     if acc < (Q.OnTaxi() and 2 or 0.2) then return end
     acc = 0
+    PN:FixLevel()
     -- you moved: redraw (the route line starts at you)
     local here = D:PlayerPos()
     local moved = here and (not PN.lastHere or D.Dist(here, PN.lastHere) > 8)
@@ -1147,6 +1173,9 @@ Q:On("QC_READY", function() hookWorldMap(); startMinimap() end)
 local function flightChanged() Q.After(0.3, function() PN:RefreshMinimap(); PN:RefreshWorld() end) end
 -- after a loading screen: drawn again once
 Q:On("PLAYER_ENTERING_WORLD", function() PN:Invalidate() end)
+-- a new waypoint pin: under Questicus' icons right away
+Q:On("USER_WAYPOINT_UPDATED", function() Q.After(0, function() PN:FixLevel() end) end)
+Q:On("SUPER_TRACKING_CHANGED", function() Q.After(0, function() PN:FixLevel() end) end)
 Q:On("PLAYER_CONTROL_LOST", flightChanged)
 Q:On("PLAYER_CONTROL_GAINED", flightChanged)
 Q:On("QC_PLAN_UPDATED", function() available = nil; PN:RefreshWorld() end)

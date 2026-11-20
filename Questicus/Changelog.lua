@@ -4,7 +4,11 @@
 -- Write for players: what was added, what changed, what was fixed - no code talk.
 local Q = Questicus
 Q.Changelog = {
-  { v = "next" },
+  { v = "next",
+    fixed = {
+      "The game's yellow waypoint marker now sits under Questicus' step icon on the world map, so you can read the step and its number.",
+    },
+  },
   { v = "0.9.18",
     fixed = {
       "The quest log no longer collapses and reopens every so often while you quest, and quest areas aren't redrawn as you walk between the spots of the same step (the map pin only moves when your route moves on to another step).",
