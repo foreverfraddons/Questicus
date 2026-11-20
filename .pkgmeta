@@ -1,0 +1,17 @@
+package-as: Questicus
+
+move-folders:
+  Questicus/Questicus: Questicus
+
+# The quest database ships as its own CurseForge project (ForeverDB). The map art (Questicus Maps,
+# from OpenMap) is copied into Questicus/Media/Textures by the release workflow before packaging.
+required-dependencies:
+  - forever-db
+
+ignore:
+  - tools
+  - upstream.json
+  - README.md
+  - NOTICE.md
+  - .github
+  - Questicus/dev

@@ -1,0 +1,119 @@
+## Interface: 16001, 120007
+## Title: |cff3fd0c9Questicus|r
+## Notes: Step-by-step questing guide for WoW: Forever. Plans the fastest route through quests with waypoints, map pins, a quest tracker and gear upgrades along the way, and Questicus Maps: one seamless world map (built from OpenMap). Free for everyone.
+## Author: Fatedfr
+## Version: 0.9.2
+## IconTexture: Interface\AddOns\Questicus\Media\icon
+## SavedVariables: QuesticusDB, QuesticusCollect, QuesticusAuthor, QuesticusMapDB
+## SavedVariablesPerCharacter: QuesticusChar, QuesticusMapCharDB
+## OptionalDeps: ForeverDB, CommandCenter, OpenMap, Questie, Leatrix_Maps, BetterMaps, HighFidelityWorldMap, HiddenMaps, Mapster, Magnify
+## X-License: Questicus: all rights Fatedfr; WorldMap\ (Questicus Maps) is built from OpenMap (MIT, Ji and the OpenMap contributors, WorldMap\LICENSE.txt); map art is Blizzard's
+## X-Requires: ForeverDB (loaded on demand)
+
+Core.lua
+Theme.lua
+Data.lua
+Flight.lua
+Quests.lua
+Gear.lua
+Planner.lua
+Survey.lua
+Guide.lua
+Nav.lua
+Arrow.lua
+Pins.lua
+Auto.lua
+Collect.lua
+Popup.lua
+Details.lua
+Learn.lua
+Paths.lua
+Patrol.lua
+Cleanup.lua
+AuthorNotes.lua
+Author.lua
+Dungeons.lua
+Zones.lua
+Tracker.lua
+Collection.lua
+Bosses.lua
+QuestItem.lua
+Marks.lua
+Waypoint.lua
+Options.lua
+Minimap.lua
+Integrate.lua
+
+# Questicus Maps: one seamless world map, every zone stitched together - built from OpenMap (MIT). Its textures
+# are in Media\Textures (Forever tiles).
+# >>> Questicus Maps files (tools/sync_maps.py - do not edit by hand) >>>
+WorldMap\Guard.lua
+WorldMap\Data\Forever\Client.lua
+WorldMap\Libs\Libs.xml
+WorldMap\Core.lua
+WorldMap\Locales\deDE.lua [AllowLoadTextLocale deDE]
+WorldMap\Locales\esES.lua [AllowLoadTextLocale esES]
+WorldMap\Locales\esMX.lua [AllowLoadTextLocale esMX]
+WorldMap\Locales\frFR.lua [AllowLoadTextLocale frFR]
+WorldMap\Locales\itIT.lua [AllowLoadTextLocale itIT]
+WorldMap\Locales\koKR.lua [AllowLoadTextLocale koKR]
+WorldMap\Locales\ptBR.lua [AllowLoadTextLocale ptBR]
+WorldMap\Locales\ruRU.lua [AllowLoadTextLocale ruRU]
+WorldMap\Locales\zhCN.lua [AllowLoadTextLocale zhCN]
+WorldMap\Locales\zhTW.lua [AllowLoadTextLocale zhTW]
+WorldMap\Credits.lua
+WorldMap\Data\Forever\Reveal.lua
+WorldMap\Data\Forever\Places.lua
+WorldMap\Data\Forever\DungeonMaps.lua
+WorldMap\Data\Forever\DungeonDrawn.lua
+WorldMap\Data\Forever\DungeonMinimap.lua
+WorldMap\Data\Forever\DungeonBosses.lua
+WorldMap\Data\Forever\Grade.lua
+WorldMap\Data\Forever\Levels.lua
+WorldMap\Data\Forever\Fishing.lua
+WorldMap\Data\Forever\FlightData.lua
+WorldMap\Data\Forever\Minimap.lua
+WorldMap\Data\Forever\MinimapLOD.lua
+WorldMap\Data\Forever\Caves.lua
+WorldMap\Data\Forever\CaveMinimap.lua
+WorldMap\Data\Forever\Gaps.lua
+WorldMap\Data\Forever\Tiles.lua
+WorldMap\Data\Forever\GapFills.lua
+WorldMap\Data\Forever\GapPlaces.lua
+WorldMap\Data\Forever\Tones.lua
+WorldMap\Data\Forever\ArtEdits.lua
+WorldMap\Data\Forever\Labels.lua
+WorldMap\Data\Forever\Banners.lua
+WorldMap\Data\Forever\ZoneArt.lua
+WorldMap\Data\Forever\Chart.lua
+WorldMap\Data\Forever\Changelog.lua
+WorldMap\Map\Stitch.lua
+WorldMap\Map\Chart.lua
+WorldMap\Map\WorldMap.lua
+WorldMap\Map\Close.lua
+WorldMap\Map\Extras.lua
+WorldMap\Map\Flights.lua
+WorldMap\Map\Routes.lua
+WorldMap\Map\Townsfolk.lua
+WorldMap\Map\Quests.lua
+WorldMap\Map\Dungeons.lua
+WorldMap\Map\Paint.lua
+WorldMap\Map\Sketch.lua
+WorldMap\Map\Debug.lua
+WorldMap\Map\Bench.lua
+WorldMap\Map\Gamepad.lua
+WorldMap\Map\PadView.lua
+WorldMap\Map\Report.lua
+WorldMap\Map\Nav.lua
+WorldMap\Map\Combat.lua
+WorldMap\Map\Pins.lua
+WorldMap\Map\Friends.lua
+WorldMap\Map\News.lua
+WorldMap\Map\Window.lua
+WorldMap\Map\Compat.lua
+WorldMap\Map\Panel.lua
+WorldMap\Map\Launcher.lua
+WorldMap\Map\Welcome.lua
+WorldMap\API.lua
+WorldMap\Init.lua
+# <<< Questicus Maps files <<<

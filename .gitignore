@@ -1,0 +1,5 @@
+# the map art is copied in at release time (tools/sync_maps.py art)
+Questicus/Media/Textures/Forever/
+Questicus/Media/Textures/GroupRing.tga
+Questicus/WorldMap.new/
+__pycache__/

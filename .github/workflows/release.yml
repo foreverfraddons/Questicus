@@ -1,0 +1,87 @@
+# Release: when the addon changed since the last tag, bump the version (Questicus.toc + Core.lua), tag it,
+# add the Questicus Maps art from the pinned OpenMap release, check, package with the BigWigsMods
+# packager and upload to CurseForge (when CF_PROJECT_ID is set) and to a GitHub release.
+name: Release
+
+on:
+  schedule:
+    - cron: "7 10 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Release even if nothing changed"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repo-write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Anything new?
+        id: check
+        run: |
+          LAST=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
+          if [ -z "$LAST" ] || [ "${{ inputs.force }}" = "true" ]; then echo "go=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if git diff --quiet "$LAST" HEAD -- Questicus upstream.json; then
+            echo "Nothing changed since $LAST."; echo "go=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checks
+        if: steps.check.outputs.go == 'true'
+        run: |
+          python3 tools/sync_maps.py check
+          sudo apt-get update -qq && sudo apt-get install -y -qq lua5.1 > /dev/null
+          bad=0
+          while IFS= read -r -d '' f; do luac5.1 -p "$f" || bad=1; done < <(find Questicus -name '*.lua' -print0)
+          exit $bad
+
+      - name: Bump version and tag
+        if: steps.check.outputs.go == 'true'
+        id: ver
+        run: |
+          CUR=$(grep -m1 '^## Version:' Questicus/Questicus.toc | sed 's/## Version: *//')
+          LASTTAG=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null | sed 's/^v//')
+          if [ -n "$LASTTAG" ] && [ "$LASTTAG" = "$CUR" ] || git rev-parse -q --verify "refs/tags/v$CUR" > /dev/null; then
+            IFS=. read -r MA MI PA <<< "$CUR"; NEW="$MA.$MI.$(( ${PA:-0} + 1 ))"
+          else
+            NEW="$CUR"                      # a version set by hand that wasn't released yet
+          fi
+          sed -i "s/^## Version:.*/## Version: $NEW/" Questicus/Questicus.toc
+          sed -i "s/^Q.version = \".*\"/Q.version = \"$NEW\"/" Questicus/Core.lua
+          git config user.name "questicus bot"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -am "Release v$NEW" || true
+          git tag "v$NEW"
+          git push origin HEAD "v$NEW"
+          echo "tag=v$NEW" >> "$GITHUB_OUTPUT"
+
+      - name: Add the Questicus Maps art
+        if: steps.check.outputs.go == 'true'
+        run: |
+          REPO=$(python3 -c "import json;print(json.load(open('upstream.json'))['repo'])")
+          TAG=$(python3 -c "import json;print(json.load(open('upstream.json'))['tag'])")
+          git clone -q --depth 1 --branch "$TAG" --filter=blob:none --sparse "https://github.com/$REPO.git" /tmp/upstream
+          (cd /tmp/upstream && git sparse-checkout set --no-cone '/OpenMap/Media/Textures/Forever/' '/OpenMap/Media/Textures/GroupRing.tga')
+          python3 tools/sync_maps.py art /tmp/upstream
+          du -sh Questicus/Media/Textures
+
+      - name: Package and upload (CurseForge + GitHub release)
+        if: steps.check.outputs.go == 'true'
+        uses: BigWigsMods/packager@v2
+        with:
+          args: ${{ vars.CF_PROJECT_ID != '' && format('-p {0}', vars.CF_PROJECT_ID) || '' }}
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}

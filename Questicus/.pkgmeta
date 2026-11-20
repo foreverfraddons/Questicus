@@ -1,0 +1,7 @@
+package-as: Questicus
+
+required-dependencies:
+  - forever-db
+
+ignore:
+  - dev

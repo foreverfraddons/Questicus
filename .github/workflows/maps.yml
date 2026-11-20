@@ -1,0 +1,88 @@
+# Questicus Maps update: when OpenMap publishes a new release, rebuild Questicus/WorldMap from it with
+# tools/sync_maps.py (OpenMap -> Questicus Maps, everywhere but the credits), check it, commit it and
+# start a release. If OpenMap changed a part the script edits, the run fails and nothing changes:
+# Questicus keeps the last good Questicus Maps (GitHub e-mails you about the failed run).
+name: Questicus Maps update
+
+on:
+  schedule:
+    - cron: "37 9 * * *"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "OpenMap tag to build from (empty: the latest release)"
+        type: string
+        default: ""
+      force:
+        description: "Rebuild even if it's the same release"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: repo-write
+
+jobs:
+  maps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Newer OpenMap release?
+        id: up
+        run: |
+          REPO=$(python3 -c "import json;print(json.load(open('upstream.json'))['repo'])")
+          HAVE=$(python3 -c "import json;print(json.load(open('upstream.json'))['tag'])")
+          WANT="${{ inputs.tag }}"
+          if [ -z "$WANT" ]; then
+            # stable releases only: vX.Y.Z (no -beta / -alpha tags)
+            WANT=$(git ls-remote --tags --refs "https://github.com/$REPO.git" 'v*' | awk '{print $2}' | sed 's#refs/tags/##' \
+                   | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          fi
+          echo "repo=$REPO" >> "$GITHUB_OUTPUT"; echo "tag=$WANT" >> "$GITHUB_OUTPUT"
+          if [ -z "$WANT" ]; then echo "::error::no OpenMap release found"; exit 1; fi
+          if [ "$WANT" = "$HAVE" ] && [ "${{ inputs.force }}" != "true" ]; then
+            echo "Questicus Maps is up to date (OpenMap $HAVE)."; echo "go=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "OpenMap $HAVE -> $WANT"; echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Get OpenMap ${{ steps.up.outputs.tag }} (code)
+        if: steps.up.outputs.go == 'true'
+        run: |
+          git clone -q --depth 1 --branch "${{ steps.up.outputs.tag }}" --filter=blob:none --sparse \
+            "https://github.com/${{ steps.up.outputs.repo }}.git" /tmp/upstream
+          cd /tmp/upstream && git sparse-checkout set --no-cone '/OpenMap/*' '!/OpenMap/Media/' '!/OpenMap/Data/Retail/'
+          echo "COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Rebuild Questicus Maps
+        if: steps.up.outputs.go == 'true'
+        run: |
+          python3 tools/sync_maps.py code /tmp/upstream
+          python3 tools/sync_maps.py check
+          sudo apt-get update -qq && sudo apt-get install -y -qq lua5.1 > /dev/null
+          bad=0
+          while IFS= read -r -d '' f; do luac5.1 -p "$f" || bad=1; done < <(find Questicus/WorldMap -name '*.lua' -print0)
+          exit $bad
+
+      - name: Commit and start a release
+        if: steps.up.outputs.go == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 - <<PY
+          import json
+          d = json.load(open('upstream.json'))
+          d['tag'], d['commit'] = "${{ steps.up.outputs.tag }}", "$COMMIT"
+          json.dump(d, open('upstream.json', 'w'), indent=2); open('upstream.json', 'a').write('\n')
+          PY
+          git config user.name "questicus bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A Questicus upstream.json
+          if git diff --cached --quiet; then echo "Nothing changed."; exit 0; fi
+          git commit -m "Questicus Maps: built from OpenMap ${{ steps.up.outputs.tag }}"
+          git push origin HEAD
+          gh workflow run release.yml --ref "${GITHUB_REF_NAME}"

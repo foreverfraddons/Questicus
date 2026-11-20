@@ -1,0 +1,37 @@
+# Every push / PR: Lua 5.1 syntax, the Questicus Maps name check, and that the generated WorldMap/
+# is exactly what tools/sync_maps.py makes from the pinned OpenMap release (nobody edited it by hand).
+name: Checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lua 5.1 syntax
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq lua5.1 > /dev/null
+          bad=0
+          while IFS= read -r -d '' f; do luac5.1 -p "$f" || bad=1; done < <(find Questicus -name '*.lua' -print0)
+          exit $bad
+
+      - name: Questicus Maps name check
+        run: python3 tools/sync_maps.py check
+
+      - name: WorldMap matches the pinned OpenMap release
+        run: |
+          REPO=$(python3 -c "import json;print(json.load(open('upstream.json'))['repo'])")
+          TAG=$(python3 -c "import json;print(json.load(open('upstream.json'))['tag'])")
+          git clone -q --depth 1 --branch "$TAG" --filter=blob:none --sparse "https://github.com/$REPO.git" /tmp/upstream
+          (cd /tmp/upstream && git sparse-checkout set --no-cone '/OpenMap/*' '!/OpenMap/Media/' '!/OpenMap/Data/Retail/')
+          python3 tools/sync_maps.py code /tmp/upstream
+          if ! git diff --quiet -- Questicus; then
+            echo "::error::Questicus/WorldMap (or its toc / bindings block) differs from what tools/sync_maps.py makes - don't edit generated files by hand"
+            git diff --stat -- Questicus
+            exit 1
+          fi

@@ -1,0 +1,12 @@
+<Bindings>
+	<Binding name="CLICK QuesticusQuestItem:LeftButton" header="QUESTICUS" category="ADDONS">
+	</Binding>
+	<!-- >>> Questicus Maps bindings (tools/sync_maps.py) >>> -->
+	<Binding name="QUESTICUSMAP_FIND" category="Questicus Maps">QuesticusMap_Binding("find")</Binding>
+	<Binding name="QUESTICUSMAP_PIN" category="Questicus Maps">QuesticusMap_Binding("pin")</Binding>
+	<Binding name="QUESTICUSMAP_PINS" category="Questicus Maps">QuesticusMap_Binding("pins")</Binding>
+	<Binding name="QUESTICUSMAP_QUILL" category="Questicus Maps">QuesticusMap_Binding("quill")</Binding>
+	<Binding name="QUESTICUSMAP_QUESTLOG" category="Questicus Maps">QuesticusMap_Binding("questlog")</Binding>
+	<Binding name="QUESTICUSMAP_MENU" category="Questicus Maps">QuesticusMap_Binding("menu")</Binding>
+	<!-- <<< Questicus Maps bindings <<< -->
+</Bindings>
