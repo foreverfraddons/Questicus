@@ -4,7 +4,10 @@
   changelog.py stamp <version> [--maps]   the "next" entry becomes <version>; a fresh empty "next" goes on top.
                                           An empty "next" gets a short line (--maps: the world map was updated).
   changelog.py md <version>               CHANGELOG.md text for CurseForge: that version's notes.
+  changelog.py count [--maps]             how many changes the "next" entry holds (--maps: +1, the map was updated).
   changelog.py check                      the file parses and has a "next" entry.
+
+One line per change. Several tries at the same fix are one change: the line is reworded, not added to.
 """
 import re
 import sys
@@ -47,6 +50,10 @@ def main():
             if v != "next" and not re.match(r"^\d+\.\d+\.\d+$", v):
                 sys.exit("Changelog.lua: odd version " + v)
         print("changelog ok: %d versions" % len(bl))
+        return
+    if cmd == "count":
+        n = sum(len(v) for v in sections(s[nxt[0][1]:nxt[0][2]]).values()) if nxt else 0
+        print(n + (1 if "--maps" in sys.argv else 0))
         return
     ver = sys.argv[2]
     if cmd == "stamp":

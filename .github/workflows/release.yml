@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       force:
-        description: "Release even if nothing changed"
+        description: "Release now (even with fewer than MIN_CHANGES changes, or none)"
         type: boolean
         default: false
 
@@ -21,6 +21,9 @@ permissions:
 # version (Questicus.toc / Core.lua / the patch notes) stays plain 1.2.3.
 env:
   RELEASE_TYPE: ${{ vars.RELEASE_TYPE || 'beta' }}
+  # a CurseForge update only once the patch notes ("next" in Questicus/Changelog.lua) hold this many
+  # different changes (several tries at one fix are one line there); repo variable MIN_CHANGES changes it
+  MIN_CHANGES: ${{ vars.MIN_CHANGES || '10' }}
 
 concurrency:
   group: repo-write
@@ -39,8 +42,16 @@ jobs:
           LAST=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
           if [ -z "$LAST" ] || [ "${{ inputs.force }}" = "true" ]; then echo "go=true" >> "$GITHUB_OUTPUT"; exit 0; fi
           if git diff --quiet "$LAST" HEAD -- Questicus upstream.json; then
-            echo "Nothing changed since $LAST."; echo "go=false" >> "$GITHUB_OUTPUT"
+            echo "Nothing changed since $LAST."; echo "go=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          MAPS=""
+          if ! git diff --quiet "$LAST" HEAD -- upstream.json; then MAPS="--maps"; fi
+          N=$(python3 tools/changelog.py count $MAPS)
+          if [ "$N" -lt "$MIN_CHANGES" ]; then
+            echo "$N of $MIN_CHANGES changes since $LAST - waiting for more before a CurseForge update."
+            echo "go=false" >> "$GITHUB_OUTPUT"
           else
+            echo "$N changes since $LAST."
             echo "go=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -63,7 +74,8 @@ jobs:
           LASTTAG=$(echo "$LASTFULL" | sed 's/^v//; s/-\(beta\|alpha\)$//')
           if [ -n "$LASTTAG" ] && [ "$LASTTAG" = "$CUR" ] || git rev-parse -q --verify "refs/tags/v$CUR" > /dev/null \
              || git rev-parse -q --verify "refs/tags/v$CUR-beta" > /dev/null || git rev-parse -q --verify "refs/tags/v$CUR-alpha" > /dev/null; then
-            IFS=. read -r MA MI PA <<< "$CUR"; NEW="$MA.$MI.$(( ${PA:-0} + 1 ))"
+            # (patch number in three digits: 0.9.021, 0.9.022 ... 0.9.999)
+            IFS=. read -r MA MI PA <<< "$CUR"; NEW="$MA.$MI.$(printf '%03d' $(( 10#${PA:-0} + 1 )))"
           else
             NEW="$CUR"                      # a version set by hand that wasn't released yet
           fi
