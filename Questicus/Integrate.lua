@@ -86,3 +86,42 @@ Q.OpenMapHook = openMap
 Q.MapHook = openMap
 Q:On("QC_READY", openMap)
 Q:On("ADDON_LOADED", function(name) if name == "OpenMap" then Q.After(0.5, openMap) end end)
+
+-- The quest log's search box on the world map: with Questicus Maps' resizable map window it could
+-- end up anchored past the quest log, a dark bar running off across the screen. Kept to the quest
+-- list's width (out of combat only: it is Blizzard's frame).
+local function searchBox()
+  local qm = _G.QuestMapFrame
+  local scroll = _G.QuestScrollFrame
+  local box = (scroll and scroll.SearchBox) or (qm and qm.QuestsFrame and qm.QuestsFrame.SearchBox) or (qm and qm.SearchBox)
+  return box, scroll
+end
+local fixing = false
+function Q.FitQuestSearch()
+  if fixing or (InCombatLockdown and InCombatLockdown()) then return end
+  local box, scroll = searchBox()
+  if not (box and scroll and box.GetRight and box:IsVisible()) then return end
+  local l, r = box:GetLeft(), box:GetRight()
+  local edge = (scroll.ScrollBar and scroll.ScrollBar:IsShown() and scroll.ScrollBar:GetRight()) or scroll:GetRight()
+  if not (l and r and edge) or r <= edge + 2 or edge - l < 60 then return end
+  fixing = true
+  local p, rel, rp, x, y = box:GetPoint(1)
+  box:ClearAllPoints()
+  box:SetPoint(p or "TOPLEFT", rel or scroll, rp or p or "TOPLEFT", x or 0, y or 0)
+  box:SetWidth(edge - l - 2)
+  fixing = false
+end
+local function hookSearch()
+  local box = searchBox()
+  local qm = _G.QuestMapFrame
+  if not box or Q.searchHooked then return end
+  Q.searchHooked = true
+  local later = function() Q.After(0, Q.FitQuestSearch) end
+  box:HookScript("OnShow", later)
+  box:HookScript("OnSizeChanged", later)
+  if qm then qm:HookScript("OnShow", later); qm:HookScript("OnSizeChanged", later) end
+  if WorldMapFrame then WorldMapFrame:HookScript("OnSizeChanged", later) end
+  later()
+end
+Q:On("PLAYER_LOGIN", function() Q.After(2, hookSearch) end)
+Q:On("PLAYER_REGEN_ENABLED", function() Q.After(0.2, Q.FitQuestSearch) end)

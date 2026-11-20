@@ -106,7 +106,14 @@ local function rares()
 end
 
 -- ------------------------------------------------------------------ world map
-local wpool, canvas, lastMap, lastScale
+local wpool, canvas, lastMap, lastScale, lastW, lastH
+-- the canvas' real scale (the map's zoom): what the pins are drawn against
+local function canvasScale(sc)
+  local c = sc and sc.Child
+  local k = c and c.GetScale and c:GetScale()
+  if type(k) == "number" and k > 0 then return k end
+  return sc and sc.GetCanvasScale and sc:GetCanvasScale() or 1
+end
 local available, availableFor = nil, nil
 
 local function availableQuests()
@@ -154,13 +161,17 @@ function PN:RefreshWorld()
   PN:ReleasePatrolHits()
   PN:ReleaseAreas()
   for _, l in ipairs(PN.lines) do l.bg:Hide(); l.fg:Hide() end
-  if not (Q.db.pins.world and D:Ready() and Q.char.surveyDone) then return end
   local mapID = WorldMapFrame:GetMapID()
-  local cs = sc.GetCanvasScale and sc:GetCanvasScale() or 1
+  if not (Q.db.pins.world and D:Ready() and Q.char.surveyDone) then
+    lastMap, lastScale, lastW, lastH = mapID, canvasScale(sc), canvas:GetWidth(), canvas:GetHeight()
+    return
+  end
+  local cs = canvasScale(sc)
   local cw, ch = canvas:GetWidth(), canvas:GetHeight()
   local size = 18 * (Q.db.pins.size or 1)
-  lastMap, lastScale = mapID, cs
+  lastMap, lastScale, lastW, lastH = mapID, cs, cw, ch
   local function place(b, x, y)
+    b.qx, b.qy = x, y
     b:SetScale(1 / cs)
     b:ClearAllPoints()
     b:SetPoint("CENTER", canvas, "TOPLEFT", x * cw * cs, -y * ch * cs)
@@ -469,8 +480,8 @@ function PN:ShowPatrolTop(e)
       ln:Show()
     end
     l.fg:SetColorTexture(math.min(1, col[1] + 0.25), math.min(1, col[2] + 0.25), math.min(1, col[3] + 0.25), 1)
-    l.fg:SetThickness(6 / e.cs)
-    l.bg:SetThickness(10 / e.cs)
+    l.fg:SetThickness(6 / (lastScale or e.cs))
+    l.bg:SetThickness(10 / (lastScale or e.cs))
   end
   for j = n + 1, #topLines do topLines[j].bg:Hide(); topLines[j].fg:Hide() end
 end
@@ -674,6 +685,30 @@ function PN:Line(i, x1, y1, x2, y2, col, px, cw, ch, cs)
   l.fg:SetColorTexture(col[1], col[2], col[3], 0.95)
   l.fg:SetThickness(px / cs)
   l.bg:SetThickness((px + 3) / cs)
+  l.px = px
+end
+
+-- the map zoomed (Blizzard's smooth zoom changes the scale every frame): the icons and line widths
+-- follow at once, in the same frame, so nothing is drawn at the old size for a moment
+function PN:Rescale(cs)
+  if not canvas or not cs or cs <= 0 then return end
+  lastScale = cs
+  local cw, ch = lastW or canvas:GetWidth(), lastH or canvas:GetHeight()
+  local function fix(b)
+    if b:IsShown() and b.qx then
+      b:SetScale(1 / cs)
+      b:ClearAllPoints()
+      b:SetPoint("CENTER", canvas, "TOPLEFT", b.qx * cw * cs, -b.qy * ch * cs)
+    end
+  end
+  if wpool then for i = 1, wpool.used do fix(wpool.list[i]) end end
+  for i = 1, hitsUsed do fix(hits[i]) end
+  for _, l in ipairs(PN.lines) do
+    if l.px and l.fg:IsShown() then
+      l.fg:SetThickness(l.px / cs)
+      l.bg:SetThickness((l.px + 3) / cs)
+    end
+  end
 end
 
 local function hookWorldMap()
@@ -684,16 +719,29 @@ local function hookWorldMap()
   local watcher = CreateFrame("Frame", nil, WorldMapFrame)
   local acc = 0
   watcher:SetScript("OnUpdate", function(_, el)
+    -- every frame (cheap): another map or canvas size (Questicus Maps changes zone as you drag it)
+    -- redraws now; a zoom only resizes the icons. Waiting for the next check drew the icons at the
+    -- old size for a moment - the "flashing big" icons.
+    local sc = WorldMapFrame.ScrollContainer
+    local c = sc and sc.Child
+    if c and lastMap then
+      local w, h = c:GetWidth(), c:GetHeight()
+      if WorldMapFrame:GetMapID() ~= lastMap or math.abs((w or 0) - (lastW or 0)) > 0.5
+        or math.abs((h or 0) - (lastH or 0)) > 0.5 then
+        PN:RefreshWorld()
+      else
+        local cs = canvasScale(sc)
+        if lastScale and math.abs(cs - lastScale) > lastScale * 1e-4 then PN:Rescale(cs) end
+      end
+    end
     acc = acc + el
     if acc < (Q.OnTaxi() and 2 or 0.2) then return end
     acc = 0
-    local sc = WorldMapFrame.ScrollContainer
-    local cs = sc and sc.GetCanvasScale and sc:GetCanvasScale() or 1
-    -- redraw when the map / zoom changes, or you moved (the route line starts at you)
+    -- you moved: redraw (the route line starts at you)
     local here = D:PlayerPos()
     local moved = here and (not PN.lastHere or D.Dist(here, PN.lastHere) > 8)
     if moved then PN.lastHere = here end
-    if WorldMapFrame:GetMapID() ~= lastMap or cs ~= lastScale or moved then PN:RefreshWorld() end
+    if moved or not lastMap then PN:RefreshWorld() end
   end)
 end
 

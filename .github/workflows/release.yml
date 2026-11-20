@@ -16,6 +16,12 @@ on:
 permissions:
   contents: write
 
+# CurseForge release type: beta unless the repo variable RELEASE_TYPE says "release" (or "alpha").
+# The packager reads it from the tag: v1.2.3-beta is a beta, v1.2.3 a release. The addon's own
+# version (Questicus.toc / Core.lua / the patch notes) stays plain 1.2.3.
+env:
+  RELEASE_TYPE: ${{ vars.RELEASE_TYPE || 'beta' }}
+
 concurrency:
   group: repo-write
 
@@ -53,8 +59,10 @@ jobs:
         id: ver
         run: |
           CUR=$(grep -m1 '^## Version:' Questicus/Questicus.toc | sed 's/## Version: *//')
-          LASTTAG=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null | sed 's/^v//')
-          if [ -n "$LASTTAG" ] && [ "$LASTTAG" = "$CUR" ] || git rev-parse -q --verify "refs/tags/v$CUR" > /dev/null; then
+          LASTFULL=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
+          LASTTAG=$(echo "$LASTFULL" | sed 's/^v//; s/-\(beta\|alpha\)$//')
+          if [ -n "$LASTTAG" ] && [ "$LASTTAG" = "$CUR" ] || git rev-parse -q --verify "refs/tags/v$CUR" > /dev/null \
+             || git rev-parse -q --verify "refs/tags/v$CUR-beta" > /dev/null || git rev-parse -q --verify "refs/tags/v$CUR-alpha" > /dev/null; then
             IFS=. read -r MA MI PA <<< "$CUR"; NEW="$MA.$MI.$(( ${PA:-0} + 1 ))"
           else
             NEW="$CUR"                      # a version set by hand that wasn't released yet
@@ -63,14 +71,18 @@ jobs:
           sed -i "s/^Q.version = \".*\"/Q.version = \"$NEW\"/" Questicus/Core.lua
           # patch notes: the "next" entry becomes this version (a maps-only release gets a map line)
           MAPS=""
-          if [ -n "$LASTTAG" ] && ! git diff --quiet "v$LASTTAG" HEAD -- upstream.json 2>/dev/null; then MAPS="--maps"; fi
+          if [ -n "$LASTFULL" ] && ! git diff --quiet "$LASTFULL" HEAD -- upstream.json 2>/dev/null; then MAPS="--maps"; fi
           python3 tools/changelog.py stamp "$NEW" $MAPS
           git config user.name "questicus bot"
           git config user.email "actions@users.noreply.github.com"
           git commit -am "Release v$NEW" || true
-          git tag "v$NEW"
-          git push origin HEAD "v$NEW"
-          echo "tag=v$NEW" >> "$GITHUB_OUTPUT"
+          TAG="v$NEW"
+          case "$RELEASE_TYPE" in beta|alpha) TAG="v$NEW-$RELEASE_TYPE" ;; esac
+          git tag "$TAG"
+          git push origin HEAD "$TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$NEW" >> "$GITHUB_OUTPUT"
+          echo "Release $TAG ($RELEASE_TYPE)"
 
       - name: Add the Questicus Maps art
         if: steps.check.outputs.go == 'true'
@@ -83,7 +95,7 @@ jobs:
           du -sh Questicus/Media/Textures
           # the packager leaves out files git doesn't track: commit the art here (this commit is never
           # pushed - the repo stays small) and move the release tag onto it, so the package is still the release
-          python3 tools/changelog.py md "$(echo '${{ steps.ver.outputs.tag }}' | sed 's/^v//')" > CHANGELOG.md
+          python3 tools/changelog.py md "${{ steps.ver.outputs.version }}" > CHANGELOG.md
           cat CHANGELOG.md
           git add -f Questicus/Media/Textures CHANGELOG.md
           git commit -qm "Questicus Maps art (OpenMap $TAG) - packaging only"
