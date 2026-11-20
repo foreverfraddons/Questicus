@@ -2,7 +2,7 @@
 ## Title: |cff3fd0c9Questicus|r
 ## Notes: Step-by-step questing guide for WoW: Forever. Plans the fastest route through quests with waypoints, map pins, a quest tracker and gear upgrades along the way, and Questicus Maps: one seamless world map (built from OpenMap). Free for everyone.
 ## Author: Fatedfr
-## Version: 0.9.4
+## Version: 0.9.5
 ## IconTexture: Interface\AddOns\Questicus\Media\icon
 ## SavedVariables: QuesticusDB, QuesticusCollect, QuesticusAuthor, QuesticusMapDB
 ## SavedVariablesPerCharacter: QuesticusChar, QuesticusMapCharDB
