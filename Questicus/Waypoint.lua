@@ -22,7 +22,10 @@ function W:Pin(pt, track)
   local map, mx, my = D:MapPos(pt)
   if not map or not canPin(map) then return false end
   local ok = pcall(C_Map.SetUserWaypoint, UiMapPoint.CreateFromCoordinates(map, mx, my))
-  if ok and track ~= false and C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then
+  -- (super tracking set again makes the game rebuild its quest log - every header shut and opened -
+  -- so only when it isn't on already)
+  local on = C_SuperTrack and C_SuperTrack.IsSuperTrackingUserWaypoint and C_SuperTrack.IsSuperTrackingUserWaypoint()
+  if ok and track ~= false and not on and C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then
     pcall(C_SuperTrack.SetSuperTrackedUserWaypoint, true)
   end
   if ok then last = pt end
@@ -34,14 +37,24 @@ function W:Clear()
   last = nil
 end
 
--- automatic: re-pin when the guide's target moves somewhere else (not for every few yards)
+-- automatic: re-pin when the route moves on to another step (or its spots are far apart). Not each
+-- time the nearest spot of the same step changes: every new pin makes the game redo its quest log
+-- (all headers shut and open again) and its map pins.
+local lastStep
+local function stepKey(s)
+  return s and ((s.type or "") .. ":" .. table.concat(s.quests or {}, ",")) or nil
+end
 function W:Follow()
   if not (Q.db.pins.autoPin ~= false and Q.char and Q.char.surveyDone) then return end
   if Q.CollectOnly and Q.CollectOnly() then return end
-  local p = Q.Guide:Target()
+  local p, s = Q.Guide:Target()
   if not p then return end
-  if last and last.i == p.i and D.Dist(last, p) < 60 then return end
-  W:Pin(p)
+  local key = stepKey(s)
+  if last and last.i == p.i then
+    local d = D.Dist(last, p)
+    if d < 60 or (key == lastStep and d < 400) then return end
+  end
+  if W:Pin(p) then lastStep = key end
 end
 
 Q:On("QC_TARGET_CHANGED", function() Q.Throttle("autopin", 0.5, function() W:Follow() end) end)

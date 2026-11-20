@@ -139,9 +139,11 @@ local function signature(mapID, cw, ch)
     tostring(D:Ready()), tostring(Q.char.surveyDone), QS.logCount or 0,
     Q.OnTaxi() and "t" or "g", Q.Guide.focus or 1 }
   if D:Ready() and Q.char.surveyDone then
-    for _, e in ipairs(PN.RouteSteps()) do
+    for k, e in ipairs(PN.RouteSteps()) do
       local st = e.step
-      local pt = e.point
+      -- (the step you're on points at its nearest open spot, which changes as you walk: that only
+      -- moves its icon and the line from you - PN:DrawLeg - so its fixed point counts here)
+      local pt = (k == 1 and st.type == "complete") and st.point or e.point
       parts[#parts + 1] = ("%s:%s:%s:%s:%s"):format(e.index, st.type or "", table.concat(st.quests or {}, ","),
         pt and math.floor((pt.x or 0) + 0.5) or "-", pt and math.floor((pt.y or 0) + 0.5) or "-")
       if st.type == "complete" then parts[#parts + 1] = #P.StepPoints(st) end
@@ -326,7 +328,7 @@ function PN:RefreshWorld(force)
     end
     local x, y
     if pt then x, y = onMap(pt, mapID) end
-    if k == 1 then PN.leg = x and { pt = pt, col = col, mapID = mapID, cw = cw, ch = ch } or nil end
+    if k == 1 then PN.leg = x and { pt = pt, col = col, mapID = mapID, cw = cw, ch = ch, live = s.type == "complete" } or nil end
     if x then
       -- line from the step before (the line from you to the step you're on: PN:DrawLeg)
       if k > 1 and px and not (Q.OnTaxi() or (IsFlying and IsFlying())) then   -- no route lines while flying
@@ -358,6 +360,7 @@ function PN:RefreshWorld(force)
       local icon = (s.type == "accept" and ICON.accept) or (s.type == "turnin" and ICON.turnin) or
         (s.type == "buy" and ICON.buy) or ICON[s.type] or ICON.kill
       style(b, icon, size * (k == 1 and 1.3 or 1.0), 1, 1, 1, 1, tostring(e.index))
+      if k == 1 and PN.leg then PN.leg.ring, PN.leg.icon = ring, b end
       b:SetFrameLevel(ring:GetFrameLevel() + 2)
       b.tip = { Q.Guide.StepText(s), PN.LABELS[k] .. " - step " .. e.index .. " of your route",
         "Click to point the arrow here" }
@@ -382,6 +385,24 @@ function PN:DrawLeg()
   local used = 0
   local L = PN.leg
   local here = D:PlayerPos()
+  -- the step you're on: its nearest open spot now (its icon moves there, nothing else is redrawn)
+  if L and L.live and canvas and L.mapID == lastMap then
+    local now = Q.Guide:Target()
+    if now and now ~= L.pt then
+      local nx, ny = onMap(now, L.mapID)
+      if nx then
+        L.pt = now
+        local cs = lastScale or 1
+        for _, b in ipairs({ L.ring, L.icon }) do
+          if b and b:IsShown() then
+            b.qx, b.qy = nx, ny
+            b:ClearAllPoints()
+            b:SetPoint("CENTER", canvas, "TOPLEFT", nx * L.cw * cs, -ny * L.ch * cs)
+          end
+        end
+      end
+    end
+  end
   if L and canvas and here and L.mapID == lastMap and Q.db.pins.world and not (Q.OnTaxi() or (IsFlying and IsFlying())) then
     local px, py = onMap(here, L.mapID)
     local x, y = onMap(L.pt, L.mapID)
