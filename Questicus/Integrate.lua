@@ -87,14 +87,52 @@ Q.MapHook = openMap
 Q:On("QC_READY", openMap)
 Q:On("ADDON_LOADED", function(name) if name == "OpenMap" then Q.After(0.5, openMap) end end)
 
--- The quest log's search box on the world map: with Questicus Maps' resizable map window it could
--- end up anchored past the quest log, a dark bar running off across the screen. Kept to the quest
--- list's width (out of combat only: it is Blizzard's frame).
+-- The quest log's search box on the world map: with Questicus Maps' resizable map window the game
+-- could make it much wider than the quest log, so it ran off across the screen and pushed the buttons
+-- that sit to its right (anchored to its right edge) out of sight. Its width is set so the box and
+-- those buttons end at the quest list's right edge. Corrected inside the game's own SetWidth / SetPoint
+-- calls (same frame: no flashing), out of combat only (it is Blizzard's frame).
 local function searchBox()
   local qm = _G.QuestMapFrame
   local scroll = _G.QuestScrollFrame
   local box = (scroll and scroll.SearchBox) or (qm and qm.QuestsFrame and qm.QuestsFrame.SearchBox) or (qm and qm.SearchBox)
   return box, scroll
+end
+-- how far the frames chained to the box's right edge (buttons) reach past it; and where the first
+-- other button on its row starts (the box must stop before it, not run under it)
+local function rightExtent(box)
+  local parent = box:GetParent()
+  if not (parent and parent.GetChildren) then return 0 end
+  local kids = { parent:GetChildren() }
+  local chained, more = { [box] = true }, true
+  local br = box:GetRight() or 0
+  local reach = 0
+  while more do
+    more = false
+    for _, c in ipairs(kids) do
+      if not chained[c] and c.GetNumPoints then
+        for i = 1, c:GetNumPoints() do
+          local _, rel = c:GetPoint(i)
+          if rel and chained[rel] then
+            chained[c] = true; more = true
+            if c:IsShown() and c:GetRight() then reach = math.max(reach, c:GetRight() - br) end
+            break
+          end
+        end
+      end
+    end
+  end
+  local bl, bt, bb = box:GetLeft() or 0, box:GetTop() or 0, box:GetBottom() or 0
+  local stop
+  for _, c in ipairs(kids) do
+    if not chained[c] and c.IsShown and c:IsShown() and c.GetLeft then
+      local cl, ct, cb = c:GetLeft(), c:GetTop(), c:GetBottom()
+      if cl and ct and cb and cl > bl + 40 and ct > bb and cb < bt and (c:GetWidth() or 0) < 80 then
+        stop = math.min(stop or cl, cl)
+      end
+    end
+  end
+  return math.max(0, reach), stop
 end
 local fixing = false
 function Q.FitQuestSearch()
@@ -103,12 +141,20 @@ function Q.FitQuestSearch()
   if not (box and scroll and box.GetRight and box:IsVisible()) then return end
   local l, r = box:GetLeft(), box:GetRight()
   local edge = (scroll.ScrollBar and scroll.ScrollBar:IsShown() and scroll.ScrollBar:GetRight()) or scroll:GetRight()
-  if not (l and r and edge) or r <= edge + 2 or edge - l < 60 then return end
+  if not (l and r and edge) then return end
+  local reach, stop = rightExtent(box)
+  local limit = math.min(edge, stop and (stop - 3) or edge)
+  local want = math.floor(limit - l - reach - 2)
+  if want < 80 then return end
+  -- only when it runs past the quest list or under a button (the game's own width otherwise stands)
+  if r + reach <= limit + 2 then return end
   fixing = true
-  local p, rel, rp, x, y = box:GetPoint(1)
-  box:ClearAllPoints()
-  box:SetPoint(p or "TOPLEFT", rel or scroll, rp or p or "TOPLEFT", x or 0, y or 0)
-  box:SetWidth(edge - l - 2)
+  if box:GetNumPoints() > 1 then
+    local p, rel, rp, x, y = box:GetPoint(1)
+    box:ClearAllPoints()
+    box:SetPoint(p or "TOPLEFT", rel or scroll, rp or p or "TOPLEFT", x or 0, y or 0)
+  end
+  box:SetWidth(want)
   fixing = false
 end
 local function hookSearch()
@@ -116,12 +162,38 @@ local function hookSearch()
   local qm = _G.QuestMapFrame
   if not box or Q.searchHooked then return end
   Q.searchHooked = true
-  local later = function() Q.After(0, Q.FitQuestSearch) end
-  box:HookScript("OnShow", later)
-  box:HookScript("OnSizeChanged", later)
-  if qm then qm:HookScript("OnShow", later); qm:HookScript("OnSizeChanged", later) end
-  if WorldMapFrame then WorldMapFrame:HookScript("OnSizeChanged", later) end
-  later()
+  -- right after the game sizes or anchors it (same frame), and once laid out
+  hooksecurefunc(box, "SetWidth", Q.FitQuestSearch)
+  hooksecurefunc(box, "SetSize", Q.FitQuestSearch)
+  hooksecurefunc(box, "SetPoint", Q.FitQuestSearch)
+  box:HookScript("OnShow", Q.FitQuestSearch)
+  box:HookScript("OnSizeChanged", Q.FitQuestSearch)
+  if qm then qm:HookScript("OnShow", Q.FitQuestSearch); qm:HookScript("OnSizeChanged", Q.FitQuestSearch) end
+  if WorldMapFrame then WorldMapFrame:HookScript("OnSizeChanged", Q.FitQuestSearch) end
+  Q.FitQuestSearch()
 end
 Q:On("PLAYER_LOGIN", function() Q.After(2, hookSearch) end)
 Q:On("PLAYER_REGEN_ENABLED", function() Q.After(0.2, Q.FitQuestSearch) end)
+-- /qc questlogdebug: the search box's row (its anchors, its neighbours' places) saved for a bug report
+Q:Command("questlogdebug", "save the world map quest log's search bar layout (for a bug report)", function()
+  local box = searchBox()
+  if not box then Q:Print("no quest log search box found"); return end
+  local function name(f) return f and (f.GetDebugName and f:GetDebugName() or f.GetName and f:GetName()) or tostring(f) end
+  local function desc(f)
+    local pts = {}
+    for i = 1, (f.GetNumPoints and f:GetNumPoints() or 0) do
+      local p, rel, rp, x, y = f:GetPoint(i)
+      pts[#pts + 1] = ("%s>%s:%s(%.0f,%.0f)"):format(tostring(p), name(rel), tostring(rp), x or 0, y or 0)
+    end
+    return ("%s shown=%s L=%.0f R=%.0f T=%.0f B=%.0f W=%.0f lvl=%s pts=%s"):format(name(f), tostring(f:IsShown()),
+      f:GetLeft() or -1, f:GetRight() or -1, f:GetTop() or -1, f:GetBottom() or -1, f:GetWidth() or -1,
+      tostring(f:GetFrameLevel()), table.concat(pts, " "))
+  end
+  local out = { "box: " .. desc(box), "parent: " .. desc(box:GetParent()) }
+  local sc = _G.QuestScrollFrame
+  if sc then out[#out + 1] = "scroll: " .. desc(sc) end
+  if _G.QuestMapFrame then out[#out + 1] = "questmap: " .. desc(_G.QuestMapFrame) end
+  for _, c in ipairs({ box:GetParent():GetChildren() }) do if c ~= box then out[#out + 1] = "kid: " .. desc(c) end end
+  Q.db.uiDebug = out
+  Q:Print("saved - /reload (or log out) so it's written to disk")
+end)
