@@ -166,7 +166,7 @@ end
 local function pageStats(p)
   header(p, "Stats and weapons", "Which stats matter most to you, and the weapon types you actually use. Upgrades and quest rewards follow this.")
   local G = Q.Gear
-  label(p, "Stat priority (click to change, right-click to clear)", 24, -84)
+  label(p, "Stat priority (click to pick, right-click to clear)", 24, -84)
   local opts = G.STAT_ORDER
   local rows = {}
   local function prio()
@@ -177,34 +177,76 @@ local function pageStats(p)
     local pl = prio()
     for i, b in ipairs(rows) do
       local k = pl[i]
-      b:SetText(("%d.  %s"):format(i, k and (G.STAT_NAMES[k] or k) or "-"))
+      b:SetText(("%d.  %s  v"):format(i, k and (G.STAT_NAMES[k] or k) or "-"))
     end
   end
+  -- the drop-down: every stat not already higher up the list, plus "(none)"
+  local menu
+  local menuBtns = {}
+  local function openMenu(i, anchor)
+    if not menu then
+      menu = CreateFrame("Frame", "QuesticusStatMenu", p)
+      menu:SetFrameStrata("FULLSCREEN_DIALOG")
+      menu:SetClampedToScreen(true)
+      menu:EnableMouse(true)
+      T.RFill(menu, { T.c.bg[1], T.c.bg[2], T.c.bg[3], 0.98 }, 6)
+      T.Border(menu, T.c.line, 6)
+      local away = 0
+      menu:SetScript("OnUpdate", function(self, el)
+        if self:IsMouseOver() or (self.anchor and self.anchor:IsMouseOver()) then away = 0 return end
+        away = away + el
+        if away > 1.5 then self:Hide() end
+      end)
+      if UISpecialFrames then table.insert(UISpecialFrames, "QuesticusStatMenu") end
+    end
+    local pl = prio()
+    if i > #pl + 1 then i = #pl + 1 end
+    local items = { { nil, "(none)" } }
+    for _, k in ipairs(opts) do
+      local used = false
+      for j = 1, #pl do if j ~= i and pl[j] == k then used = true end end
+      if not used then items[#items + 1] = { k, G.STAT_NAMES[k] or k } end
+    end
+    local cols = #items > 12 and 2 or 1
+    local per = math.ceil(#items / cols)
+    for n, it in ipairs(items) do
+      local b = menuBtns[n]
+      if not b then b = T.Button(menu, "", 150, 20); menuBtns[n] = b end
+      local col, row = math.floor((n - 1) / per), (n - 1) % per
+      b:ClearAllPoints()
+      b:SetPoint("TOPLEFT", 6 + col * 154, -6 - row * 22)
+      b:SetText((pl[i] == it[1] and "> " or "") .. it[2])
+      b:SetScript("OnClick", function()
+        if it[1] then pl[i] = it[1] else table.remove(pl, i) end
+        menu:Hide()
+        refresh()
+      end)
+      b:Show()
+    end
+    for n = #items + 1, #menuBtns do menuBtns[n]:Hide() end
+    menu:SetSize(12 + cols * 154 - 4, 12 + per * 22 - 2)
+    menu:ClearAllPoints()
+    menu:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -2)
+    menu.anchor = anchor
+    menu:Show()
+    if menu.Raise then menu:Raise() end
+    return items
+  end
+  p.OpenStatMenu = openMenu
   for i = 1, 5 do
     local b = T.Button(p, "", 200, 24)
     b:SetPoint("TOPLEFT", 24, -104 - (i - 1) * 28)
     if b.RegisterForClicks then b:RegisterForClicks("LeftButtonUp", "RightButtonUp") end
-    b:SetScript("OnClick", function(_, btn)
-      local pl = prio()
+    b:SetScript("OnClick", function(self, btn)
       if btn == "RightButton" then
-        table.remove(pl, i)
+        table.remove(prio(), i)
+        if menu then menu:Hide() end
+        refresh()
+      elseif menu and menu:IsShown() and menu.anchor == self then
+        menu:Hide()
       else
-        -- next stat that isn't already higher up the list
-        local cur = pl[i]
-        local start = 0
-        for j, k in ipairs(opts) do if k == cur then start = j end end
-        for step = 1, #opts do
-          local k = opts[(start + step - 1) % #opts + 1]
-          local used = false
-          for j = 1, #pl do if j ~= i and pl[j] == k then used = true end end
-          if not used then
-            if i > #pl + 1 then i = #pl + 1 end
-            pl[i] = k
-            break
-          end
-        end
+        openMenu(i, self)
       end
-      refresh()
     end)
     rows[i] = b
   end
@@ -299,6 +341,7 @@ local function build()
   frame = T.Window("QuesticusSurvey", W, H, "Questicus  -  set up your questing", nil)
   frame:SetFrameStrata("DIALOG")
   pages = {}
+  SV.pages = pages
   for i, b in ipairs(BUILDERS) do
     local p = CreateFrame("Frame", nil, frame)
     p:SetPoint("TOPLEFT", 0, -24)
