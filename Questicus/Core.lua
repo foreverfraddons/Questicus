@@ -3,7 +3,7 @@ local ADDON = ...
 local Q = {}
 _G.Questicus = Q
 Q.name = ADDON or "Questicus"
-Q.version = "0.9.3"
+Q.version = "0.9.4"
 -- on a flight path: heavy work (replans, map redraws) waits for the landing
 -- WoW 12 "secret" values (GUIDs / names / health in some situations): never touch them as strings
 function Q.Secret(v) return v ~= nil and issecretvalue ~= nil and issecretvalue(v) or false end
