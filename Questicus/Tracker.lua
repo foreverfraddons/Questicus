@@ -107,7 +107,7 @@ function TR:Refresh()
   if not frame then return end
   if not c.on then frame:Hide(); return end
   frame:Show()
-  frame:SetWidth(c.width)
+  if not TR.sizing then frame:SetWidth(c.width) end
   frame.bg:SetVertexColor(T.c.bg[1], T.c.bg[2], T.c.bg[3], c.alpha)
   local ri = routeIndex()
   local list = {}
@@ -193,11 +193,33 @@ function TR:Refresh()
   if n == 0 then put(Q.Color(T.HEX.dim, "No quests in your log"), nil, fs + 6, nil) end
   for i = n + 1, #rows do rows[i]:Hide(); TR.rowData[rows[i]] = nil end
   body:SetHeight(math.max(1, y))
-  local h = math.min(c.maxHeight, 30 + y + 6)
-  frame:SetHeight(h)
+  -- folded: just the title bar. A size you dragged stays (the list scrolls); else it fits the list
+  local h
+  if c.collapsed then h = 28
+  elseif c.height then h = c.height
+  else h = math.min(c.maxHeight, 30 + y + 6) end
+  frame.scroll:SetShown(not c.collapsed)
+  frame.grip:SetShown(not c.collapsed and not c.locked)
+  frame.collapse.t:SetTexture(c.collapsed and "Interface\\Buttons\\Arrow-Down-Up" or "Interface\\Buttons\\Arrow-Up-Up")
+  if not TR.sizing then frame:SetHeight(h) end
   frame.title:SetText(Q.Color(T.HEX.accent, "Quests") .. Q.Color(T.HEX.dim, ("  %d/%d"):format(QS.logCount or 0, QS.MaxLog())) ..
     (focus and Q.Color(T.HEX.gold, "  focus") or ""))
   frame.scroll:SetVerticalScroll(math.min(frame.scroll:GetVerticalScroll() or 0, math.max(0, y - (h - 36))))
+  TR:Thumb()
+end
+
+-- the scroll bar: a slim thumb on the right when the list is longer than the window
+function TR:Thumb()
+  if not frame then return end
+  local sc = frame.scroll
+  local view, total = sc:GetHeight() or 0, body:GetHeight() or 0
+  if cfg().collapsed or total <= view + 2 or view <= 0 then frame.thumb:Hide(); return end
+  local th = math.max(16, view * view / total)
+  local pos = (sc:GetVerticalScroll() or 0) / math.max(1, total - view)
+  frame.thumb:SetHeight(th)
+  frame.thumb:ClearAllPoints()
+  frame.thumb:SetPoint("TOPRIGHT", sc, "TOPRIGHT", 3, -pos * (view - th))
+  frame.thumb:Show()
 end
 
 -- ------------------------------------------------------------------ actions
@@ -451,13 +473,18 @@ function TR:Build()
   end
   frame.cog = tbtn("Interface\\Icons\\Trade_Engineering", "Tracker settings", function() TR:Settings() end)
   frame.add = tbtn("Interface\\PaperDollInfoFrame\\Character-Plus", "Add a quest to your route", function() TR:Search() end, frame.cog)
-  frame.fold = tbtn("Interface\\Buttons\\UI-MinusButton-Up", "Fold / unfold all", function()
+  -- fold the whole tracker to its title bar
+  frame.collapse = tbtn("Interface\\Buttons\\Arrow-Up-Up", "Fold the tracker (just the title) / open it", function()
+    c.collapsed = not c.collapsed or nil
+    TR:Refresh()
+  end, frame.add)
+  frame.fold = tbtn("Interface\\Buttons\\UI-MinusButton-Up", "Fold / unfold all quests", function()
     Q.char.trackCollapsed = Q.char.trackCollapsed or {}
     local any = next(Q.char.trackCollapsed) ~= nil
     wipe(Q.char.trackCollapsed)
     if not any then for id in pairs(QS.log) do Q.char.trackCollapsed[id] = true end end
     TR:Refresh()
-  end, frame.add)
+  end, frame.collapse)
   local sc = CreateFrame("ScrollFrame", nil, frame)
   sc:SetPoint("TOPLEFT", 6, -28)
   sc:SetPoint("BOTTOMRIGHT", -6, 6)
@@ -468,9 +495,55 @@ function TR:Build()
   sc:SetScript("OnMouseWheel", function(self, d)
     local max = math.max(0, (body:GetHeight() or 0) - (self:GetHeight() or 0))
     self:SetVerticalScroll(math.max(0, math.min(max, (self:GetVerticalScroll() or 0) - d * 30)))
+    TR:Thumb()
   end)
   frame.scroll = sc
-  frame:HookScript("OnSizeChanged", function() body:SetWidth(math.max(50, (frame:GetWidth() or c.width) - 12)) end)
+  frame.thumb = frame:CreateTexture(nil, "OVERLAY")
+  frame.thumb:SetWidth(3)
+  frame.thumb:SetTexture("Interface\\Buttons\\WHITE8x8")
+  frame.thumb:SetVertexColor(T.c.line[1], T.c.line[2], T.c.line[3], 0.9)
+  frame.thumb:Hide()
+  -- resize from the bottom-right corner (the list scrolls when it doesn't fit); right-click: fit the list
+  frame:SetResizable(true)
+  if frame.SetResizeBounds then frame:SetResizeBounds(180, 80, 600, 1000)
+  elseif frame.SetMinResize then frame:SetMinResize(180, 80); frame:SetMaxResize(600, 1000) end
+  local grip = CreateFrame("Button", nil, frame)
+  grip:SetSize(14, 14)
+  grip:SetPoint("BOTTOMRIGHT", -2, 2)
+  grip:SetFrameLevel((frame:GetFrameLevel() or 1) + 10)
+  grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+  grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+  grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+  grip:RegisterForClicks("RightButtonUp")
+  grip:SetScript("OnMouseDown", function(_, btn)
+    if btn == "LeftButton" and not c.locked and not (InCombatLockdown and InCombatLockdown()) then
+      TR.sizing = true
+      frame:StartSizing("BOTTOMRIGHT")
+    end
+  end)
+  grip:SetScript("OnMouseUp", function(_, btn)
+    if btn ~= "LeftButton" or TR.sizing ~= true then return end
+    TR.sizing = nil
+    frame:StopMovingOrSizing()
+    c.width = math.floor((frame:GetWidth() or c.width) + 0.5)
+    c.height = math.floor((frame:GetHeight() or 200) + 0.5)
+    local pt, _, _, x, yy = frame:GetPoint()
+    c.at = { pt, x, yy }
+    TR:Refresh()
+  end)
+  grip:SetScript("OnClick", function() c.height = nil; TR:Refresh() end)
+  grip:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:AddLine("Drag to resize", 1, 1, 1)
+    GameTooltip:AddLine("Right-click: fit the list again", 0.7, 0.7, 0.7)
+    GameTooltip:Show()
+  end)
+  grip:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  frame.grip = grip
+  frame:HookScript("OnSizeChanged", function()
+    body:SetWidth(math.max(50, (frame:GetWidth() or c.width) - 12))
+    TR:Thumb()
+  end)
 end
 
 local function refresh() Q.Throttle("tracker", 0.2, function() TR:Refresh() end) end
