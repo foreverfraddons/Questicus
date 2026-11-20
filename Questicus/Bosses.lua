@@ -208,11 +208,31 @@ local function run(area)
   end
   return r
 end
-function BT:Killed(area, name) return run(area).killed[name:lower()] == true end
+-- kills live in the current run (Runs.lua); a run is started for the dungeon when needed
+local function runFor(area)
+  local R = Q.Runs
+  local cur = R and R:Current()
+  if cur and cur.area == area and not cur.ended then return cur end
+end
+function BT:Killed(area, name)
+  if Q.Runs then return runFor(area) ~= nil and Q.Runs:Killed(name) end
+  return run(area).killed[name:lower()] == true
+end
+function BT:KillTime(area, name)
+  local cur = runFor(area)
+  local k = cur and cur.kills[name:lower()]
+  return k and k.t
+end
 function BT:SetKilled(area, name, v)
-  local r = run(area)
-  r.killed[name:lower()] = v or nil
-  r.t = time and time() or 0
+  if Q.Runs then
+    local shown = BT.shownE
+    if not runFor(area) and shown and shown.area == area then Q.Runs:Begin(shown) end
+    if v then Q.Runs:Kill(name, "hand") else Q.Runs:Unkill(name) end
+  else
+    local r = run(area)
+    r.killed[name:lower()] = v or nil
+    r.t = time and time() or 0
+  end
   BT:Refresh()
 end
 
@@ -291,9 +311,29 @@ function BT:Show(e)
     bar.count:SetPoint("RIGHT", bar.close, "LEFT", -6, 0)
     bar.reset = T.Button(bar, "New run", 70, 18)
     bar.reset:SetPoint("BOTTOMRIGHT", -8, 6)
+    bar.reset.tip = "Start a new run (the current one goes into the history)"
     bar.reset:SetScript("OnClick", function()
       Q.char.bossRun = nil
+      if Q.Runs then Q.Runs:NewRun() end
       BT:Refresh()
+    end)
+    -- history of runs (averages, loot, times)
+    bar.hist = T.Button(bar, "History", 70, 18)
+    bar.hist:SetPoint("RIGHT", bar.reset, "LEFT", -6, 0)
+    bar.hist.tip = "Your runs: completion time, gold, XP, loot (and who got it) and the averages"
+    bar.hist:SetScript("OnClick", function() if Q.Runs then Q.Runs:ShowHistory(bar.e and bar.e.area) end end)
+    -- this run: time, gold and XP
+    bar.stats = T.Text(bar, 11, T.c.text)
+    bar.stats:SetPoint("BOTTOMLEFT", 10, 9)
+    bar.stats:SetPoint("RIGHT", bar.hist, "LEFT", -6, 0)
+    bar.stats:SetJustifyH("LEFT")
+    bar.stats:SetWordWrap(false)
+    local acc = 0
+    bar:HookScript("OnUpdate", function(_, el)
+      acc = acc + (el or 0)
+      if acc < 1 then return end
+      acc = 0
+      BT:Stats()
     end)
     bar.none = T.Text(bar, 11, T.c.dim)
     bar.none:SetPoint("TOPLEFT", 12, -34)
@@ -318,6 +358,7 @@ function BT:Show(e)
     bar.title:SetWordWrap(false)
   end
   bar.e = e
+  BT.shownE = e
   bar.list = BT:List(e)
   BT.Front(bar)
   BT:Refresh()
@@ -342,10 +383,13 @@ local function lrow(i)
   r.tick:SetSize(16, 16)
   r.tick:SetPoint("CENTER", r.box, "CENTER", 1, 0)
   r.tick:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+  r.time = T.Text(r, 10, T.c.dim)
+  r.time:SetPoint("RIGHT", -2, 0)
   r.name = T.Text(r, 12, T.c.text)
   r.name:SetPoint("LEFT", r.box, "RIGHT", 6, 0)
-  r.name:SetPoint("RIGHT", -2, 0)
+  r.name:SetPoint("RIGHT", -40, 0)
   r.name:SetJustifyH("LEFT")
+  r.name:SetWordWrap(false)
   r:SetHighlightTexture("Interface\\Buttons\\WHITE8x8")
   local hl = r:GetHighlightTexture()
   if hl then hl:SetVertexColor(1, 1, 1, 0.06) end
@@ -368,20 +412,38 @@ local function lrow(i)
   return r
 end
 
+-- the run's line at the bottom: time (stops at the last boss), gold and XP made inside
+function BT:Stats()
+  if not (bar and bar.stats) then return end
+  local cur = Q.Runs and Q.Runs:Current()
+  if cur and bar.e and cur.area == bar.e.area and not cur.ended then
+    bar.stats:SetText((cur.done and c(T.HEX.good, "Cleared ") or "") .. Q.Runs:Summary(cur))
+  else
+    local av = Q.Runs and bar.e and Q.Runs:Averages(bar.e.area)
+    bar.stats:SetText(av and c(DIM, ("avg %s  %s  %d XP"):format(av.time and Q.Runs.Clock(av.time) or "-", Q.Runs.Money(av.gold), math.floor(av.xp))) or "")
+  end
+end
+Q:On("QC_RUN_CHANGED", function() if bar and bar:IsShown() then BT:Refresh() end end)
+
 function BT:Refresh()
   if not (bar and bar:IsShown() and bar.e) then return end
+  BT:Stats()
   local e, list = bar.e, bar.list or {}
   bar.title:SetText(Q.Color(T.HEX.accent, "Bosses") .. Q.Color(DIM, " - " .. e.name))
   if Q.db.bossLow then
     for _, s in ipairs(slots) do s:Hide() end
-    local done = 0
+    local done, nextShown = 0, false
     for i, b in ipairs(list) do
       local r = lrow(i)
       BT.lrowBoss[r] = b
       local dead = BT:Killed(e.area, b.name)
       if dead then done = done + 1 end
       r.tick:SetShown(dead)
-      r.name:SetText(dead and c(DIM, b.name) or b.name)
+      local kt = dead and BT:KillTime(e.area, b.name)
+      r.time:SetText(kt and Q.Runs.Clock(kt) or "")
+      if dead then r.name:SetText(c(DIM, b.name))
+      elseif not nextShown then nextShown = true; r.name:SetText(c(GOLD, b.name))   -- the next one to kill
+      else r.name:SetText(b.name) end
       r:ClearAllPoints()
       r:SetPoint("TOPLEFT", 10, -30 - (i - 1) * 19)
       r:SetPoint("RIGHT", bar, "RIGHT", -10, 0)
@@ -392,9 +454,9 @@ function BT:Refresh()
     bar.none:SetText(#list == 0 and "No boss data for this dungeon yet." or "")
     local w = 200
     for _, r in ipairs(lrows) do
-      if r:IsShown() and r.name.GetStringWidth then w = math.max(w, (r.name:GetStringWidth() or 0) + 44) end
+      if r:IsShown() and r.name.GetStringWidth then w = math.max(w, (r.name:GetStringWidth() or 0) + 84) end
     end
-    bar:SetWidth(math.min(340, math.max(260, w)))
+    bar:SetWidth(math.min(360, math.max(290, w)))
     bar:SetHeight(30 + math.max(1, #list) * 19 + 34)
     return
   end
@@ -419,7 +481,7 @@ function BT:Refresh()
   bar.count:SetText(#list > 0 and (done .. "/" .. #list) or "")
   bar.none:SetText(#list == 0 and "No boss data for this dungeon yet - bosses you fight here are added as you meet them." or "")
   local rows = math.max(1, math.ceil(#list / per))
-  bar:SetWidth(math.max(240, 16 + math.min(#list, per) * 56))
+  bar:SetWidth(math.max(300, 16 + math.min(#list, per) * 56))
   bar:SetHeight(30 + rows * 72 + 30)
 end
 
@@ -826,27 +888,7 @@ Q:On("ENCOUNTER_START", function(_, name)
   if e and type(name) == "string" and not Q.Secret(name) then record(e, nil, name) end
   bossUnits()
 end)
-local function killedName(name)
-  local e = BT:Current()
-  if not (e and type(name) == "string") or Q.Secret(name) then return end
-  for _, b in ipairs(BT:List(e)) do
-    if b.name:lower() == name:lower() then BT:SetKilled(e.area, b.name, true); return end
-  end
-end
-Q:On("ENCOUNTER_END", function(_, name, _, _, success) if success == 1 or success == true then killedName(name) end end)
-Q:On("BOSS_KILL", function(_, name) killedName(name) end)
--- a dead boss you target or loot
-local function deadTarget()
-  if not (UnitExists and UnitExists("target") and UnitIsDead and UnitIsDead("target")) then return end
-  local e = BT:Current()
-  if not e then return end
-  local nid, tname = npcOf(Q.UnitGUID("target")), Q.UnitName("target")
-  for _, b in ipairs(BT:List(e)) do
-    if (nid and b.nid == nid) or (tname and b.name == tname) then BT:SetKilled(e.area, b.name, true) end
-  end
-end
-Q:On("PLAYER_TARGET_CHANGED", deadTarget)
-Q:On("LOOT_OPENED", deadTarget)
+-- boss kills (boss events, deaths, corpses) are recorded by the run log (Runs.lua)
 -- (no combat log: WoW Forever forbids addons from registering COMBAT_LOG_EVENT_UNFILTERED)
 
 -- pop up inside a dungeon, and when the route's dungeon step comes up

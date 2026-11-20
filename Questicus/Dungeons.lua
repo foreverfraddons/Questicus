@@ -230,6 +230,8 @@ end
 
 -- your own clear times (learned) or an estimate from the number of mobs and bosses
 function DG:ClearTime(e)
+  local av = Q.Runs and Q.Runs:Averages(e.area)
+  if av and av.time then return av.time, av.timed end
   local runs = QuesticusCollect and QuesticusCollect.dclear and QuesticusCollect.dclear[e.area]
   if runs and #runs > 0 then
     local s = 0
@@ -327,6 +329,25 @@ function DG.DrawnMap(name, area)
   return f and f.tiles
 end
 
+-- no picture anywhere (Alcaz Prison): the piece of the zone's own map around the entrance
+function DG.ZoneTile(area)
+  if not (area and C_Map and C_Map.GetMapArtLayerTextures and C_Map.GetMapArtLayers) then return end
+  local ent = D:Entrance(area)[1]
+  local d = D:Dungeon(area)
+  local map, mx, my = ent and ent.m, ent and ent.mx, ent and ent.my
+  if not map and d and d[3] and d[3][1] then map, mx, my = d[3][1], d[3][2] / 1000, d[3][3] / 1000 end
+  if not (map and mx) then return end
+  local ok, layers = pcall(C_Map.GetMapArtLayers, map)
+  local L = ok and layers and layers[1]
+  local ok2, tex = pcall(C_Map.GetMapArtLayerTextures, map, 1)
+  if not (L and ok2 and tex and #tex > 0) then return end
+  local cols = math.ceil((L.layerWidth or 1002) / (L.tileWidth or 256))
+  local rows = math.ceil((L.layerHeight or 668) / (L.tileHeight or 256))
+  local cx = math.min(cols - 1, math.floor(mx * (L.layerWidth or 1002) / (L.tileWidth or 256)))
+  local cy = math.min(rows - 1, math.floor(my * (L.layerHeight or 668) / (L.tileHeight or 256)))
+  return tex[cy * cols + cx + 1]
+end
+
 -- (icon, background) textures for a dungeon
 function DG.Art(name)
   local j = journalArt()[name or ""]
@@ -342,6 +363,8 @@ end
 -- vendor price, for items the game has loaded)
 local function coin(lvl) return 0.025 * (lvl ^ 2.5) * 0.55 end   -- copper, the average kill (not all drop coins)
 function DG:GoldPerRun(e)
+  local av = Q.Runs and Q.Runs:Averages(e.area)
+  if av and av.gold > 0 then return av.gold, av.runs end
   local runs = QuesticusCollect and QuesticusCollect.dgold and QuesticusCollect.dgold[e.area]
   if runs and #runs > 0 then
     local sum = 0
@@ -511,7 +534,8 @@ function DG:Show()
     local active = Q.char.dmode == e.area
     local pic = DG.Art(e.name)
     local tiles = (pic == DG.CASTLE) and DG.DrawnMap(e.name, e.area)
-    r.pic:SetTexture(tiles and tiles[6] or pic)
+    local zt = (pic == DG.CASTLE and not tiles) and DG.ZoneTile(e.area)
+    r.pic:SetTexture((tiles and tiles[6]) or zt or pic)
     r.pic:SetDesaturated(not inRange)
     local total, doneN = #e.quests, 0
     for _, id in ipairs(e.quests) do if QS.done[id] then doneN = doneN + 1 end end
@@ -540,7 +564,7 @@ DG.qdata = {}
 local function qrow(i)
   local r = qrows[i]
   if r then return r end
-  r = CreateFrame("Button", nil, detail)
+  r = CreateFrame("Button", nil, detail.qbody)
   r.text = T.Text(r, 12, T.c.text)
   r.text:SetPoint("TOPLEFT", 4, -2)
   r.text:SetPoint("RIGHT", -74, 0)
@@ -550,6 +574,7 @@ local function qrow(i)
   r.chain:SetPoint("TOPLEFT", 16, -18)
   r.chain:SetPoint("RIGHT", -74, 0)
   r.chain:SetJustifyH("LEFT")
+  r.chain:SetWordWrap(false)                 -- one line (the tooltip has all of it)
   r.add = T.Button(r, "+ Route", 66, 18)
   r.add:SetPoint("TOPRIGHT", -2, 0)
   r:SetScript("OnEnter", function(self)
@@ -608,12 +633,13 @@ function DG:QuestRows(e, lv, textH)
     end)
     r:SetHeight(hgt)
     r:ClearAllPoints()
-    r:SetPoint("TOPLEFT", detail.text, "TOPLEFT", 0, -(textH + 4 + y))
-    r:SetPoint("RIGHT", detail, "RIGHT", -14, 0)
+    r:SetPoint("TOPLEFT", detail.qbody, "TOPLEFT", 0, -y)
+    r:SetPoint("RIGHT", detail.qbody, "RIGHT", 0, 0)
     r:Show()
     y = y + hgt + 2
   end
   for i = #sorted + 1, #qrows do qrows[i]:Hide(); DG.qdata[qrows[i]] = nil end
+  detail.qbody:SetHeight(math.max(1, y))
   return y
 end
 
@@ -636,6 +662,17 @@ function DG:ShowDungeon(e)
     detail.text:SetPoint("RIGHT", -14, 0)
     detail.text:SetJustifyH("LEFT")
     detail.text:SetSpacing(3)
+    -- the quests scroll in their own area between the details and the buttons
+    detail.qscroll = CreateFrame("ScrollFrame", nil, detail)
+    detail.qscroll:SetPoint("BOTTOMRIGHT", -12, 44)
+    detail.qbody = CreateFrame("Frame", nil, detail.qscroll)
+    detail.qbody:SetSize(410, 1)
+    detail.qscroll:SetScrollChild(detail.qbody)
+    if detail.qscroll.EnableMouseWheel then detail.qscroll:EnableMouseWheel(true) end
+    detail.qscroll:SetScript("OnMouseWheel", function(self, d)
+      local max = math.max(0, (detail.qbody:GetHeight() or 0) - (self:GetHeight() or 0))
+      self:SetVerticalScroll(math.max(0, math.min(max, (self:GetVerticalScroll() or 0) - d * 36)))
+    end)
     detail.go = T.Button(detail, "Get all quests", 140, 24)
     detail.go:SetPoint("BOTTOMRIGHT", -14, 12)
     detail.back = T.Button(detail, "All dungeons", 110, 24)
@@ -644,6 +681,10 @@ function DG:ShowDungeon(e)
     detail.bosses:SetPoint("RIGHT", detail.back, "LEFT", -8, 0)
     detail.bosses:SetScript("OnClick", function() if Q.Bosses and detail.e then Q.Bosses:Show(detail.e) end end)
     detail.back:SetScript("OnClick", function() detail:Hide(); DG:Show() end)
+    detail.hist = T.Button(detail, "Runs", 60, 24)
+    detail.hist:SetPoint("RIGHT", detail.bosses, "LEFT", -8, 0)
+    detail.hist.tip = "Your runs of this dungeon: times, gold, XP, loot and averages"
+    detail.hist:SetScript("OnClick", function() if Q.Runs and detail.e then Q.Runs:ShowHistory(detail.e.area) end end)
   end
   if list and list:IsShown() and detail.ClearAllPoints then
     detail:ClearAllPoints()
@@ -653,7 +694,9 @@ function DG:ShowDungeon(e)
   detail.title:SetText(Q.Color(T.HEX.accent, e.name))
   local icon, bg = DG.Art(e.name)
   local tiles = DG.DrawnMap(e.name, e.area)
-  detail.icon:SetTexture((icon == DG.CASTLE and tiles) and tiles[6] or icon)
+  local zt = (icon == DG.CASTLE and not tiles) and DG.ZoneTile(e.area)
+  detail.icon:SetTexture((icon == DG.CASTLE and tiles) and tiles[6] or zt or icon)
+  if not bg and not tiles and zt then bg = zt end
   DG.bannerTiles = DG.bannerTiles or {}
   local btiles = DG.bannerTiles
   for _, t in ipairs(btiles) do t:Hide() end
@@ -736,7 +779,12 @@ function DG:ShowDungeon(e)
   local h = (detail.text.GetStringHeight and detail.text:GetStringHeight()) or (#L * 17)
   if type(h) ~= "number" or h < #L * 10 then h = #L * 17 end
   local qh = DG:QuestRows(e, lv, h)
-  detail:SetHeight(math.min(900, 34 + 98 + h + qh + 56))
+  -- the window grows with the quests up to 300 px of them; more than that scroll
+  detail.qscroll:ClearAllPoints()
+  detail.qscroll:SetPoint("TOPLEFT", detail.text, "TOPLEFT", 0, -(h + 4))
+  detail.qscroll:SetPoint("BOTTOMRIGHT", detail, "BOTTOMRIGHT", -12, 44)
+  detail.qscroll:SetVerticalScroll(0)
+  detail:SetHeight(34 + 98 + h + math.min(qh, 300) + 8 + 48)
   local active = Q.char.dmode == e.area
   detail.go:SetText(active and "Stop dungeon mode" or "Get all quests")
   detail.go:SetShown(active or todo > 0)

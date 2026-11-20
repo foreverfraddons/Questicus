@@ -37,6 +37,7 @@ Zones.lua
 Tracker.lua
 Collection.lua
 Bosses.lua
+Runs.lua
 QuestItem.lua
 Marks.lua
 Waypoint.lua
