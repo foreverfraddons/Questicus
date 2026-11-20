@@ -5,6 +5,11 @@ move-folders:
 
 # The quest database ships as its own CurseForge project (ForeverDB). The map art (Questicus Maps,
 # from OpenMap) is copied into Questicus/Media/Textures by the release workflow before packaging.
+# patch notes for the CurseForge file: written by the release workflow from Questicus/Changelog.lua
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
 required-dependencies:
   - forever-db
 
@@ -13,5 +18,6 @@ ignore:
   - upstream.json
   - README.md
   - NOTICE.md
+  - CHANGELOG.md
   - .github
   - Questicus/dev

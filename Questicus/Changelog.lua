@@ -1,0 +1,86 @@
+-- Questicus: patch notes shown in game ("What's new") and on CurseForge.
+-- Newest first. Put changes for the coming release in the "next" entry: the release workflow
+-- (tools/changelog.py) turns "next" into the real version number and writes CHANGELOG.md from this file.
+-- Write for players: what was added, what changed, what was fixed - no code talk.
+local Q = Questicus
+Q.Changelog = {
+  { v = "next",
+    added = {
+      "Questicus now tells you when a newer version is out (it checks with guild and group members who use it).",
+      "Patch notes: after an update, the first time you log in you'll see what's new. Type /qc news to see them again.",
+    },
+  },
+  { v = "0.9.14",
+    fixed = {
+      "With escort quests turned off, escort quests (like Ringo in Un'Goro) no longer end up on your route.",
+    },
+  },
+  { v = "0.9.13",
+    changed = {
+      "The quest tracker's fold button sits in the far right corner, and the title bar stays put when you fold or unfold it.",
+    },
+  },
+  { v = "0.9.12",
+    fixed = {
+      "The route window remembers where you put it when you open it from Command Center or the minimap button.",
+    },
+  },
+  { v = "0.9.11",
+    changed = {
+      "The minimap button follows Command Center's minimap shape, and route lines fit square minimaps.",
+    },
+  },
+  { v = "0.9.10",
+    added = {
+      "The quest tracker can be resized (drag the corner, right-click it to fit) and scrolls when your quests don't fit.",
+      "The quest tracker can be folded down to its title bar.",
+    },
+  },
+  { v = "0.9.9",
+    fixed = {
+      "Boss portraits show the first time you open the boss tracker.",
+    },
+  },
+  { v = "0.9.8",
+    fixed = {
+      "The level and time-to-level text no longer overlaps the route window's title when the window is narrow.",
+    },
+  },
+  { v = "0.9.7",
+    changed = {
+      "Stat priority in the setup questions is now picked from a drop-down list.",
+    },
+  },
+  { v = "0.9.6",
+    added = {
+      "Dungeon run history: time, gold, XP and loot (and who got it) for every run, with averages. Type /qc runs.",
+      "Pictures for every dungeon in the list.",
+    },
+    changed = {
+      "Boss kills in your current run are tracked more reliably.",
+      "The quest list on a dungeon's page scrolls.",
+    },
+  },
+  { v = "0.9.5",
+    fixed = {
+      "The boss tracker's low profile mode no longer has text running into the buttons.",
+    },
+  },
+  { v = "0.9.4",
+    added = {
+      "Every WoW Forever dungeon is in the dungeon list, with its real bosses.",
+      "Low profile boss tracker - click a boss name for its loot.",
+      "The dungeon list shows how many of its quests you've done; finished dungeons turn green with a check.",
+      "Dungeon pages show the average gold per run and the state of each quest (done, ready to get, or needs a chain first), with a button to add a chain to your route.",
+      "All zones, including the new WoW Forever zones, are in the zone list.",
+    },
+    fixed = {
+      "Quest NPCs no longer show up in boss lists.",
+    },
+  },
+  { v = "0.9.3",
+    fixed = {
+      "The map pictures are included in the download again.",
+    },
+  },
+}

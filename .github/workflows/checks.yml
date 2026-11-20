@@ -17,6 +17,7 @@ jobs:
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq lua5.1 > /dev/null
           bad=0
+          python3 tools/changelog.py check || bad=1
           while IFS= read -r -d '' f; do luac5.1 -p "$f" || bad=1; done < <(find Questicus -name '*.lua' -print0)
           exit $bad
 

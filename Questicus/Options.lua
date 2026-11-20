@@ -107,6 +107,10 @@ local function build()
   mapb:SetPoint("BOTTOMLEFT", 262, 44)
   mapb.tip = "Questicus Maps: the stitched world map's own settings (also /qc map)"
   mapb:SetScript("OnClick", function() frame:Hide(); Q.MapSettings() end)
+  local news = T.Button(frame, "News", 50, 24)
+  news:SetPoint("BOTTOMRIGHT", -14, 44)
+  news.tip = "What's new: the patch notes for this version (also /qc news)"
+  news:SetScript("OnClick", function() Q.News:Show(nil) end)
   local patrol = T.Button(frame, "Record patrol", 110, 24)
   patrol:SetPoint("BOTTOMLEFT", 16, 44)
   patrol.tip = "Record the path of a mob that walks around (target it, then follow it). Shown as a line on the map."

@@ -42,6 +42,7 @@ jobs:
         if: steps.check.outputs.go == 'true'
         run: |
           python3 tools/sync_maps.py check
+          python3 tools/changelog.py check
           sudo apt-get update -qq && sudo apt-get install -y -qq lua5.1 > /dev/null
           bad=0
           while IFS= read -r -d '' f; do luac5.1 -p "$f" || bad=1; done < <(find Questicus -name '*.lua' -print0)
@@ -60,6 +61,10 @@ jobs:
           fi
           sed -i "s/^## Version:.*/## Version: $NEW/" Questicus/Questicus.toc
           sed -i "s/^Q.version = \".*\"/Q.version = \"$NEW\"/" Questicus/Core.lua
+          # patch notes: the "next" entry becomes this version (a maps-only release gets a map line)
+          MAPS=""
+          if [ -n "$LASTTAG" ] && ! git diff --quiet "v$LASTTAG" HEAD -- upstream.json 2>/dev/null; then MAPS="--maps"; fi
+          python3 tools/changelog.py stamp "$NEW" $MAPS
           git config user.name "questicus bot"
           git config user.email "actions@users.noreply.github.com"
           git commit -am "Release v$NEW" || true
@@ -78,7 +83,9 @@ jobs:
           du -sh Questicus/Media/Textures
           # the packager leaves out files git doesn't track: commit the art here (this commit is never
           # pushed - the repo stays small) and move the release tag onto it, so the package is still the release
-          git add -f Questicus/Media/Textures
+          python3 tools/changelog.py md "$(echo '${{ steps.ver.outputs.tag }}' | sed 's/^v//')" > CHANGELOG.md
+          cat CHANGELOG.md
+          git add -f Questicus/Media/Textures CHANGELOG.md
           git commit -qm "Questicus Maps art (OpenMap $TAG) - packaging only"
           git tag -f "${{ steps.ver.outputs.tag }}"
           git ls-files Questicus/Media/Textures | wc -l
