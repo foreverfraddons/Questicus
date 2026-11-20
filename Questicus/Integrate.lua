@@ -144,6 +144,15 @@ function Q.FitQuestSearch()
   if not (l and r and edge) then return end
   local reach, stop = rightExtent(box)
   local limit = math.min(edge, stop and (stop - 3) or edge)
+  -- the game gives it its right width while there's text in it (seen in game): kept, and used when empty
+  local typed = box.GetText and box:GetText() or ""
+  if typed ~= "" then
+    local w = box:GetWidth()
+    if w and w >= 80 and r <= limit + 2 then Q.db.questSearchW = math.floor(w + 0.5) end
+    return
+  end
+  local good = Q.db.questSearchW
+  if good and good >= 80 and l + good + reach <= limit + 2 then limit = l + good + reach + 2 end
   local want = math.floor(limit - l - reach - 2)
   if want < 80 then return end
   -- only when it runs past the quest list or under a button (the game's own width otherwise stands)
@@ -167,6 +176,8 @@ local function hookSearch()
   hooksecurefunc(box, "SetSize", Q.FitQuestSearch)
   hooksecurefunc(box, "SetPoint", Q.FitQuestSearch)
   box:HookScript("OnShow", Q.FitQuestSearch)
+  box:HookScript("OnTextChanged", function() Q.After(0, Q.FitQuestSearch) end)
+  box:HookScript("OnEditFocusLost", function() Q.After(0, Q.FitQuestSearch) end)
   box:HookScript("OnSizeChanged", Q.FitQuestSearch)
   if qm then qm:HookScript("OnShow", Q.FitQuestSearch); qm:HookScript("OnSizeChanged", Q.FitQuestSearch) end
   if WorldMapFrame then WorldMapFrame:HookScript("OnSizeChanged", Q.FitQuestSearch) end
@@ -174,8 +185,24 @@ local function hookSearch()
 end
 Q:On("PLAYER_LOGIN", function() Q.After(2, hookSearch) end)
 Q:On("PLAYER_REGEN_ENABLED", function() Q.After(0.2, Q.FitQuestSearch) end)
+local captured = {}
+local function capture(tag)
+  if captured[tag] or not Q.db then return end
+  captured[tag] = true
+  local ok = pcall(function() SlashCmdList.QUESTICUS("questlogdebug quiet " .. tag) end)
+end
+Q:On("PLAYER_LOGIN", function()
+  Q.After(3, function()
+    local box = searchBox()
+    if not box then return end
+    box:HookScript("OnShow", function() Q.After(1, function() capture("open") end) end)
+    box:HookScript("OnTextChanged", function(b) if b:GetText() ~= "" then Q.After(0.5, function() capture("typed") end) end end)
+  end)
+end)
+
 -- /qc questlogdebug: the search box's row (its anchors, its neighbours' places) saved for a bug report
-Q:Command("questlogdebug", "save the world map quest log's search bar layout (for a bug report)", function()
+Q:Command("questlogdebug", "save the world map quest log's search bar layout (for a bug report)", function(arg)
+  local quiet, tag = tostring(arg or ""):match("^(quiet)%s*(%S*)")
   local box = searchBox()
   if not box then Q:Print("no quest log search box found"); return end
   local function name(f) return f and (f.GetDebugName and f:GetDebugName() or f.GetName and f:GetName()) or tostring(f) end
@@ -194,6 +221,11 @@ Q:Command("questlogdebug", "save the world map quest log's search bar layout (fo
   if sc then out[#out + 1] = "scroll: " .. desc(sc) end
   if _G.QuestMapFrame then out[#out + 1] = "questmap: " .. desc(_G.QuestMapFrame) end
   for _, c in ipairs({ box:GetParent():GetChildren() }) do if c ~= box then out[#out + 1] = "kid: " .. desc(c) end end
-  Q.db.uiDebug = out
-  Q:Print("saved - /reload (or log out) so it's written to disk")
+  local qm = _G.QuestMapFrame
+  if qm then for _, c in ipairs({ qm:GetChildren() }) do out[#out + 1] = "qmkid: " .. desc(c) end end
+  local qf = qm and qm.QuestsFrame
+  if qf and qf ~= box:GetParent() then for _, c in ipairs({ qf:GetChildren() }) do out[#out + 1] = "qfkid: " .. desc(c) end end
+  Q.db.uiDebug = Q.db.uiDebug or {}
+  Q.db.uiDebug[(tag and tag ~= "") and tag or "manual"] = out
+  if not quiet then Q:Print("saved - /reload (or log out) so it's written to disk") end
 end)

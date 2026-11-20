@@ -170,6 +170,15 @@ function PN:FixLevel()
   local lvl = (canvas:GetFrameLevel() or 1) + 2500
   local OMA = PN.openMap and (_G.QuesticusMapAPI or _G.OpenMapAPI)
   if OMA then lvl = math.max(lvl, (tonumber(OMA.ArtTopLevel()) or 0) + 20) end
+  -- Questicus Maps' own icons (its waypoint marker among them, up to 5 over its icon level) are on a
+  -- layer of the map's view, not the canvas: over those too
+  if OMA and WorldMapFrame.GetPinFrameLevelsManager then
+    local okM, fl = pcall(WorldMapFrame.GetPinFrameLevelsManager, WorldMapFrame)
+    if okM and fl and fl.GetValidFrameLevel then
+      local okL, il = pcall(fl.GetValidFrameLevel, fl, "PIN_FRAME_LEVEL_QUESTICUSMAP_ICONS")
+      if okL and tonumber(il) then lvl = math.max(lvl, il + 8) end
+    end
+  end
   eachWaypointPin(function(pin)
     local pl = pin.GetFrameLevel and pin:GetFrameLevel() or 0
     if pl >= lvl and pl + 10 <= MAX_LEVEL then lvl = pl + 10 end
