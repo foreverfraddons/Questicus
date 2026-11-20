@@ -7,10 +7,18 @@ Q.Minimap = MM
 local btn
 
 local function place()
-  local a = math.rad(Q.db.minimap.angle or 200)
-  local r = (Minimap:GetWidth() / 2) + 10
+  if not btn then return end
+  local deg = Q.db.minimap.angle or 200
+  local CC = _G.CommandCenter
+  local x, y
+  if CC and CC.MinimapEdge then
+    x, y = CC.MinimapEdge(deg, 10)   -- Command Center's minimap: follows its shape (square / rounded / round)
+  else
+    local a, r = math.rad(deg), (Minimap:GetWidth() / 2) + 10
+    x, y = math.cos(a) * r, math.sin(a) * r
+  end
   btn:ClearAllPoints()
-  btn:SetPoint("CENTER", Minimap, "CENTER", math.cos(a) * r, math.sin(a) * r)
+  btn:SetPoint("CENTER", Minimap, "CENTER", x, y)
 end
 
 local function dragUpdate()
@@ -62,6 +70,8 @@ local function build()
     GameTooltip:Show()
   end)
   btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  local CC = _G.CommandCenter
+  if CC and CC.OnMinimapChange then CC:OnMinimapChange(place) end
   place()
 end
 

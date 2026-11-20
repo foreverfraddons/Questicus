@@ -789,7 +789,9 @@ local function minimapXY(here, pt, clamp)
     local c, s = math.cos(f), math.sin(f)
     ex, ny = ex * c - ny * s, ex * s + ny * c
   end
-  local dist = math.sqrt(ex * ex + ny * ny)
+  -- square minimaps (Command Center's minimap look, other minimap addons) also show the corners
+  local square = GetMinimapShape and GetMinimapShape() == "SQUARE"
+  local dist = square and math.max(math.abs(ex), math.abs(ny)) or math.sqrt(ex * ex + ny * ny)
   if dist > radius then
     if not clamp then return end
     ex, ny = ex / dist * radius * 0.95, ny / dist * radius * 0.95
