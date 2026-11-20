@@ -424,6 +424,10 @@ local function build()
   frame.zn:SetScript("OnLeave", function(self) self.icon:SetAlpha(0.75); GameTooltip:Hide() end)
   frame.lvl = T.Text(frame.bar, 11, T.c.dim)
   frame.lvl:SetPoint("RIGHT", frame.zn, "LEFT", -6, 0)
+  -- between the title and the buttons: when the window is narrow it shortens (never runs over the title)
+  frame.lvl:SetPoint("LEFT", frame.title, "RIGHT", 8, 0)
+  frame.lvl:SetJustifyH("RIGHT")
+  frame.lvl:SetWordWrap(false)
   frame.xp = T.Bar(frame, (g.w or WIDTH) - 8, 3)
   frame.xp:SetPoint("TOPLEFT", 4, -26)
   frame.xp:SetPoint("TOPRIGHT", -4, -26)
@@ -605,6 +609,7 @@ local function build()
   frame.grip = grip
   frame:HookScript("OnSizeChanged", function(self, w)
     if self.sizing == true then GD:Layout() end
+    Q.Throttle("guideHeader", 0.1, function() GD:Refresh() end)
   end)
 
   frame.foot = T.Text(frame, 10, T.c.dim)
@@ -682,8 +687,12 @@ function GD:Refresh()
   local lv = Q.player.level
   local xp, max = UnitXP and UnitXP("player") or 0, UnitXPMax and UnitXPMax("player") or 1
   local ttl = Q.Details and Q.Details:TimeToLevel()
-  frame.lvl:SetText(("Level %d  %d%%"):format(lv, math.floor(xp / math.max(1, max) * 100)) ..
-    (ttl and ("  -  " .. ttl .. " to " .. (lv + 1)) or ""))
+  local w = frame:GetWidth() or WIDTH
+  local full = ("Level %d  %d%%"):format(lv, math.floor(xp / math.max(1, max) * 100)) ..
+    (ttl and ("  -  " .. ttl .. " to " .. (lv + 1)) or "")
+  -- narrow window: just the level and %, then only the %
+  frame.lvl:SetText(w >= 330 and full or (w >= 280 and ("Lv %d  %d%%"):format(lv, math.floor(xp / math.max(1, max) * 100))
+    or ("%d%%"):format(math.floor(xp / math.max(1, max) * 100))))
   frame.xp:SetValue(xp / math.max(1, max))
   if GD.focus > #steps then GD.focus = 1 end
   local s = steps[GD.focus]
