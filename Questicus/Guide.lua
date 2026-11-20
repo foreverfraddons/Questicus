@@ -356,6 +356,13 @@ end
 local function build()
   local g = Q.db.guide
   frame = T.Window("QuesticusGuide", g.w or WIDTH, g.h or 200, "Questicus", g)
+  -- a spot you've put it in stays: Command Center's dock opens it there instead of out of its icon
+  -- (ccOwnSpot), and the minimap button / commands bring it back there
+  if g.at then frame.ccOwnSpot = true end
+  frame.bar:HookScript("OnDragStop", function()
+    frame.ccOwnSpot = true
+    frame.__fromDock = nil
+  end)
   frame:SetScale(g.scale or 1)
   frame.title:SetText(Q.Color(T.HEX.accent, "Questicus"))
   -- broom: clean up the quest log (quests not in the route, leftover quest items)
@@ -596,6 +603,7 @@ local function build()
     g.w, g.h = math.floor(frame:GetWidth() + 0.5), math.floor(frame:GetHeight() + 0.5)
     local p, _, _, x, y = frame:GetPoint()
     g.at = { p, x, y }
+    frame.ccOwnSpot = true
     GD:Refresh()
   end)
   grip:SetScript("OnClick", function() GD:ResetSize() end)
@@ -868,6 +876,13 @@ function Q:ShowGuide()
     return
   end
   if not frame then build() end
+  local g = Q.db.guide
+  if g.at and not frame:IsShown() then
+    frame:ClearAllPoints()
+    frame:SetPoint(g.at[1], UIParent, g.at[1], g.at[2], g.at[3])
+    frame.ccOwnSpot = true
+    frame.__fromDock = nil
+  end
   frame:Show()
   GD:Refresh()
 end
