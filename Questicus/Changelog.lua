@@ -4,7 +4,8 @@
 -- Write for players: what was added, what changed, what was fixed - no code talk.
 local Q = Questicus
 Q.Changelog = {
-  { v = "next",
+  { v = "next" },
+  { v = "0.9.20",
     fixed = {
       "The quest log's search bar on the world map no longer flickers or covers the buttons beside it.",
     },
