@@ -15,6 +15,25 @@ local function zoneName(map)
   return (info and info.name) or ("Zone " .. tostring(map))
 end
 
+-- every questing zone of the world (ForeverDB's zone table, Questicus Maps' level table and WoW Forever's
+-- new zones), with its level range; zones for your level first. [uiMap] = { lo, hi }
+Z.FOREVER = {
+  [2521] = { 1, 12 },    -- Zephras Isle (Skyborne start)
+  [2548] = { 35, 45 },   -- The Riverglades
+  [2652] = { 40, 53 },   -- Shen'dralas (sources say 40-45 or 45-53)
+  [2482] = { 58, 60 },   -- Mount Hyjal (level 60)
+}
+local CITY = { [1453] = true, [1454] = true, [1455] = true, [1456] = true, [1457] = true, [1458] = true }
+function Z.Ranges()
+  local out = {}
+  local spf = D.db and D.db.spf
+  for map, z in pairs((spf and spf.Zones) or {}) do out[map] = { z.low, z.high } end
+  local ML = _G.QuesticusMap and _G.QuesticusMap.MapLevels
+  for map, r in pairs(ML or {}) do out[map] = out[map] or { r[1], r[2] } end
+  for map, r in pairs(Z.FOREVER) do out[map] = out[map] or { r[1], r[2] } end
+  return out
+end
+
 -- zones with quests in your level range (and the ones your log quests are in), with counts
 function Z:List()
   local lv = Q.player.level or 1
@@ -33,9 +52,20 @@ function Z:List()
   end
   local off = Q.char.zoneOff or {}
   for z in pairs(off) do count[z] = count[z] or 0 end
+  local ranges = Z.Ranges()
+  for z in pairs(ranges) do if not CITY[z] then count[z] = count[z] or 0 end end
   local out = {}
-  for z, n in pairs(count) do out[#out + 1] = { map = z, name = zoneName(z), n = n, log = inLog[z] or 0 } end
-  table.sort(out, function(a, b) return a.name < b.name end)
+  for z, n in pairs(count) do
+    local r = ranges[z]
+    local fits = (n > 0) or (inLog[z] or 0) > 0 or (r and lv >= r[1] - 2 and lv <= r[2] + 2)
+    out[#out + 1] = { map = z, name = zoneName(z), n = n, log = inLog[z] or 0, lo = r and r[1], hi = r and r[2],
+      fits = fits and true or false, new = Z.FOREVER[z] ~= nil }
+  end
+  table.sort(out, function(a, b)
+    if a.fits ~= b.fits then return a.fits end
+    if (a.lo or 99) ~= (b.lo or 99) then return (a.lo or 99) < (b.lo or 99) end
+    return a.name < b.name
+  end)
   return out
 end
 
@@ -81,14 +111,17 @@ function Z:Refresh()
     r.box:SetTexture("Interface\\Buttons\\WHITE8x8")
     r.box:SetVertexColor(0.12, 0.1, 0.08, 1)
     r.tick:SetShown(on)
-    r.name:SetText(on and z.name or Q.Color(T.HEX.dim, z.name .. "  (off)"))
-    r.n:SetText(z.n .. " quest" .. (z.n == 1 and "" or "s") .. (z.log > 0 and ("  - " .. z.log .. " in your log") or ""))
+    local lvl = z.lo and Q.Color(T.HEX.dim, (" %d-%d"):format(z.lo, z.hi)) or ""
+    local nm = z.name .. (z.new and Q.Color(T.HEX.good, " new") or "")
+    r.name:SetText((on and (z.fits and nm or Q.Color(T.HEX.dim, z.name)) or Q.Color(T.HEX.dim, z.name .. "  (off)")) .. lvl)
+    r.n:SetText((z.n > 0 and (z.n .. " quest" .. (z.n == 1 and "" or "s")) or "") .. (z.log > 0 and ("  - " .. z.log .. " in your log") or ""))
+    if i > 1 and list[i - 1].fits and not z.fits then y = y + 14 end     -- a gap before the zones for other levels
     r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y); r:SetPoint("RIGHT", 0, 0); r:Show()
     y = y + 20
   end
   for i = #list + 1, #rows do rows[i]:Hide() end
   win.body:SetHeight(math.max(1, y))
-  win:SetHeight(math.min(700, 62 + y + 40))
+  win:SetHeight(math.min(640, 62 + y + 40))
   return list
 end
 
@@ -98,11 +131,18 @@ function Z:Show()
     win.note = T.Text(win, 11, T.c.dim)
     win.note:SetPoint("TOPLEFT", 14, -32)
     win.note:SetPoint("RIGHT", -14, 0)
-    win.note:SetText("Untick a zone to keep its quests off your route.")
-    win.body = CreateFrame("Frame", nil, win)
-    win.body:SetPoint("TOPLEFT", 8, -52)
-    win.body:SetPoint("RIGHT", -8, 0)
-    win.body:SetHeight(1)
+    win.note:SetText("Untick a zone to keep its quests off your route. Zones for your level first.")
+    win.scroll = CreateFrame("ScrollFrame", nil, win)
+    win.scroll:SetPoint("TOPLEFT", 8, -52)
+    win.scroll:SetPoint("BOTTOMRIGHT", -8, 38)
+    win.body = CreateFrame("Frame", nil, win.scroll)
+    win.body:SetSize(344, 1)
+    win.scroll:SetScrollChild(win.body)
+    if win.scroll.EnableMouseWheel then win.scroll:EnableMouseWheel(true) end
+    win.scroll:SetScript("OnMouseWheel", function(self, d)
+      local max = math.max(0, (win.body:GetHeight() or 0) - (self:GetHeight() or 0))
+      self:SetVerticalScroll(math.max(0, math.min(max, (self:GetVerticalScroll() or 0) - d * 40)))
+    end)
     win.all = T.Button(win, "All zones on", 110, 20)
     win.all:SetPoint("BOTTOMRIGHT", -12, 10)
     win.all:SetScript("OnClick", function()

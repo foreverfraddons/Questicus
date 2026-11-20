@@ -1499,6 +1499,7 @@ end
 function P.QuestDungeon(id)
   local c = dqCache[id]
   if c ~= nil then return c or nil end
+  if Q.Dungeons and Q.Dungeons.Extras then Q.Dungeons.Extras() end
   local info = QS:Info(id)
   local x = (info and info.x) or D:QuestExtra(id) or {}
   local a = info and info.dungeon
@@ -1511,6 +1512,10 @@ function P.QuestDungeon(id)
       local srcs = D:ItemSources(it)
       if srcs[1] and not srcs[1].vendor then a = keyDungeon(srcs[1].key) end
     end
+    -- WoW Forever's newest dungeons (Questicus Maps' boss lists): a quest to kill one of their bosses
+    if not a and Q.Dungeons and Q.Dungeons.bossArea then
+      for _, cId in ipairs(x[8] or {}) do a = a or Q.Dungeons.bossArea[cId] end
+    end
     if a and D.RAID_AREA[a] then a = nil end
   end
   dqCache[id] = a or false
@@ -1519,6 +1524,7 @@ end
 -- dungeon area -> quests of it this character can do (built once per quest pool)
 function P.DungeonIndex()
   if P.dIdx and P.dIdxPool == QS.pool then return P.dIdx end
+  if Q.Dungeons and Q.Dungeons.Extras then Q.Dungeons.Extras() end
   local idx = {}
   for _, id in ipairs(QS.pool or {}) do
     local a = P.QuestDungeon(id)

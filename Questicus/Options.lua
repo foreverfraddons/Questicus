@@ -13,7 +13,7 @@ local function scaleRow(parent, text, get, set, y)
 end
 
 local function build()
-  frame = T.Window("QuesticusOptions", 440, 920, "Questicus options", nil)
+  frame = T.Window("QuesticusOptions", 440, 944, "Questicus options", nil)
   frame:SetFrameStrata("DIALOG")
   local db, pr = Q.db, function() return Q.prefs end
   local w = {}
@@ -38,6 +38,8 @@ local function build()
   check("Minimap pins", function() return db.pins.minimap end, function(v) db.pins.minimap = v end)
   check("Boss tracker in dungeons", function() return db.bossTracker ~= false end,
     function(v) db.bossTracker = v end, "Pops up inside a dungeon (and when the route's dungeon step comes up): boss portraits, fights, loot, ticked off as you kill them.")
+  check("Boss tracker: low profile (just the names)", function() return db.bossLow == true end,
+    function(v) db.bossLow = v; if Q.Bosses then Q.Bosses:Refresh() end end, "A plain list of the bosses, ticked off as you kill them. Click a name for its loot.")
   check("Route lines on the minimap", function() return db.pins.mmRoute ~= false end,
     function(v) db.pins.mmRoute = v end, "Draws your next steps as lines on the minimap, and the patrol paths of the mobs you're after.")
   check("Quest objectives on the map (like Questie)", function() return db.pins.objectives ~= false end,

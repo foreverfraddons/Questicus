@@ -16,6 +16,7 @@ local function mins(sec) sec = math.floor((sec or 0) / 60 + 0.5); return sec >= 
 local info
 local function mobsOf()
   if info then return info end
+  DG.Extras()
   info = {}
   local DB = D.db
   local function add(area, key, count)
@@ -31,7 +32,7 @@ local function mobsOf()
     if rank == 1 or rank == 2 then e.elites = e.elites + count end
     -- bosses: boss rank, or a named elite with a single spawn
     if rank == 3 or ((rank == 1 or rank == 2) and count == 1) then e.bosses[#e.bosses + 1] = { n[1], hi, nid } end
-    e.xpw[#e.xpw + 1] = { hi, count, rank, lo }
+    e.xpw[#e.xpw + 1] = { hi, count, rank, lo, nid }
   end
   for key, groups in pairs(DB.spw or {}) do
     if key:sub(1, 1) == "c" then
@@ -76,13 +77,104 @@ DG.FOREVER = {
   ["Ruins of Lordaeron"] = { 15, 20, "Ruins above the Undercity, Tirisfal Glades" },
   ["Excavation Site: Wetlands"] = { 24, 29, "Above Whelgar's Excavation, Wetlands" },
   ["City of Dalaran"] = { 28, 33, "Alterac Mountains" },
-  ["The Drowned City"] = { 35, 40 }, ["Krol'dok Stronghold"] = { 40, 45 }, ["Alcaz Prison"] = { 48, 53 },
-  ["Blackmaw Hold"] = { 55, 60 }, ["Shaper's Terrace"] = { 58, 60 },
+  ["The Drowned City"] = { 35, 42, "The Vile Reef, Stranglethorn Vale" }, ["Krol'dok Stronghold"] = { 40, 47, "The Riverglades" },
+  ["Alcaz Prison"] = { 48, 55, "Alcaz Island, Dustwallow Marsh" }, ["Blackmaw Hold"] = { 55, 60, "Azshara" },
+  ["Shaper's Terrace"] = { 58, 60, "Un'Goro Crater" },
 }
+-- ------------------------------------------------------------------ Questicus Maps' place data
+-- The map (WorldMap\Data\Forever\Places.lua) knows every dungeon in the game's tables: entrance,
+-- Group Finder levels and the bosses in the game's order - WoW Forever's own dungeons included.
+-- Used for the boss lists (only real bosses, no quest NPCs) and for dungeons ForeverDB doesn't have yet.
+local function norm(n)
+  n = (n or ""):lower():gsub("^the ", ""):gsub("[^%w]", "")
+  return n
+end
+DG.ALIAS = { stormwindstockade = "stockade", templeofatalhakkar = "sunkentemple", deadmines = "deadmines",
+  lowerblackrockspire = "blackrockspire", upperblackrockspire = "blackrockspire" }
+local function key(n) n = norm(n); return DG.ALIAS[n] or n end
+DG.Key = key
+local places
+-- [instance mapID] = { id, name, lo, hi, raid, bosses = {...}, map, mx, my | i, x, y }, plus .byKey[key] = entry
+function DG.Places()
+  if places then return places end
+  local MP = _G.QuesticusMap and _G.QuesticusMap.MapPlaces
+  places = { byKey = {} }
+  if not MP then return places end
+  for _, inst in ipairs(MP.instances or {}) do
+    for _, d in ipairs(inst[4] or {}) do
+      local id, name = d[1], d[2]
+      local e = places[id]
+      if not e then
+        e = { id = id, name = name, lo = d[4], hi = d[5], raid = d[3], bosses = (MP.bosses or {})[id] or {} }
+        if inst[1] then e.i, e.x, e.y = inst[1], inst[2], inst[3] else e.map, e.mx, e.my = inst.map, inst[2], inst[3] end
+        places[id] = e
+      else
+        e.lo, e.hi = math.min(e.lo or 99, d[4] or 99), math.max(e.hi or 0, d[5] or 0)   -- wings: the whole range
+      end
+      places.byKey[key(name)] = places.byKey[key(name)] or e
+      local base = name:match("^(.-) %- ")                    -- "Scarlet Monastery - Library" -> the dungeon
+      if base then places.byKey[key(base)] = places.byKey[key(base)] or e end
+    end
+  end
+  return places
+end
+-- the place entry for a dungeon (by its instance map, else its name)
+local areaInstance
+function DG.PlaceOf(area, name)
+  local pl = DG.Places()
+  if not areaInstance then
+    areaInstance = {}
+    for inst, a in pairs(D.INSTANCE_AREA) do areaInstance[a] = inst end
+  end
+  local inst = areaInstance[area] or (type(area) == "number" and area < 0 and -area) or nil
+  return (inst and pl[inst]) or pl.byKey[key(name)]
+end
+-- the real bosses of a dungeon, in the game's order (nil when the map has no list for it)
+function DG.BossNames(e)
+  local p = e and DG.PlaceOf(e.area, e.name)
+  if p and p.bosses and #p.bosses > 0 then return p.bosses end
+end
+-- dungeons the map knows that ForeverDB doesn't (yet): added as area -mapID, with their entrance, and
+-- their bosses' quests (a quest that has one of its bosses as an objective is that dungeon's)
+local extrasDone
+DG.bossArea = {}
+function DG.Extras()
+  if extrasDone then return end
+  local pl = DG.Places()
+  if not D:Ready() then return end
+  extrasDone = true
+  local have = {}
+  for _, a in pairs(D.INSTANCE_AREA) do local d = D:Dungeon(a); if d then have[key(d[1])] = a end end
+  for a, d in pairs(D.db.dng or {}) do if not D.RAID_AREA[a] then have[key(d[1])] = have[key(d[1])] or a end end
+  for id, p in pairs(pl) do
+    if type(id) == "number" and not p.raid then
+      local k = key(p.name)
+      -- WoW Forever dungeons ForeverDB has by area: their instance map too (spawns inside, the boss tracker)
+      if have[k] and not D.INSTANCE_AREA[id] and DG.FOREVER[(D:Dungeon(have[k]) or {})[1] or ""] then D.INSTANCE_AREA[id] = have[k] end
+      if not have[k] and not D.INSTANCE_AREA[id] then
+        local area = -id
+        local spots = {}
+        if p.map then spots = { p.map, math.floor(p.mx * 1000 + 0.5), math.floor(p.my * 1000 + 0.5) }
+        elseif p.i then
+          local m, mx, my = D:MapPos({ i = p.i, x = p.x, y = p.y })
+          if m then spots = { m, math.floor(mx * 1000 + 0.5), math.floor(my * 1000 + 0.5) } end
+        end
+        D.EXTRA_DNG[area] = { p.name, nil, spots }
+        D.INSTANCE_AREA[id] = area
+        have[k] = true
+        for _, bn in ipairs(p.bosses or {}) do
+          for _, nid in ipairs(D:NPCByName(bn) or {}) do DG.bossArea[nid] = area end
+        end
+      end
+    end
+  end
+end
+
 local isInstance = {}
-for _, a in pairs(D.INSTANCE_AREA) do isInstance[a] = true end
 local listCache, listKey
 function DG:List()
+  DG.Extras()
+  for _, a in pairs(D.INSTANCE_AREA) do isInstance[a] = true end
   local idx = P.DungeonIndex()
   local key = tostring(QS.pool) .. ":" .. (QS.logCount or 0) .. ":" .. (Q.player.level or 0)
   if listCache and listKey == key then return listCache end
@@ -119,13 +211,18 @@ function DG:List()
     end
     local lo = (fv and fv[1]) or ((m and m.lo < 999) and m.lo) or (qlo < 999 and qlo) or nil
     local hi = (fv and fv[2]) or ((m and m.hi > 0) and m.hi) or (qhi > 0 and qhi) or nil
-    local e = { area = area, name = d[1], lo = lo, hi = hi, quests = qs, mobs = m, forever = fv ~= nil, where = fv and fv[3] }
+    local pl = DG.PlaceOf(area, d[1])
+    if pl and not (m and m.fromSpawns) then lo, hi = pl.lo or lo, pl.hi or hi end
+    if pl and fv then lo, hi = pl.lo or lo, pl.hi or hi end      -- the game's Group Finder levels
+    local e = { area = area, name = d[1], lo = lo, hi = hi, quests = qs, mobs = m, forever = fv ~= nil or area < 0,
+      where = fv and fv[3], instance = pl and pl.id }
     byName[d[1]] = e
     out[#out + 1] = e
   end
   for _, area in pairs(D.INSTANCE_AREA) do add(area) end
   for area in pairs(idx) do add(area) end
   for area, d in pairs(D.db.dng or {}) do if DG.FOREVER[d[1]] then add(area) end end
+  for area in pairs(D.EXTRA_DNG) do add(area) end
   table.sort(out, function(a, b) return (a.lo or 99) < (b.lo or 99) or ((a.lo or 99) == (b.lo or 99) and a.name < b.name) end)
   listCache, listKey = out, key
   return out
@@ -171,10 +268,10 @@ end
 -- icon, else a castle
 DG.LFG = {
   ["Ragefire Chasm"] = "RagefireChasm", ["The Deadmines"] = "Deadmines", ["Deadmines"] = "Deadmines",
-  ["Wailing Caverns"] = "WailingCaverns", ["Shadowfang Keep"] = "ShadowFang", ["Blackfathom Deeps"] = "BlackfathomDeeps",
-  ["The Stockade"] = "Stockade", ["Stormwind Stockade"] = "Stockade", ["Gnomeregan"] = "Gnomeregan",
+  ["Wailing Caverns"] = "WailingCaverns", ["Shadowfang Keep"] = "ShadowFangKeep", ["Blackfathom Deeps"] = "BlackfathomDeeps",
+  ["The Stockade"] = "StormwindStockades", ["Stormwind Stockade"] = "StormwindStockades", ["Gnomeregan"] = "Gnomeregan",
   ["Razorfen Kraul"] = "RazorfenKraul", ["Scarlet Monastery"] = "ScarletMonastery", ["Razorfen Downs"] = "RazorfenDowns",
-  ["Uldaman"] = "Uldaman", ["Zul'Farrak"] = "ZulFarrak", ["Maraudon"] = "Maraudon", ["Sunken Temple"] = "SunkenTemple",
+  ["Uldaman"] = "Uldaman", ["Zul'Farrak"] = "ZulFarak", ["Maraudon"] = "Maraudon", ["Sunken Temple"] = "SunkenTemple",
   ["The Temple of Atal'Hakkar"] = "SunkenTemple", ["Blackrock Depths"] = "BlackrockDepths",
   ["Blackrock Spire"] = "BlackrockSpire", ["Lower Blackrock Spire"] = "BlackrockSpire", ["Upper Blackrock Spire"] = "BlackrockSpire",
   ["Dire Maul"] = "DireMaul", ["Scholomance"] = "Scholomance", ["Stratholme"] = "Stratholme",
@@ -201,13 +298,157 @@ local function journalArt()
   end)
   return journal
 end
+-- the Group Finder's own picture names (GetLFGDungeonInfo's textureFilename): the client's real files,
+-- WoW Forever's dungeons included when the client has them
+local lfgTex
+local function lfgArt()
+  if lfgTex then return lfgTex end
+  lfgTex = {}
+  if not GetLFGDungeonInfo then return lfgTex end
+  for id = 1, 3200 do
+    local ok, name, _, _, _, _, _, _, _, _, _, tex = pcall(GetLFGDungeonInfo, id)
+    if ok and type(name) == "string" and type(tex) == "string" and tex ~= "" then
+      local k = DG.Key(name)
+      if not lfgTex[k] then lfgTex[k] = tex end
+      local base = name:match("^(.-) %- ") or name:match("^(.-) %(")
+      if base and not lfgTex[DG.Key(base)] then lfgTex[DG.Key(base)] = tex end
+    end
+  end
+  return lfgTex
+end
+-- WoW Forever's dungeons the game has no picture for: their map, drawn for Questicus Maps (12 tiles, 4 x 3)
+function DG.DrawnMap(name, area)
+  local M = _G.QuesticusMap
+  local drawn = M and M.MapDungeonDrawn
+  if not drawn then return end
+  local p = DG.PlaceOf(area, name)
+  local floors = (p and drawn[p.id]) or drawn[name or ""]
+  local f = floors and floors[1]
+  return f and f.tiles
+end
+
 -- (icon, background) textures for a dungeon
 function DG.Art(name)
   local j = journalArt()[name or ""]
-  local lfg = DG.LFG[name or ""]
+  local lfg = lfgArt()[DG.Key(name)] or DG.LFG[name or ""]
   local icon = (j and (j.small or j.button)) or (lfg and ("Interface\\LFGFrame\\LFGIcon-" .. lfg)) or DG.CASTLE
   local bg = (j and (j.button or j.bg)) or (lfg and ("Interface\\LFGFrame\\UI-LFG-BACKGROUND-" .. lfg)) or nil
   return icon, bg
+end
+
+-- ------------------------------------------------------------------ gold per run
+-- Your own runs when there are some (the money you gained inside, learned below), else an estimate:
+-- coin drops (a level based average for the mobs inside) + what the drops sell for (drop chances x the
+-- vendor price, for items the game has loaded)
+local function coin(lvl) return 0.025 * (lvl ^ 2.5) * 0.55 end   -- copper, the average kill (not all drop coins)
+function DG:GoldPerRun(e)
+  local runs = QuesticusCollect and QuesticusCollect.dgold and QuesticusCollect.dgold[e.area]
+  if runs and #runs > 0 then
+    local sum = 0
+    for _, g in ipairs(runs) do sum = sum + g end
+    return sum / #runs, #runs
+  end
+  local m = e.mobs
+  if not (m and m.xpw and #m.xpw > 0) then return nil end
+  local coins, goods, missing = 0, 0, 0
+  local drops = Q.Bosses and Q.Bosses.NpcDrops
+  for _, w in ipairs(m.xpw) do
+    local lvl, count, rank, _, nid = w[1], w[2] or 1, w[3] or 0, w[4], w[5]
+    coins = coins + coin(lvl) * count * ((rank == 1 or rank == 2) and 1.6 or (rank == 3 and 4 or 1))
+    for _, d in ipairs((drops and nid) and drops(nid) or {}) do
+      local price = select(11, Q.GetItemInfo(d[1]))
+      if type(price) == "number" then goods = goods + price * d[2] * count
+      else
+        missing = missing + 1
+        if C_Item and C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, d[1]) end
+      end
+    end
+  end
+  return coins + goods, 0, coins, goods, missing
+end
+-- money gained inside a dungeon: the difference between entering and leaving (see "learn clear times")
+function DG.MoneyText(cp)
+  cp = math.floor(cp or 0)
+  local g, si, co = math.floor(cp / 10000), math.floor(cp / 100) % 100, cp % 100
+  if g > 0 then return ("%dg %ds"):format(g, si) end
+  if si > 0 then return ("%ds %dc"):format(si, co) end
+  return co .. "c"
+end
+
+-- ------------------------------------------------------------------ a quest's status and its chain
+DG.STATUS_COLOR = { done = T.HEX.good, log = T.HEX.white, can = "ffd100", locked = "ff4040" }
+function DG:QuestState(id, lv)
+  if QS.done[id] then return "done", "done" end
+  if QS.log[id] then return "log", QS.log[id].complete and "ready to hand in" or "in your log" end
+  local i = QS:Info(id)
+  if QS:Available(id) then return "can", "can get now" end
+  if i and lv < (i.min or 1) then
+    -- too low, but is the chain open?
+    return "locked", ("needs level %d"):format(i.min)
+  end
+  return "locked", "needs an earlier quest"
+end
+local function factionName(id)
+  if C_Reputation and C_Reputation.GetFactionDataByID then
+    local ok, d = pcall(C_Reputation.GetFactionDataByID, id)
+    if ok and d and d.name then return d.name end
+  end
+  if GetFactionInfoByID then local ok, n = pcall(GetFactionInfoByID, id); if ok and n then return n end end
+  return "faction " .. tostring(id)
+end
+DG.SKILL = { [129] = "First Aid", [164] = "Blacksmithing", [165] = "Leatherworking", [171] = "Alchemy", [182] = "Herbalism",
+  [185] = "Cooking", [186] = "Mining", [197] = "Tailoring", [202] = "Engineering", [333] = "Enchanting", [356] = "Fishing",
+  [393] = "Skinning", [755] = "Jewelcrafting", [633] = "Lockpicking" }
+local STANDING = { [0] = "Hated", "Hostile", "Unfriendly", "Neutral", "Friendly", "Honored", "Revered", "Exalted" }
+local function repText(v)
+  -- QuestieDB's requiredMinRep value: reputation points from Neutral (0); show the standing it means
+  if type(v) ~= "number" then return "" end
+  local tiers = { { 42000, "Exalted" }, { 21000, "Revered" }, { 9000, "Honored" }, { 3000, "Friendly" }, { 0, "Neutral" } }
+  for _, t in ipairs(tiers) do if v >= t[1] then return t[2] end end
+  return "Unfriendly"
+end
+DG.STANDING = STANDING
+-- where a locked quest's chain starts: the earliest quests of it you can't skip, with giver, zone,
+-- level and what else they need (reputation, profession)
+function DG:ChainStart(id)
+  local need = P.NeedChain and P.NeedChain(id) or { [id] = true }
+  local starts = {}
+  for q in pairs(need) do
+    if q ~= id and not QS.done[q] and not QS.log[q] then
+      local x = D:QuestExtra(q) or {}
+      local blocked
+      for _, pre in ipairs(x[4] or {}) do if need[pre] and not QS.done[pre] then blocked = true end end
+      for _, pre in ipairs(x[3] or {}) do if need[pre] and not QS.done[pre] then blocked = true end end
+      if not blocked then starts[#starts + 1] = q end
+    end
+  end
+  table.sort(starts)
+  local lines = {}
+  for _, q in ipairs(starts) do
+    local inf = QS:Info(q)
+    local dq = D:Quest(q)
+    local title = (inf and inf.title) or (dq and dq[1]) or ("Quest " .. q)
+    local giver, zone = "", ""
+    local gk = inf and inf.givers and inf.givers[1]
+    if gk then
+      giver = D:Name(gk)
+      local z = P.QuestZone and P.QuestZone(q)
+      local mi = z and C_Map and C_Map.GetMapInfo and C_Map.GetMapInfo(z)
+      if mi then zone = mi.name end
+    end
+    local minLv = (inf and inf.min) or (dq and dq[3]) or 1
+    local x = D:QuestExtra(q) or {}
+    local extra = {}
+    if x[19] and x[19][1] then extra[#extra + 1] = factionName(x[19][1]) .. " " .. repText(x[19][2]) end
+    if x[14] and x[14][1] then
+      extra[#extra + 1] = ("%s %d"):format(DG.SKILL[x[14][1]] or ("skill " .. x[14][1]), x[14][2] or 0)
+    end
+    local avail = QS:Available(q)
+    lines[#lines + 1] = { id = q, text = ("%s%s%s, level %d%s"):format(
+      title, giver ~= "" and (" - from " .. giver) or "", zone ~= "" and (" in " .. zone) or "", minLv,
+      #extra > 0 and (", needs " .. table.concat(extra, ", ")) or ""), can = avail }
+  end
+  return lines, need
 end
 
 -- ------------------------------------------------------------------ list window
@@ -230,6 +471,11 @@ local function listRow(i)
   r.lv:SetPoint("LEFT", 250, 0)
   r.q = T.Text(r, 11, T.c.dim)
   r.q:SetPoint("RIGHT", -6, 0)
+  r.done = r:CreateTexture(nil, "OVERLAY")
+  r.done:SetSize(16, 16)
+  r.done:SetPoint("RIGHT", r.q, "LEFT", -4, 0)
+  r.done:SetTexture("Interface\\RaidFrame\\ReadyCheck-Ready")
+  r.done:Hide()
   r:SetScript("OnClick", function(self) if self.e then DG:ShowDungeon(self.e) end end)
   rows[i] = r
   return r
@@ -263,14 +509,18 @@ function DG:Show()
     r.e = e
     local inRange = e.lo and lv >= e.lo - 2 and lv <= (e.hi or e.lo) + 2
     local active = Q.char.dmode == e.area
-    r.pic:SetTexture((DG.Art(e.name)))
+    local pic = DG.Art(e.name)
+    local tiles = (pic == DG.CASTLE) and DG.DrawnMap(e.name, e.area)
+    r.pic:SetTexture(tiles and tiles[6] or pic)
     r.pic:SetDesaturated(not inRange)
-    r.name:SetText((active and c(GOLD, "> ") or "") .. (inRange and c(T.HEX.white, e.name) or c(DIM, e.name)) ..
+    local total, doneN = #e.quests, 0
+    for _, id in ipairs(e.quests) do if QS.done[id] then doneN = doneN + 1 end end
+    local complete = total > 0 and doneN == total
+    r.name:SetText((active and c(GOLD, "> ") or "") .. (complete and c(T.HEX.good, e.name) or (inRange and c(T.HEX.white, e.name) or c(DIM, e.name))) ..
       (e.forever and c(T.HEX.good, "  new") or ""))
+    r.done:SetShown(complete)
     r.lv:SetText(e.lo and (e.lo == e.hi and tostring(e.lo) or (e.lo .. "-" .. (e.hi or e.lo))) or "?")
-    local todo = 0
-    for _, id in ipairs(e.quests) do if not QS.done[id] then todo = todo + 1 end end
-    r.q:SetText(#e.quests > 0 and (todo .. " quest" .. (todo == 1 and "" or "s")) or "")
+    r.q:SetText(total > 0 and (complete and c(T.HEX.good, ("%d/%d quests"):format(doneN, total)) or ("%d/%d quests"):format(doneN, total)) or "")
     r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y); r:SetPoint("RIGHT", 0, 0); r:Show()
     y = y + 34
   end
@@ -279,6 +529,92 @@ function DG:Show()
   list:SetHeight(math.min(700, 60 + y + 12))
   if Q.Bosses then Q.Bosses.Front(list) else list:Show() end
   return all
+end
+
+-- ------------------------------------------------------------------ dungeon window: quest rows
+-- each quest in its colour (done green, can get now yellow, in your log white, locked red); a locked one
+-- says where its chain starts and has a button that puts the whole chain on your route
+local qrows = {}
+DG.qrows = qrows
+DG.qdata = {}
+local function qrow(i)
+  local r = qrows[i]
+  if r then return r end
+  r = CreateFrame("Button", nil, detail)
+  r.text = T.Text(r, 12, T.c.text)
+  r.text:SetPoint("TOPLEFT", 4, -2)
+  r.text:SetPoint("RIGHT", -74, 0)
+  r.text:SetJustifyH("LEFT")
+  r.text:SetWordWrap(false)
+  r.chain = T.Text(r, 10, T.c.dim)
+  r.chain:SetPoint("TOPLEFT", 16, -18)
+  r.chain:SetPoint("RIGHT", -74, 0)
+  r.chain:SetJustifyH("LEFT")
+  r.add = T.Button(r, "+ Route", 66, 18)
+  r.add:SetPoint("TOPRIGHT", -2, 0)
+  r:SetScript("OnEnter", function(self)
+    local d = DG.qdata[self]
+    if not d then return end
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    for k, l in ipairs(QS:QuestTip(d.id, nil, nil)) do
+      if k == 1 then GameTooltip:AddLine(l, 1, 0.82, 0.3) else GameTooltip:AddLine(l, 0.9, 0.9, 0.9, true) end
+    end
+    if d.starts and #d.starts > 0 then
+      GameTooltip:AddLine(" ")
+      GameTooltip:AddLine("Start the chain with:", 1, 0.25, 0.25)
+      for _, st in ipairs(d.starts) do GameTooltip:AddLine(st.text .. (st.can and "  (you can get it now)" or ""), 0.9, 0.9, 0.9, true) end
+    end
+    GameTooltip:Show()
+  end)
+  r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  qrows[i] = r
+  return r
+end
+function DG:QuestRows(e, lv, textH)
+  local sorted = {}
+  for _, id in ipairs(e.quests) do if QS:Info(id) then sorted[#sorted + 1] = id end end
+  local order = { log = 1, can = 2, locked = 3, done = 4 }
+  table.sort(sorted, function(a, b)
+    local sa, sb = DG:QuestState(a, lv), DG:QuestState(b, lv)
+    if sa ~= sb then return order[sa] < order[sb] end
+    return (QS:Info(a).level or 0) < (QS:Info(b).level or 0)
+  end)
+  local y = 0
+  for i, id in ipairs(sorted) do
+    local r = qrow(i)
+    local inf = QS:Info(id)
+    local st, word = DG:QuestState(id, lv)
+    local d = { id = id }
+    DG.qdata[r] = d
+    r.text:SetText(c(DG.STATUS_COLOR[st], ("[%d] %s"):format(inf.level, inf.title)) .. "  " .. c(DG.STATUS_COLOR[st], "- " .. word))
+    local hgt = 18
+    if st == "locked" then
+      local starts = DG:ChainStart(id)
+      d.starts = starts
+      local first = starts[1]
+      r.chain:SetText(first and c("ff8080", "Starts with: ") .. first.text .. (#starts > 1 and ("  (+%d more)"):format(#starts - 1) or "") or "")
+      r.chain:Show()
+      if first then hgt = 34 end
+    else
+      r.chain:Hide()
+    end
+    local forced = Q.char.forced and Q.char.forced[id]
+    r.add:SetShown(st ~= "done" and st ~= "log")
+    r.add:SetText(forced and "On route" or "+ Route")
+    r.add.tip = forced and "Take this quest (and its chain) off your route" or "Put this quest on your route, with every earlier quest of its chain it needs"
+    r.add:SetScript("OnClick", function()
+      if Q.Tracker then Q.Tracker:Force(id, not (Q.char.forced and Q.char.forced[id])) end
+      DG:ShowDungeon(e)
+    end)
+    r:SetHeight(hgt)
+    r:ClearAllPoints()
+    r:SetPoint("TOPLEFT", detail.text, "TOPLEFT", 0, -(textH + 4 + y))
+    r:SetPoint("RIGHT", detail, "RIGHT", -14, 0)
+    r:Show()
+    y = y + hgt + 2
+  end
+  for i = #sorted + 1, #qrows do qrows[i]:Hide(); DG.qdata[qrows[i]] = nil end
+  return y
 end
 
 -- ------------------------------------------------------------------ dungeon window
@@ -316,7 +652,24 @@ function DG:ShowDungeon(e)
   local lv = Q.player.level or 1
   detail.title:SetText(Q.Color(T.HEX.accent, e.name))
   local icon, bg = DG.Art(e.name)
-  detail.icon:SetTexture(icon)
+  local tiles = DG.DrawnMap(e.name, e.area)
+  detail.icon:SetTexture((icon == DG.CASTLE and tiles) and tiles[6] or icon)
+  DG.bannerTiles = DG.bannerTiles or {}
+  local btiles = DG.bannerTiles
+  for _, t in ipairs(btiles) do t:Hide() end
+  if not bg and tiles then
+    -- the dungeon's drawn map (4 x 3 tiles) as its picture, centred in the banner
+    local w, h = 135, 90
+    for k = 1, 12 do
+      local t = btiles[k]
+      if not t then t = detail:CreateTexture(nil, "ARTWORK", nil, 1); btiles[k] = t end
+      t:SetTexture(tiles[k])
+      t:SetSize(w / 4, h / 3)
+      t:ClearAllPoints()
+      t:SetPoint("TOPLEFT", detail.banner, "TOP", -w / 2 + ((k - 1) % 4) * w / 4, -math.floor((k - 1) / 4) * h / 3)
+      t:Show()
+    end
+  end
   if bg then
     detail.banner:SetTexture(bg)
     detail.banner:SetTexCoord(0, 1, 0.15, 0.85)
@@ -339,7 +692,10 @@ function DG:ShowDungeon(e)
   if m and m.fromSpawns and m.spawns > 0 then
     add(c(DIM, "Mobs: ") .. m.spawns .. c(DIM, " (") .. m.elites .. c(DIM, " elite)"))
   end
-  if m and #m.bosses > 0 then
+  local bossNames = DG.BossNames(e)
+  if bossNames then
+    add(c(DIM, "Bosses: ") .. table.concat(bossNames, ", "))
+  elseif m and #m.bosses > 0 then
     local b = {}
     for i = 1, math.min(8, #m.bosses) do b[i] = m.bosses[i] end
     add(c(DIM, "Bosses and named elites: ") .. table.concat(b, ", ") .. (#m.bosses > 8 and " ..." or ""))
@@ -360,18 +716,18 @@ function DG:ShowDungeon(e)
   if ct and ct > 0 and ((mx or 0) + qxp) > 0 then
     add(c(DIM, "Average XP per hour (one run + quests): ") .. "~" .. math.floor(((mx or 0) + qxp) / ct * 3600))
   end
+  local gold, gruns, coins, goods, missing = DG:GoldPerRun(e)
+  if gold and gold > 0 then
+    if gruns and gruns > 0 then
+      add(c(DIM, "Gold per run: ") .. c(GOLD, DG.MoneyText(gold)) .. c(DIM, ("  (your average of %d run%s)"):format(gruns, gruns == 1 and "" or "s")))
+    else
+      add(c(DIM, "Gold per run: ") .. c(GOLD, "~" .. DG.MoneyText(gold)) .. c(DIM, ("  (estimate: ~%s coin, ~%s vendor value of drops%s)")
+        :format(DG.MoneyText(coins), DG.MoneyText(goods), (missing or 0) > 0 and ", more once items load" or "")))
+    end
+  end
   if #e.quests > 0 then
     add(" ")
-    add(c(GOLD, "Quests"))
-    local sorted = {}
-    for _, id in ipairs(e.quests) do sorted[#sorted + 1] = id end
-    table.sort(sorted, function(a, b) return (QS:Info(a).level or 0) < (QS:Info(b).level or 0) end)
-    for i, id in ipairs(sorted) do
-      if i > 14 then add(c(DIM, ("  ... and %d more"):format(#sorted - 14))); break end
-      local inf = QS:Info(id)
-      local st = DG:QuestStatus(id, lv)
-      add(("  [%d] %s  %s"):format(inf.level, inf.title, c(DIM, "- " .. st)))
-    end
+    add(c(GOLD, "Quests") .. c(DIM, ("  %d/%d done"):format((function() local n = 0 for _, id in ipairs(e.quests) do if QS.done[id] then n = n + 1 end end return n end)(), #e.quests)))
   else
     add(" ")
     add(c(DIM, "No quests for your character here."))
@@ -379,7 +735,8 @@ function DG:ShowDungeon(e)
   detail.text:SetText(table.concat(L, "\n"))
   local h = (detail.text.GetStringHeight and detail.text:GetStringHeight()) or (#L * 17)
   if type(h) ~= "number" or h < #L * 10 then h = #L * 17 end
-  detail:SetHeight(math.min(860, 34 + 98 + h + 56))
+  local qh = DG:QuestRows(e, lv, h)
+  detail:SetHeight(math.min(900, 34 + 98 + h + qh + 56))
   local active = Q.char.dmode == e.area
   detail.go:SetText(active and "Stop dungeon mode" or "Get all quests")
   detail.go:SetShown(active or todo > 0)
@@ -415,7 +772,7 @@ local function check()
   local area = where()
   local now = GetTime and GetTime() or 0
   if area and not run then
-    run = { area = area, start = now }
+    run = { area = area, start = now, money = GetMoney and GetMoney() or 0 }
   elseif run and area ~= run.area then
     local dur = now - run.start
     if dur >= 300 and dur <= 4 * 3600 and QuesticusCollect and Q.db.collect ~= false then
@@ -424,8 +781,17 @@ local function check()
       t[#t + 1] = math.floor(dur)
       while #t > 10 do table.remove(t, 1) end
       QuesticusCollect.dclear[run.area] = t
+      -- the money you made in there (coins and loot sold by the next visit count from the next run)
+      local gained = (GetMoney and GetMoney() or 0) - (run.money or 0)
+      if gained > 0 then
+        QuesticusCollect.dgold = QuesticusCollect.dgold or {}
+        local g = QuesticusCollect.dgold[run.area] or {}
+        g[#g + 1] = gained
+        while #g > 10 do table.remove(g, 1) end
+        QuesticusCollect.dgold[run.area] = g
+      end
     end
-    run = area and { area = area, start = now } or nil
+    run = area and { area = area, start = now, money = GetMoney and GetMoney() or 0 } or nil
   end
 end
 Q:On("PLAYER_ENTERING_WORLD", check)

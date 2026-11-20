@@ -97,6 +97,7 @@ local function npcDrops(nid)
   end
   return dropsOf[nid] or {}
 end
+BT.NpcDrops = npcDrops
 
 -- quests that need an item: as an objective (qx 10), or as a part you put together (qx 21)
 local questItems
@@ -133,6 +134,7 @@ local function recorded(dname)
 end
 function BT:List(e)
   local out, byName = {}, {}
+  local names = Q.Dungeons and Q.Dungeons.BossNames and Q.Dungeons.BossNames(e)
   local function add(b)
     local k = b.name:lower()
     local had = byName[k]
@@ -174,7 +176,26 @@ function BT:List(e)
   for nid, r in pairs(rec) do extra[#extra + 1] = { name = r.name, nid = tonumber(nid), order = r.order or 99, hp = r.hp } end
   table.sort(extra, function(a, b) return a.order < b.order end)
   for _, b in ipairs(extra) do add(b) end
-  return out
+  -- the game's own boss list for this dungeon (Questicus Maps' data): only those, in its order - quest
+  -- NPCs and named elites that aren't bosses stay out
+  if names then
+    local real = {}
+    for _, n in ipairs(names) do
+      local b = byName[n:lower()]
+      if not b then
+        local ids = D:NPCByName(n)
+        b = { name = n, nid = ids and ids[1] }
+        local np = b.nid and D:NPC(b.nid)
+        b.lvl = np and (np[4] or np[3])
+      end
+      real[#real + 1] = b
+    end
+    return real
+  end
+  -- no list: leave out friendly NPCs (quest givers, prisoners)
+  local kept = {}
+  for _, b in ipairs(out) do if not (b.nid and D:Faction(b.nid)) then kept[#kept + 1] = b end end
+  return kept
 end
 
 -- ------------------------------------------------------------------ kills this run
@@ -277,6 +298,20 @@ function BT:Show(e)
     bar.none = T.Text(bar, 11, T.c.dim)
     bar.none:SetPoint("TOPLEFT", 12, -34)
     bar.none:SetPoint("RIGHT", -12, 0)
+    -- low profile: a plain text list instead of portraits
+    bar.mode = CreateFrame("Button", nil, bar.bar)
+    bar.mode:SetSize(18, 18)
+    bar.mode:SetPoint("RIGHT", bar.count, "LEFT", -6, 0)
+    bar.mode.t = bar.mode:CreateTexture(nil, "OVERLAY")
+    bar.mode.t:SetAllPoints()
+    bar.mode.t:SetTexture("Interface\\Buttons\\UI-GuildButton-PublicNote-Up")
+    bar.mode:SetScript("OnClick", function() Q.db.bossLow = not Q.db.bossLow; BT:Refresh() end)
+    bar.mode:SetScript("OnEnter", function(self)
+      GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+      GameTooltip:AddLine(Q.db.bossLow and "Show portraits" or "Low profile: just a list of names", 1, 1, 1)
+      GameTooltip:Show()
+    end)
+    bar.mode:SetScript("OnLeave", function() GameTooltip:Hide() end)
   end
   bar.e = e
   bar.list = BT:List(e)
@@ -285,10 +320,77 @@ function BT:Show(e)
   return bar.list
 end
 
+-- low profile rows: the names, ticked off as you kill them; click one for its loot
+local lrows = {}
+BT.lrows = lrows
+BT.lrowBoss = {}
+local function lrow(i)
+  local r = lrows[i]
+  if r then return r end
+  r = CreateFrame("Button", nil, bar)
+  r:SetHeight(18)
+  if r.RegisterForClicks then r:RegisterForClicks("LeftButtonUp", "RightButtonUp") end
+  r.box = r:CreateTexture(nil, "ARTWORK")
+  r.box:SetSize(14, 14)
+  r.box:SetPoint("LEFT", 2, 0)
+  r.box:SetTexture("Interface\\Buttons\\UI-CheckBox-Up")
+  r.tick = r:CreateTexture(nil, "OVERLAY")
+  r.tick:SetSize(16, 16)
+  r.tick:SetPoint("CENTER", r.box, "CENTER", 1, 0)
+  r.tick:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+  r.name = T.Text(r, 12, T.c.text)
+  r.name:SetPoint("LEFT", r.box, "RIGHT", 6, 0)
+  r.name:SetPoint("RIGHT", -2, 0)
+  r.name:SetJustifyH("LEFT")
+  r:SetHighlightTexture("Interface\\Buttons\\WHITE8x8")
+  local hl = r:GetHighlightTexture()
+  if hl then hl:SetVertexColor(1, 1, 1, 0.06) end
+  r:SetScript("OnClick", function(self, btn)
+    local b = BT.lrowBoss[self]
+    if not b then return end
+    if btn == "RightButton" then BT:SetKilled(bar.e.area, b.name, not BT:Killed(bar.e.area, b.name))
+    else BT:ShowBoss(bar.e, b) end
+  end)
+  r:SetScript("OnEnter", function(self)
+    local b = BT.lrowBoss[self]
+    if not b then return end
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:AddLine(b.name, 1, 1, 1)
+    GameTooltip:AddLine("Click: loot, stats and fight - right-click: tick off / undo", 0.7, 0.7, 0.7, true)
+    GameTooltip:Show()
+  end)
+  r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  lrows[i] = r
+  return r
+end
+
 function BT:Refresh()
   if not (bar and bar:IsShown() and bar.e) then return end
   local e, list = bar.e, bar.list or {}
   bar.title:SetText(Q.Color(T.HEX.accent, "Bosses") .. Q.Color(DIM, " - " .. e.name))
+  if Q.db.bossLow then
+    for _, s in ipairs(slots) do s:Hide() end
+    local done = 0
+    for i, b in ipairs(list) do
+      local r = lrow(i)
+      BT.lrowBoss[r] = b
+      local dead = BT:Killed(e.area, b.name)
+      if dead then done = done + 1 end
+      r.tick:SetShown(dead)
+      r.name:SetText(dead and c(DIM, b.name) or b.name)
+      r:ClearAllPoints()
+      r:SetPoint("TOPLEFT", 10, -30 - (i - 1) * 19)
+      r:SetPoint("RIGHT", bar, "RIGHT", -10, 0)
+      r:Show()
+    end
+    for i = #list + 1, #lrows do lrows[i]:Hide() end
+    bar.count:SetText(#list > 0 and (done .. "/" .. #list) or "")
+    bar.none:SetText(#list == 0 and "No boss data for this dungeon yet." or "")
+    bar:SetWidth(220)
+    bar:SetHeight(30 + math.max(1, #list) * 19 + 34)
+    return
+  end
+  for _, r in ipairs(lrows) do r:Hide() end
   local done, per = 0, 6
   for i, b in ipairs(list) do
     local s = slot(i)

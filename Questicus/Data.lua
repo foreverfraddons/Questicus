@@ -117,7 +117,10 @@ D.INSTANCE_AREA = { [33] = 209, [34] = 717, [36] = 1581, [43] = 718, [47] = 491,
   [349] = 2100, [389] = 2437, [429] = 2557 }
 D.RAID_AREA = { [2717] = true, [2677] = true, [3428] = true, [3429] = true, [1977] = true, [2159] = true, [3456] = true }
 
-function D:Dungeon(area) return DB.dng and DB.dng[area] end      -- {name, parentArea, {uiMap, x, y, ...}}
+-- dungeons ForeverDB doesn't have yet (WoW Forever's newest; Questicus Maps' place data, Dungeons.lua):
+-- [ -instance mapID ] = the same shape
+D.EXTRA_DNG = {}
+function D:Dungeon(area) return (DB.dng and DB.dng[area]) or D.EXTRA_DNG[area] end      -- {name, parentArea, {uiMap, x, y, ...}}
 
 -- entrance points of a dungeon (marked with .dungeon = area)
 local entranceCache = {}
