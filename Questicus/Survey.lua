@@ -119,7 +119,7 @@ local function pageComplete(p)
     { "rep", "Prefer quests with reputation rewards" },
     { "classQuests", "Class quests (spells, class items)" },
     { "profQuests", "Profession quests" },
-    { "escort", "Escort quests", "Off: skipped unless a chain needs them for gear or a dungeon (the step says why)." },
+    { "escort", "Escort quests", "Off: never on your route (unless you add one yourself, or it's a dungeon quest in dungeon mode)." },
     { "cooking", "Cooking and recipe quests", "Off: skipped unless a chain needs them for gear or a dungeon (the step says why)." },
     { "pvp", "PvP and battleground quests", "Warsong Gulch, Arathi Basin, Alterac Valley, Darkspear Islands and other PvP quests. Off by default." },
     { "seasonal", "Holiday / seasonal quests" },

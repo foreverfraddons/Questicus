@@ -726,13 +726,21 @@ function optedOut(id)
   local want = (kind == "escort" and pr.escort ~= false) or ((kind == "cooking" or kind == "recipe") and pr.cooking ~= false)
     or (kind == "pvp" and pr.pvp == true)
   if want then return false end
-  if kind == "pvp" then return true end            -- PvP quests off: no exceptions
+  if kind == "pvp" or kind == "escort" then return true end   -- PvP / escort quests off: no exceptions
+  -- (an escort you add yourself - tracker "+", a dungeon's "Get all quests" - still goes on the route)
   local need = P.NeededFor(id)
   if need then
     P.keepWhy[id] = KIND_NAMES[kind] .. " - kept because the chain needs it: " .. need
     return false
   end
   return true
+end
+
+-- an escort in your log with escorts turned off: no objective work (abandon it, or add it in the
+-- tracker to do it anyway)
+function P.EscortOff(id)
+  if Q.prefs.escort ~= false or (Q.char.forced and Q.char.forced[id]) or (P.dset and P.dset[id]) then return false end
+  return P.Kind(id) == "escort"
 end
 
 -- quests in the level window that are worth routing at all
@@ -1047,7 +1055,7 @@ local function bestAction(st, cands)
     yi = yi + 1
     if yi % 8 == 0 then maybeYield() end
     local m = stage == "obj" and not Q.char.skipped[id] and not P.Excluded(id)
-      and not (P.dset and not P.dset[id]) and not P.ZoneOff(id) and questMeta(id)
+      and not (P.dset and not P.dset[id]) and not P.ZoneOff(id) and not P.EscortOff(id) and questMeta(id)
     if m and m.lc and st.open[id] then
       groups[id] = groupsOf(id, m, st.open[id])
       for _, g in ipairs(groups[id]) do pending[#pending + 1] = g end
@@ -1059,6 +1067,7 @@ local function bestAction(st, cands)
     local m = not Q.char.skipped[id] and not (stage ~= "ready" and P.Excluded(id))
       and not (P.dset and not P.dset[id] and stage ~= "ready")   -- dungeon mode: other quests only get handed in
       and not (stage ~= "ready" and P.ZoneOff(id))                 -- zones you turned off: hand-ins only
+      and not (stage ~= "ready" and P.EscortOff(id))               -- escorts turned off: hand-ins only
       and questMeta(id)
     if m then
       -- dungeon mode: every quest of the dungeon is wanted, so only the walking decides the order
