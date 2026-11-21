@@ -147,8 +147,39 @@ local function cornerButtons()
   end
   return out
 end
+-- The map window's close / full-screen buttons hang off its border frame's top-right corner. With
+-- Questicus Maps sizing the window, the game kept that border wider than the window (it adds the quest
+-- log's width again), so the buttons - and the quest log's filter button chained to them - sat past
+-- the window's right edge, out of sight. They're put back in the window's own top-right corner.
+local movingCorner = false
+local function placeCornerButtons()
+  local m = WorldMapFrame
+  local bf = m and type(m.BorderFrame) == "table" and m.BorderFrame or nil
+  local close = bf and type(bf.CloseButton) == "table" and bf.CloseButton or nil
+  if not (close and close.GetRight and m:GetRight()) or movingCorner then return end
+  local mr, cr = m:GetRight(), close:GetRight()
+  if not cr or cr <= mr + 2 then return end
+  movingCorner = true
+  local p, rel, rp, x, y = close:GetPoint(1)
+  close:ClearAllPoints()
+  -- (same spot in the corner as the game gives it, against the window instead of the wider border)
+  if rel == bf or rel == nil then
+    close:SetPoint(p or "TOPRIGHT", m, rp or p or "TOPRIGHT", x or 0, y or 0)
+  else
+    close:SetPoint("TOPRIGHT", m, "TOPRIGHT", 0, 0)
+  end
+  -- the full-screen button normally hangs off the close button; if not, it goes next to it
+  local mm = type(bf.MaximizeMinimizeFrame) == "table" and bf.MaximizeMinimizeFrame or nil
+  if mm and mm.GetRight and mm:GetRight() and mm:GetRight() > mr + 2 then
+    mm:ClearAllPoints()
+    mm:SetPoint("RIGHT", close, "LEFT", 8, 0)
+  end
+  movingCorner = false
+end
+
 function Q.RaiseMapCorner()
   if InCombatLockdown and InCombatLockdown() then return end
+  pcall(placeCornerButtons)
   local qm = _G.QuestMapFrame
   local top = qm and qm:IsVisible() and math.min(9990, (qm:GetFrameLevel() or 0) + 700)
   for _, b in ipairs(cornerButtons()) do
@@ -157,6 +188,7 @@ function Q.RaiseMapCorner()
       if (b:GetFrameLevel() or 0) < top then pcall(b.SetFrameLevel, b, top) end
     end
   end
+  if Q.FitQuestSearch then Q.FitQuestSearch() end
 end
 
 local fixing = false
@@ -214,7 +246,19 @@ local function hookSearch()
     qm:HookScript("OnShow", Q.FitQuestSearch); qm:HookScript("OnSizeChanged", Q.FitQuestSearch)
     qm:HookScript("OnShow", function() Q.RaiseMapCorner(); Q.After(0, Q.RaiseMapCorner) end)
   end
-  if WorldMapFrame then WorldMapFrame:HookScript("OnShow", function() Q.After(0, Q.RaiseMapCorner) end) end
+  if WorldMapFrame then
+    WorldMapFrame:HookScript("OnShow", function() Q.After(0, Q.RaiseMapCorner) end)
+    WorldMapFrame:HookScript("OnSizeChanged", function() Q.RaiseMapCorner() end)
+    for _, fn in ipairs({ "SetDisplayState", "Maximize", "Minimize", "UpdateSpacerFrameAnchoring" }) do
+      if type(WorldMapFrame[fn]) == "function" then
+        hooksecurefunc(WorldMapFrame, fn, function() Q.RaiseMapCorner(); Q.After(0, Q.RaiseMapCorner) end)
+      end
+    end
+    local bf = type(WorldMapFrame.BorderFrame) == "table" and WorldMapFrame.BorderFrame or nil
+    local close = bf and type(bf.CloseButton) == "table" and bf.CloseButton or nil
+    if close and close.SetPoint then hooksecurefunc(close, "SetPoint", function() if not movingCorner then Q.After(0, Q.RaiseMapCorner) end end) end
+  end
+  if qm then qm:HookScript("OnHide", function() Q.After(0, Q.RaiseMapCorner) end) end
   if WorldMapFrame then WorldMapFrame:HookScript("OnSizeChanged", Q.FitQuestSearch) end
   Q.FitQuestSearch()
 end
