@@ -134,6 +134,31 @@ local function rightExtent(box)
   end
   return math.max(0, reach), stop
 end
+-- the map window's own corner buttons (close, full screen): over the quest log, which the game
+-- puts in a higher strata - with the log at the window's top they were hidden under its search bar
+local function cornerButtons()
+  local m = WorldMapFrame
+  if not m then return {} end
+  local bf = type(m.BorderFrame) == "table" and m.BorderFrame or nil
+  local out = {}
+  for _, b in ipairs({ bf and bf.CloseButton or false, bf and bf.MaximizeMinimizeFrame or false, m.CloseButton or false,
+    m.MaximizeMinimizeFrame or false, bf and bf.Tutorial or false }) do
+    if type(b) == "table" and b.IsShown and b:IsShown() then out[#out + 1] = b end
+  end
+  return out
+end
+function Q.RaiseMapCorner()
+  if InCombatLockdown and InCombatLockdown() then return end
+  local qm = _G.QuestMapFrame
+  local top = qm and qm:IsVisible() and math.min(9990, (qm:GetFrameLevel() or 0) + 700)
+  for _, b in ipairs(cornerButtons()) do
+    if top then
+      if b:GetFrameStrata() ~= qm:GetFrameStrata() then pcall(b.SetFrameStrata, b, qm:GetFrameStrata()) end
+      if (b:GetFrameLevel() or 0) < top then pcall(b.SetFrameLevel, b, top) end
+    end
+  end
+end
+
 local fixing = false
 function Q.FitQuestSearch()
   if fixing or (InCombatLockdown and InCombatLockdown()) then return end
@@ -143,6 +168,12 @@ function Q.FitQuestSearch()
   local edge = (scroll.ScrollBar and scroll.ScrollBar:IsShown() and scroll.ScrollBar:GetRight()) or scroll:GetRight()
   if not (l and r and edge) then return end
   local reach, stop = rightExtent(box)
+  -- (and before the window's close / full screen buttons, when the bar is on their row)
+  local bt, bb = box:GetTop(), box:GetBottom()
+  for _, b in ipairs(cornerButtons()) do
+    local cl, ct, cb = b:GetLeft(), b:GetTop(), b:GetBottom()
+    if cl and ct and cb and bt and bb and ct > bb and cb < bt and cl > l + 40 then stop = math.min(stop or cl, cl) end
+  end
   local limit = math.min(edge, stop and (stop - 3) or edge)
   -- the game gives it its right width while there's text in it (seen in game): kept, and used when empty
   local typed = box.GetText and box:GetText() or ""
@@ -179,7 +210,11 @@ local function hookSearch()
   box:HookScript("OnTextChanged", function() Q.After(0, Q.FitQuestSearch) end)
   box:HookScript("OnEditFocusLost", function() Q.After(0, Q.FitQuestSearch) end)
   box:HookScript("OnSizeChanged", Q.FitQuestSearch)
-  if qm then qm:HookScript("OnShow", Q.FitQuestSearch); qm:HookScript("OnSizeChanged", Q.FitQuestSearch) end
+  if qm then
+    qm:HookScript("OnShow", Q.FitQuestSearch); qm:HookScript("OnSizeChanged", Q.FitQuestSearch)
+    qm:HookScript("OnShow", function() Q.RaiseMapCorner(); Q.After(0, Q.RaiseMapCorner) end)
+  end
+  if WorldMapFrame then WorldMapFrame:HookScript("OnShow", function() Q.After(0, Q.RaiseMapCorner) end) end
   if WorldMapFrame then WorldMapFrame:HookScript("OnSizeChanged", Q.FitQuestSearch) end
   Q.FitQuestSearch()
 end
@@ -225,6 +260,34 @@ Q:Command("questlogdebug", "save the world map quest log's search bar layout (fo
   if qm then for _, c in ipairs({ qm:GetChildren() }) do out[#out + 1] = "qmkid: " .. desc(c) end end
   local qf = qm and qm.QuestsFrame
   if qf and qf ~= box:GetParent() then for _, c in ipairs({ qf:GetChildren() }) do out[#out + 1] = "qfkid: " .. desc(c) end end
+  -- every visible frame over the window's top-right corner and over the step icon (what covers what)
+  local function at(px, py)
+    local list, f, n = {}, EnumerateFrames and EnumerateFrames(), 0
+    while f and n < 60000 do
+      n = n + 1
+      if not (f.IsForbidden and f:IsForbidden()) and f.IsVisible and f:IsVisible() and f.GetLeft then
+        local k = f:GetEffectiveScale() or 1
+        local L, R, T, B = f:GetLeft(), f:GetRight(), f:GetTop(), f:GetBottom()
+        if L and R and T and B and L * k <= px and R * k >= px and B * k <= py and T * k >= py then
+          list[#list + 1] = ("%s strata=%s lvl=%s"):format(name(f), tostring(f:GetFrameStrata()), tostring(f:GetFrameLevel()))
+        end
+      end
+      f = EnumerateFrames(f)
+    end
+    return list
+  end
+  local m = WorldMapFrame
+  if m and m:GetRight() then
+    local k = m:GetEffectiveScale()
+    for _, l in ipairs(at((m:GetRight() - 12) * k, (m:GetTop() - 12) * k)) do out[#out + 1] = "corner: " .. l end
+  end
+  for _, b in ipairs(cornerButtons()) do out[#out + 1] = "cornerbtn: " .. desc(b) end
+  local ic = Q.Pins.leg and Q.Pins.leg.icon
+  if ic and ic:IsVisible() then
+    local x, y = ic:GetCenter()
+    local k = ic:GetEffectiveScale()
+    for _, l in ipairs(at(x * k, y * k)) do out[#out + 1] = "stepicon: " .. l end
+  end
   Q.db.uiDebug = Q.db.uiDebug or {}
   Q.db.uiDebug[(tag and tag ~= "") and tag or "manual"] = out
   if not quiet then Q:Print("saved - /reload (or log out) so it's written to disk") end

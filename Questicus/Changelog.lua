@@ -6,7 +6,12 @@
 -- update goes out once "next" holds 10 lines (release.yml, MIN_CHANGES).
 local Q = Questicus
 Q.Changelog = {
-  { v = "next" },
+  { v = "next",
+    fixed = {
+      "The yellow waypoint marker no longer covers the step icon on the world map: it turns see-through while it sits on the icon.",
+      "The world map window's close and full-screen buttons are no longer hidden under the quest log's search bar.",
+    },
+  },
   { v = "0.9.21",
     fixed = {
       "The yellow waypoint marker on Questicus Maps' stitched map now goes under Questicus' step icon too.",

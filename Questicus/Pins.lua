@@ -477,6 +477,82 @@ function PN:DrawLeg()
     end
   end
   for i = used + 1, #PN.legLines do PN.legLines[i].bg:Hide(); PN.legLines[i].fg:Hide() end
+  -- (the icon may have moved: a waypoint marker over it is looked for again)
+  local ic = PN.leg and PN.leg.icon
+  local cx, cy
+  if ic and ic:IsShown() then cx, cy = ic:GetCenter() end
+  if cx and (cx ~= PN.coverX or cy ~= PN.coverY) then
+    PN.coverX, PN.coverY = cx, cy
+    Q.Throttle("wpcover", 0.2, function() PN:UncoverStep() end)
+  end
+end
+
+-- A waypoint marker (the game's, or Questicus Maps' own on its stitched map) put exactly where
+-- the step you're on is - Questicus pins the route's target - hides the step's icon and number.
+-- The marker drawn over it is made see-through (and click-through) while it sits on the icon, and
+-- comes back as soon as it doesn't. Found by place on screen: Questicus Maps' marker isn't reachable
+-- any other way.
+local covered = {}
+local function hasWaypointArt(f)
+  for _, r in ipairs({ f:GetRegions() }) do
+    if r.GetAtlas then
+      local a = r:GetAtlas()
+      if type(a) == "string" and a:find("Waypoint", 1, true) then return true end
+    end
+    if r.GetTexture then
+      local t = r:GetTexture()
+      if type(t) == "string" and (t:find("Waypoint", 1, true) or t:find("ping5", 1, true)) then return true end
+    end
+  end
+  for _, k in ipairs({ "Icon", "Texture" }) do
+    local r = f[k]
+    if type(r) == "table" and r.GetAtlas then
+      local a = r:GetAtlas()
+      if type(a) == "string" and a:find("Waypoint", 1, true) then return true end
+    end
+  end
+end
+local function screenCenter(f)
+  local x, y = f:GetCenter()
+  if not x then return end
+  local k = f:GetEffectiveScale() or 1
+  return x * k, y * k, (f:GetWidth() or 0) * k
+end
+function PN:UncoverStep()
+  local ic = PN.leg and PN.leg.icon
+  local keep = {}
+  if ic and ic:IsVisible() and EnumerateFrames and WorldMapFrame and WorldMapFrame:IsShown() then
+    local ix, iy, iw = screenCenter(ic)
+    if ix then
+      local near = math.max(10, iw * 0.6)
+      local f = EnumerateFrames()
+      local n = 0
+      while f do
+        n = n + 1
+        if n > 60000 then break end
+        if f ~= ic and not (f.IsForbidden and f:IsForbidden()) and f.IsVisible and f:IsVisible() then
+          local x, y, w = screenCenter(f)
+          if x and w < 80 and math.abs(x - ix) < near and math.abs(y - iy) < near and f:GetParent() ~= PN.overlay
+            and f.GetRegions and hasWaypointArt(f) then
+            keep[f] = true
+            if not covered[f] then
+              covered[f] = { a = f:GetAlpha(), m = f.IsMouseEnabled and f:IsMouseEnabled() }
+              f:SetAlpha(0)
+              if f.EnableMouse and not (InCombatLockdown and InCombatLockdown()) then pcall(f.EnableMouse, f, false) end
+            end
+          end
+        end
+        f = EnumerateFrames(f)
+      end
+    end
+  end
+  for f, was in pairs(covered) do
+    if not keep[f] then
+      f:SetAlpha(was.a or 1)
+      if was.m and f.EnableMouse and not (InCombatLockdown and InCombatLockdown()) then pcall(f.EnableMouse, f, true) end
+      covered[f] = nil
+    end
+  end
 end
 
 -- ------------------------------------------------------------------ quest log objectives (Questie-style)
@@ -867,7 +943,7 @@ local function hookWorldMap()
   if not WorldMapFrame or PN.hooked then return end
   PN.hooked = true
   if WorldMapFrame.OnMapChanged then hooksecurefunc(WorldMapFrame, "OnMapChanged", function() PN:RefreshWorld() end) end
-  WorldMapFrame:HookScript("OnShow", function() PN:RefreshWorld() end)
+  WorldMapFrame:HookScript("OnShow", function() PN:RefreshWorld(); Q.After(0.3, function() PN:UncoverStep() end) end)
   local watcher = CreateFrame("Frame", nil, WorldMapFrame)
   local acc = 0
   watcher:SetScript("OnUpdate", function(_, el)
@@ -890,6 +966,9 @@ local function hookWorldMap()
     if acc < (Q.OnTaxi() and 2 or 0.2) then return end
     acc = 0
     PN:FixLevel()
+    -- (markers come and go - the map's own redraws reuse them: checked again now and then)
+    PN.coverAcc = (PN.coverAcc or 0) + 1
+    if PN.coverAcc >= 8 then PN.coverAcc = 0; PN:UncoverStep() end
     -- you moved: redraw (the route line starts at you)
     local here = D:PlayerPos()
     local moved = here and (not PN.lastHere or D.Dist(here, PN.lastHere) > 8)
@@ -1183,7 +1262,7 @@ local function flightChanged() Q.After(0.3, function() PN:RefreshMinimap(); PN:R
 -- after a loading screen: drawn again once
 Q:On("PLAYER_ENTERING_WORLD", function() PN:Invalidate() end)
 -- a new waypoint pin: under Questicus' icons right away
-Q:On("USER_WAYPOINT_UPDATED", function() Q.After(0, function() PN:FixLevel() end) end)
+Q:On("USER_WAYPOINT_UPDATED", function() Q.After(0, function() PN:FixLevel() end); Q.After(0.3, function() PN:UncoverStep() end) end)
 Q:On("SUPER_TRACKING_CHANGED", function() Q.After(0, function() PN:FixLevel() end) end)
 Q:On("PLAYER_CONTROL_LOST", flightChanged)
 Q:On("PLAYER_CONTROL_GAINED", flightChanged)
