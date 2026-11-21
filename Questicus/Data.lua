@@ -438,10 +438,13 @@ end
 
 -- npc ids by (lower-case) name, for quest texts like "WANTED: Old Rot-Chum" or "X's Head"
 local byName
+local byNameOf
 function D:NPCByName(name)
   if not name or name == "" then return end
-  if not byName then
-    byName = {}
+  -- (built once the database is loaded: asked earlier, an empty index stayed empty for the session)
+  if not byName or byNameOf ~= DB.npc then
+    if not (DB.npc and next(DB.npc)) then return end
+    byName, byNameOf = {}, DB.npc
     for id, n in pairs(DB.npc) do
       local k = n[1] and n[1]:lower()
       if k then byName[k] = byName[k] or {}; table.insert(byName[k], id) end

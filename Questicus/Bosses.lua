@@ -352,12 +352,28 @@ local function portrait(s, b, shared, dead)
     return
   end
   local ownIcon = b.icon and not (shared and shared[b.icon])
+  if not b.nid then                             -- (the list was made before the database was there)
+    local ids = D:NPCByName(b.name)
+    b.nid = ids and ids[1]
+  end
   if b.nid and s.model.SetCreature then
     s.icon:Hide()
     BT.modelNid = BT.modelNid or {}
     BT.modelNid[s.model] = b.nid
     s.model:Show()
     BT.Still(s.model, b.nid)
+    -- no model came (the game doesn't have that creature to hand): a flat picture instead
+    Q.After(0.8, function()
+      if s.b ~= b or not s.model:IsShown() or not s.model.GetModelFileID then return end
+      local okF, fid = pcall(s.model.GetModelFileID, s.model)
+      if okF and fid and fid ~= 0 then return end
+      s.model:Hide(); s.icon:Show()
+      if ownIcon then
+        s.icon:SetTexture(b.icon); s.icon:SetTexCoord(0.2, 0.8, 0, 1)
+      elseif b.display and b.display ~= 0 and SetPortraitTextureFromCreatureDisplayID then
+        pcall(SetPortraitTextureFromCreatureDisplayID, s.icon, b.display)
+      end
+    end)
   elseif ownIcon then
     s.icon:SetTexture(b.icon)
     s.icon:SetTexCoord(0.2, 0.8, 0, 1)        -- Adventure Guide portraits are wide: the middle
