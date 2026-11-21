@@ -10,6 +10,9 @@ Q.Changelog = {
     fixed = {
       "Opening the world map no longer redraws the quest areas when nothing has changed.",
     },
+    added = {
+      "Mob tooltips show about how much money a kill drops and, if you know Skinning, what skinning it gives (real WoW: Forever counts from Drop Tables). /qc mobinfo turns it off.",
+    },
   },
   { v = "0.9.022",
     fixed = {

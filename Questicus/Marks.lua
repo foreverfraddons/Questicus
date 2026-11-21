@@ -146,6 +146,71 @@ Q:On("QC_QUESTS_CHANGED", function() Q.Throttle("marks", 0.5, function() M:Rebui
 Q:On("QC_PLAN_UPDATED", function() Q.Throttle("marks", 0.5, function() M:Rebuild() end) end)
 Q:On("QC_TARGET_CHANGED", function() Q.Throttle("marksmain", 0.3, function() M:RebuildMain() end) end)
 
+-- ------------------------------------------------------------------ mob info (ForeverDB, from Drop Tables)
+-- gold = {[npc] = {average copper per kill, smallest, largest, kills}}; skin = {[item] = {npc, chance, ...}}
+local skinBy                      -- [npc] = { {item, chance}, ... } built once
+local function skinsOf(npc)
+  local db = Q.Data and Q.Data.db
+  if not (db and db.skin) then return nil end
+  if not skinBy then
+    skinBy = {}
+    for item, t in pairs(db.skin) do
+      for k = 1, #t - 1, 2 do
+        local l = skinBy[t[k]] or {}
+        l[#l + 1] = { item, t[k + 1] }
+        skinBy[t[k]] = l
+      end
+    end
+    for _, l in pairs(skinBy) do table.sort(l, function(x, y) return x[2] > y[2] end) end
+  end
+  return skinBy[npc]
+end
+local SKINNING_LINE = 393
+local function canSkin()
+  if GetProfessions and GetProfessionInfo then
+    local ok, a, b = pcall(GetProfessions)
+    for _, i in ipairs(ok and { a, b } or {}) do
+      local ok2, _, _, _, _, _, _, line = pcall(GetProfessionInfo, i)
+      if ok2 and line == SKINNING_LINE then return true end
+    end
+  end
+  if IsSpellKnown then
+    for _, s in ipairs({ 8613, 8617, 8618, 10768 }) do if IsSpellKnown(s) then return true end end
+  end
+  return false
+end
+local function npcOf(unit)
+  local g = UnitGUID and UnitGUID(unit)
+  local kind, id = g and g:match("^(%a+)%-%d+%-%d+%-%d+%-%d+%-(%d+)")
+  if kind == "Creature" then return tonumber(id) end
+end
+local function money(c)
+  if GetCoinTextureString then return GetCoinTextureString(c) end
+  return c .. "c"
+end
+-- money per kill (and what skinning gives, if you can skin) on mobs you can fight
+local function mobInfo(tt, unit)
+  if Q.db.marks.mobInfo == false then return end
+  if not (UnitCanAttack and UnitCanAttack("player", unit)) or UnitIsPlayer(unit) then return end
+  local npc = npcOf(unit)
+  local db = npc and Q.Data and Q.Data.db
+  if not db then return end
+  local g = db.gold and db.gold[npc]
+  if g and g[1] and g[1] > 0 then
+    tt:AddLine("Questicus: about " .. money(g[1]) .. " per kill", 0.25, 0.82, 0.79)
+  end
+  local sk = canSkin() and skinsOf(npc)
+  if sk and #sk > 0 then
+    local parts = {}
+    for k = 1, math.min(3, #sk) do
+      local id, ch = sk[k][1], sk[k][2]
+      local name = Q.GetItemInfo(id) or (Q.Data.Name and Q.Data:Name("i" .. id)) or ("item " .. id)
+      parts[#parts + 1] = name .. " " .. math.floor(ch / 100 + 0.5) .. "%"
+    end
+    tt:AddLine("Skinning: " .. table.concat(parts, ", "), 0.85, 0.7, 0.45)
+  end
+end
+
 -- tooltip line on units we mark (modern tooltip API; never in combat, never on forbidden tooltips)
 local function tipLine(tt)
   if not tt or (tt.IsForbidden and tt:IsForbidden()) or (InCombatLockdown and InCombatLockdown()) then return end
@@ -153,7 +218,12 @@ local function tipLine(tt)
   if not ok or type(unit) ~= "string" then return end
   local ok2, kind, why = pcall(M.Kind, M, unit)
   if ok2 and kind then tt:AddLine("|T" .. ICON[kind] .. ":12|t Questicus: " .. why, 0.25, 0.82, 0.79) end
+  pcall(mobInfo, tt, unit)
 end
+Q:Command("mobinfo", "money per kill and skinning on mob tooltips on / off", function()
+  Q.db.marks.mobInfo = Q.db.marks.mobInfo == false
+  Q:Print("mob tooltips: " .. (Q.db.marks.mobInfo and "on" or "off"))
+end)
 if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType then
   TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, tipLine)
 elseif GameTooltip and GameTooltip.HasScript and GameTooltip:HasScript("OnTooltipSetUnit") then
