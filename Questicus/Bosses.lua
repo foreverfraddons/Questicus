@@ -244,19 +244,32 @@ end
 local bar, card
 local slots = {}
 BT.slots = slots
+local SLOT_W, SLOT_H, PIC = 64, 86, 50   -- a boss: its round picture, its name under it (two lines)
 local function slot(i)
   local s = slots[i]
   if s then return s end
   s = CreateFrame("Button", nil, bar)
-  s:SetSize(54, 70)
+  s:SetSize(SLOT_W, SLOT_H)
   if s.RegisterForClicks then s:RegisterForClicks("LeftButtonUp", "RightButtonUp") end
   s.bg = T.RFill(s, { T.c.bg[1] * 0.6, T.c.bg[2] * 0.6, T.c.bg[3] * 0.6, 1 }, 6)
   s.icon = s:CreateTexture(nil, "ARTWORK")
-  s.icon:SetPoint("TOP", 0, -4)
-  s.icon:SetSize(46, 46)
+  s.icon:SetPoint("TOP", 0, -5)
+  s.icon:SetSize(PIC, PIC)
+  -- round portraits, all the same shape whatever they come from
+  if s.CreateMaskTexture then
+    local mk = s:CreateMaskTexture()
+    mk:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    mk:SetAllPoints(s.icon)
+    if s.icon.AddMaskTexture then s.icon:AddMaskTexture(mk) end
+  end
+  s.ring = s:CreateTexture(nil, "OVERLAY")
+  s.ring:SetTexture(Q.MEDIA .. "ring_thin")
+  s.ring:SetPoint("CENTER", s.icon, "CENTER")
+  s.ring:SetSize(PIC + 4, PIC + 4)
+  s.ring:SetVertexColor(T.c.line[1], T.c.line[2], T.c.line[3], 0.9)
   s.model = CreateFrame("PlayerModel", nil, s)
-  s.model:SetPoint("TOP", 0, -4)
-  s.model:SetSize(46, 46)
+  s.model:SetPoint("TOP", 0, -5)
+  s.model:SetSize(PIC, PIC)
   -- a model set while it wasn't drawn yet stays empty: set it again when it shows
   s.model:SetScript("OnShow", function(m)
     local nid = BT.modelNid and BT.modelNid[m]
@@ -273,10 +286,15 @@ local function slot(i)
   s.check:SetSize(30, 30)
   s.check:SetPoint("CENTER", s.icon, "CENTER", 0, 0)
   s.check:SetTexture("Interface\\RaidFrame\\ReadyCheck-Ready")
+  -- the name under the picture, never over it: up to two lines, shortened past that
   s.name = T.Text(s, 9, T.c.text)
-  s.name:SetPoint("BOTTOM", 0, 3)
-  s.name:SetWidth(52)
+  s.name:SetPoint("TOP", s.icon, "BOTTOM", 0, -4)
+  s.name:SetWidth(SLOT_W - 4)
+  s.name:SetHeight(24)
   s.name:SetJustifyH("CENTER")
+  s.name:SetJustifyV("TOP")
+  if s.name.SetWordWrap then s.name:SetWordWrap(true) end
+  if s.name.SetMaxLines then s.name:SetMaxLines(2) end
   s:SetScript("OnClick", function(self, btn)
     if not self.b then return end
     if btn == "RightButton" then BT:SetKilled(bar.e.area, self.b.name, not BT:Killed(bar.e.area, self.b.name))
@@ -294,15 +312,19 @@ local function slot(i)
   return s
 end
 
-local function portrait(s, b)
+-- The picture: the creature's own portrait (from its look, like the target frame's), else the
+-- Adventure Guide's picture - unless it's the guide's stand-in skull, which bosses without a picture
+-- of their own all share - else its 3D model, else a skull.
+local function portrait(s, b, shared)
   s.model:Hide()
   s.icon:Show()
   s.icon:SetTexCoord(0, 1, 0, 1)
-  if b.icon then
-    s.icon:SetTexture(b.icon)
-    s.icon:SetTexCoord(0.15, 0.85, 0, 1)      -- Adventure Guide portraits are wide
-  elseif b.display and SetPortraitTextureFromCreatureDisplayID then
+  local ownIcon = b.icon and not (shared and shared[b.icon])
+  if b.display and b.display ~= 0 and SetPortraitTextureFromCreatureDisplayID then
     pcall(SetPortraitTextureFromCreatureDisplayID, s.icon, b.display)
+  elseif ownIcon then
+    s.icon:SetTexture(b.icon)
+    s.icon:SetTexCoord(0.2, 0.8, 0, 1)        -- Adventure Guide portraits are wide: the middle
   elseif b.nid and s.model.SetCreature then
     s.icon:Hide()
     BT.modelNid = BT.modelNid or {}
@@ -481,27 +503,35 @@ function BT:Refresh()
   end
   for _, r in ipairs(lrows) do r:Hide() end
   local done, per = 0, 6
+  -- an Adventure Guide picture two bosses share is its stand-in, not theirs
+  local seen, shared = {}, {}
+  for _, b in ipairs(list) do
+    if b.icon then
+      if seen[b.icon] then shared[b.icon] = true end
+      seen[b.icon] = true
+    end
+  end
   for i, b in ipairs(list) do
     local s = slot(i)
     s.b = b
     local dead = BT:Killed(e.area, b.name)
     if dead then done = done + 1 end
-    portrait(s, b)
+    portrait(s, b, shared)
     s.icon:SetDesaturated(dead)
     s.model:SetAlpha(dead and 0.35 or 1)
     s.check:SetShown(dead)
     s.name:SetText(dead and c(DIM, b.name) or b.name)
     local col, row = (i - 1) % per, math.floor((i - 1) / per)
     s:ClearAllPoints()
-    s:SetPoint("TOPLEFT", 8 + col * 56, -30 - row * 72)
+    s:SetPoint("TOPLEFT", 8 + col * (SLOT_W + 2), -30 - row * (SLOT_H + 2))
     s:Show()
   end
   for i = #list + 1, #slots do slots[i]:Hide() end
   bar.count:SetText(#list > 0 and (done .. "/" .. #list) or "")
   bar.none:SetText(#list == 0 and "No boss data for this dungeon yet - bosses you fight here are added as you meet them." or "")
   local rows = math.max(1, math.ceil(#list / per))
-  bar:SetWidth(math.max(300, 16 + math.min(#list, per) * 56))
-  bar:SetHeight(30 + rows * 72 + 30)
+  bar:SetWidth(math.max(300, 16 + math.min(#list, per) * (SLOT_W + 2)))
+  bar:SetHeight(30 + rows * (SLOT_H + 2) + 30)
 end
 
 -- one boss: header (portrait, name, level), stats and fight, then its loot as item rows
