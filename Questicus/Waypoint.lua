@@ -21,6 +21,7 @@ function W:Pin(pt, track)
   if not pt then return false end
   local map, mx, my = D:MapPos(pt)
   if not map or not canPin(map) then return false end
+  if Q.Trace then Q.Trace("Questicus pins the waypoint") end
   local ok = pcall(C_Map.SetUserWaypoint, UiMapPoint.CreateFromCoordinates(map, mx, my))
   -- (super tracking set again makes the game rebuild its quest log - every header shut and opened -
   -- so only when it isn't on already)

@@ -336,3 +336,44 @@ Q:Command("questlogdebug", "save the world map quest log's search bar layout (fo
   Q.db.uiDebug[(tag and tag ~= "") and tag or "manual"] = out
   if not quiet then Q:Print("saved - /reload (or log out) so it's written to disk") end
 end)
+
+-- ------------------------------------------------------------------ open-the-map trace
+-- What happens in the first 3 seconds after the map opens (map changes, Questicus redraws and why,
+-- waypoint / super-tracking changes, the quest log list being rebuilt and who asked for it), kept for
+-- the last 3 openings in QuesticusDB.uiDebug.opens - for finding what redraws things on opening.
+local trace, traceStart
+function Q.Trace(what)
+  if not (trace and traceStart and GetTime) then return end
+  local t = GetTime() - traceStart
+  if t > 3 then trace = nil return end
+  if #trace < 120 then trace[#trace + 1] = ("%.2f %s"):format(t, what) end
+end
+local function caller()
+  local st = debugstack and debugstack(3, 3, 0) or ""
+  st = st:gsub("Interface[\\/]AddOns[\\/]", ""):gsub("\n", " < ")
+  return st:sub(1, 220)
+end
+Q:On("PLAYER_LOGIN", function()
+  if not WorldMapFrame then return end
+  WorldMapFrame:HookScript("OnShow", function()
+    trace, traceStart = { ("open on map %s"):format(tostring(WorldMapFrame:GetMapID())) }, GetTime and GetTime() or 0
+    Q.db.uiDebug = type(Q.db.uiDebug) == "table" and Q.db.uiDebug or {}
+    local opens = Q.db.uiDebug.opens or {}
+    table.insert(opens, 1, trace)
+    while #opens > 3 do table.remove(opens) end
+    Q.db.uiDebug.opens = opens
+  end)
+  if WorldMapFrame.OnMapChanged then
+    hooksecurefunc(WorldMapFrame, "OnMapChanged", function(m) Q.Trace("map -> " .. tostring(m:GetMapID())) end)
+  end
+  for _, fn in ipairs({ "QuestLogQuests_Update", "QuestMapFrame_UpdateAll", "QuestMapFrame_ResetFilters" }) do
+    if type(_G[fn]) == "function" then hooksecurefunc(fn, function() Q.Trace(fn .. " from " .. caller()) end) end
+  end
+  local sc = WorldMapFrame.ScrollContainer
+  if sc and sc.Child then
+    sc.Child:HookScript("OnSizeChanged", function(_, w, h) Q.Trace(("canvas %dx%d"):format(w or 0, h or 0)) end)
+  end
+end)
+for _, ev in ipairs({ "SUPER_TRACKING_CHANGED", "USER_WAYPOINT_UPDATED", "QUEST_LOG_UPDATE", "QUEST_WATCH_LIST_CHANGED" }) do
+  Q:On(ev, function() Q.Trace(ev) end)
+end

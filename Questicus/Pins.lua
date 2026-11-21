@@ -226,6 +226,20 @@ function PN:RefreshWorld(force)
       PN:DrawLeg()
       return
     end
+    -- (why, for the open-the-map trace: the first part of the signature that changed)
+    if Q.Trace then
+      local why = "first"
+      if PN.sig then
+        local a, b, i = {}, {}, 0
+        for x in (PN.sig .. "|"):gmatch("([^|]*)|") do a[#a + 1] = x end
+        for x in (sig .. "|"):gmatch("([^|]*)|") do b[#b + 1] = x end
+        local NAMES = { "map", "width", "height", "size", "world", "objectives", "others", "areas", "areasNext",
+          "collectibles", "db", "survey", "log", "taxi", "focus" }
+        for j = 1, math.max(#a, #b) do if a[j] ~= b[j] then i = j break end end
+        why = (NAMES[i] or ("step part " .. i)) .. " " .. tostring(a[i]) .. " -> " .. tostring(b[i])
+      end
+      Q.Trace("redraw: " .. why)
+    end
     PN.sig = sig
     PN.draws = (PN.draws or 0) + 1
   end
@@ -943,7 +957,13 @@ local function hookWorldMap()
   if not WorldMapFrame or PN.hooked then return end
   PN.hooked = true
   if WorldMapFrame.OnMapChanged then hooksecurefunc(WorldMapFrame, "OnMapChanged", function() PN:RefreshWorld() end) end
-  WorldMapFrame:HookScript("OnShow", function() PN:RefreshWorld(); Q.After(0.3, function() PN:UncoverStep() end) end)
+  -- (opening the map: checked once its own layout is done - read straight away the canvas could still
+  -- have the size it had while shut, a redraw for nothing, then another)
+  WorldMapFrame:HookScript("OnShow", function()
+    PN.openedAt = GetTime and GetTime() or 0
+    Q.After(0.1, function() PN:RefreshWorld() end)
+    Q.After(0.3, function() PN:UncoverStep() end)
+  end)
   local watcher = CreateFrame("Frame", nil, WorldMapFrame)
   local acc = 0
   watcher:SetScript("OnUpdate", function(_, el)
@@ -952,7 +972,8 @@ local function hookWorldMap()
     -- old size for a moment - the "flashing big" icons.
     local sc = WorldMapFrame.ScrollContainer
     local c = sc and sc.Child
-    if c and lastMap then
+    local settling = PN.openedAt and GetTime and (GetTime() - PN.openedAt) < 0.1
+    if c and lastMap and not settling then
       local w, h = c:GetWidth(), c:GetHeight()
       if WorldMapFrame:GetMapID() ~= lastMap or math.abs((w or 0) - (lastW or 0)) > 0.5
         or math.abs((h or 0) - (lastH or 0)) > 0.5 then

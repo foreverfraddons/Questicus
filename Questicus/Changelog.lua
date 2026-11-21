@@ -6,7 +6,11 @@
 -- update goes out once "next" holds 10 lines (release.yml, MIN_CHANGES).
 local Q = Questicus
 Q.Changelog = {
-  { v = "next" },
+  { v = "next",
+    fixed = {
+      "Opening the world map no longer redraws the quest areas when nothing has changed.",
+    },
+  },
   { v = "0.9.022",
     fixed = {
       "The yellow waypoint marker no longer covers the step icon on the world map: it turns see-through while it sits on the icon.",
