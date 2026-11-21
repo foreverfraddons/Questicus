@@ -116,6 +116,7 @@ function R:Kill(name, how)
   if not cur.kills[k] then
     cur.kills[k] = { t = now() - cur.start, how = how }
     cur.seen = now()
+    cur.lastBoss = { k = k, t = now() }
     local done = 0
     for _ in pairs(cur.kills) do done = done + 1 end
     if cur.bosses > 0 and done >= cur.bosses and not cur.done then cur.done = now() - cur.start end
@@ -187,7 +188,10 @@ local function onLoot(text)
   if not id then return end
   local q = select(3, Q.GetItemInfo(id))
   if q and q < 2 then return end                                    -- greys and whites: not worth a line
-  cur.loot[#cur.loot + 1] = { id = id, link = link, who = who, n = n, t = now() - cur.start }
+  -- which boss it came from: the corpse being looted, else the boss killed in the last few minutes
+  local boss = R.lootFrom
+  if not boss and cur.lastBoss and now() - (cur.lastBoss.t or 0) < 180 then boss = cur.lastBoss.k end
+  cur.loot[#cur.loot + 1] = { id = id, link = link, who = who, n = n, t = now() - cur.start, boss = boss }
   cur.seen = now()
   changed()
 end
@@ -292,7 +296,30 @@ local function deadUnit(unit)
 end
 Q:On("NAME_PLATE_UNIT_ADDED", deadUnit)
 Q:On("PLAYER_TARGET_CHANGED", function() deadUnit("target") end)
-Q:On("LOOT_OPENED", function() deadUnit("target") end)
+Q:On("LOOT_OPENED", function()
+  deadUnit("target")
+  -- looting a boss you killed: what you take is its loot
+  R.lootFrom = nil
+  local cur = R:Current()
+  if cur and GetLootSourceInfo then
+    local ok, guid = pcall(GetLootSourceInfo, 1)
+    local _, id = Q.ParseGUID(ok and guid or nil)
+    local nm = id and Q.Data and Q.Data.NPC and Q.Data:NPC(id)
+    nm = nm and nm[1]
+    if type(nm) == "string" and cur.kills[nm:lower()] then R.lootFrom = nm:lower() end
+  end
+end)
+Q:On("LOOT_CLOSED", function() Q.After(2, function() R.lootFrom = nil end) end)
+
+-- what dropped from a boss in this run (or `run`), and who got it
+function R:LootOf(name, run)
+  run = run or R:Current()
+  local out = {}
+  if not (run and name) then return out end
+  local k = name:lower()
+  for _, l in ipairs(run.loot or {}) do if l.boss == k then out[#out + 1] = l end end
+  return out
+end
 -- "X has been reset." for your dungeon
 Q:On("CHAT_MSG_SYSTEM", function(text)
   text = plain(text)

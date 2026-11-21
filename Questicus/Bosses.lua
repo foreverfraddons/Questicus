@@ -244,6 +244,17 @@ end
 local bar, card
 local slots = {}
 BT.slots = slots
+-- a creature's face as a still picture: its model, zoomed on the face, frozen on the first frame of
+-- standing (not moving about)
+function BT.Still(m, nid)
+  if not (m and nid and m.SetCreature) then return end
+  pcall(m.SetCreature, m, nid)
+  if m.SetPortraitZoom then pcall(m.SetPortraitZoom, m, 1) end
+  if m.SetAnimation then pcall(m.SetAnimation, m, 0) end
+  if m.FreezeAnimation then pcall(m.FreezeAnimation, m, 0, 0, 0) end
+  if m.SetPaused then pcall(m.SetPaused, m, true) end
+end
+
 local SLOT_W, SLOT_H, PIC = 64, 86, 50   -- a boss: its round picture, its name under it (two lines)
 local function slot(i)
   local s = slots[i]
@@ -273,10 +284,12 @@ local function slot(i)
   -- a model set while it wasn't drawn yet stays empty: set it again when it shows
   s.model:SetScript("OnShow", function(m)
     local nid = BT.modelNid and BT.modelNid[m]
-    if nid and m.SetCreature then
-      pcall(m.SetCreature, m, nid)
-      if m.SetPortraitZoom then pcall(m.SetPortraitZoom, m, 1) end
-    end
+    if nid then BT.Still(m, nid) end
+  end)
+  -- (the model loads a moment later: frozen again once it's there)
+  pcall(s.model.SetScript, s.model, "OnModelLoaded", function(m)
+    if m.FreezeAnimation then pcall(m.FreezeAnimation, m, 0, 0, 0) end
+    if m.SetPaused then pcall(m.SetPaused, m, true) end
   end)
   -- the tick sits on its own layer above the portrait (a 3D portrait would cover a plain texture)
   s.top = CreateFrame("Frame", nil, s)
@@ -304,6 +317,20 @@ local function slot(i)
     if not self.b then return end
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
     GameTooltip:AddLine(self.b.name, 1, 1, 1)
+    local area = bar and bar.e and bar.e.area
+    if area and BT:Killed(area, self.b.name) then
+      local kt = BT:KillTime(area, self.b.name)
+      GameTooltip:AddLine("Killed" .. (kt and Q.Runs and (" at " .. Q.Runs.Clock(kt)) or ""), 0.5, 0.86, 0.35)
+      local got = Q.Runs and Q.Runs.LootOf and Q.Runs:LootOf(self.b.name) or {}
+      if #got == 0 then
+        GameTooltip:AddLine("No loot recorded from it", 0.6, 0.6, 0.6)
+      else
+        for _, l in ipairs(got) do
+          GameTooltip:AddDoubleLine((l.link or ("item " .. tostring(l.id))) .. ((l.n or 1) > 1 and (" x" .. l.n) or ""),
+            tostring(l.who or "?"), 1, 1, 1, 0.8, 0.8, 0.8)
+        end
+      end
+    end
     GameTooltip:AddLine("Click: stats, fight and loot - right-click: tick off / undo", 0.7, 0.7, 0.7, true)
     GameTooltip:Show()
   end)
@@ -315,25 +342,29 @@ end
 -- The picture: the creature's own portrait (from its look, like the target frame's), else the
 -- Adventure Guide's picture - unless it's the guide's stand-in skull, which bosses without a picture
 -- of their own all share - else its 3D model, else a skull.
-local function portrait(s, b, shared)
+local DEAD_SKULL = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull"
+local function portrait(s, b, shared, dead)
   s.model:Hide()
   s.icon:Show()
   s.icon:SetTexCoord(0, 1, 0, 1)
+  if dead then                                  -- killed this run: a skull (the tick goes over it)
+    s.icon:SetTexture(DEAD_SKULL)
+    return
+  end
   local ownIcon = b.icon and not (shared and shared[b.icon])
-  if b.display and b.display ~= 0 and SetPortraitTextureFromCreatureDisplayID then
-    pcall(SetPortraitTextureFromCreatureDisplayID, s.icon, b.display)
-  elseif ownIcon then
-    s.icon:SetTexture(b.icon)
-    s.icon:SetTexCoord(0.2, 0.8, 0, 1)        -- Adventure Guide portraits are wide: the middle
-  elseif b.nid and s.model.SetCreature then
+  if b.nid and s.model.SetCreature then
     s.icon:Hide()
     BT.modelNid = BT.modelNid or {}
     BT.modelNid[s.model] = b.nid
     s.model:Show()
-    pcall(s.model.SetCreature, s.model, b.nid)
-    if s.model.SetPortraitZoom then pcall(s.model.SetPortraitZoom, s.model, 1) end
+    BT.Still(s.model, b.nid)
+  elseif ownIcon then
+    s.icon:SetTexture(b.icon)
+    s.icon:SetTexCoord(0.2, 0.8, 0, 1)        -- Adventure Guide portraits are wide: the middle
+  elseif b.display and b.display ~= 0 and SetPortraitTextureFromCreatureDisplayID then
+    pcall(SetPortraitTextureFromCreatureDisplayID, s.icon, b.display)
   else
-    s.icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_8")
+    s.icon:SetTexture(DEAD_SKULL)
   end
 end
 
@@ -516,9 +547,9 @@ function BT:Refresh()
     s.b = b
     local dead = BT:Killed(e.area, b.name)
     if dead then done = done + 1 end
-    portrait(s, b, shared)
-    s.icon:SetDesaturated(dead)
-    s.model:SetAlpha(dead and 0.35 or 1)
+    portrait(s, b, shared, dead)
+    s.icon:SetDesaturated(false)
+    s.model:SetAlpha(1)
     s.check:SetShown(dead)
     s.name:SetText(dead and c(DIM, b.name) or b.name)
     local col, row = (i - 1) % per, math.floor((i - 1) / per)
@@ -683,12 +714,12 @@ function BT:ShowBoss(e, b)
   card.lvl:SetText(lvl and tostring(lvl) or "?")
   card.model:Hide(); card.face:Show()
 
-  if b.display and SetPortraitTextureFromCreatureDisplayID then
-    pcall(SetPortraitTextureFromCreatureDisplayID, card.face, b.display)
-  elseif b.nid and card.model.SetCreature then
+  -- (the same still picture as in the tracker: its model first)
+  if b.nid and card.model.SetCreature then
     card.face:Hide(); card.model:Show()
-    pcall(card.model.SetCreature, card.model, b.nid)
-    if card.model.SetPortraitZoom then pcall(card.model.SetPortraitZoom, card.model, 1) end
+    BT.Still(card.model, b.nid)
+  elseif b.display and SetPortraitTextureFromCreatureDisplayID then
+    pcall(SetPortraitTextureFromCreatureDisplayID, card.face, b.display)
   elseif b.icon then
     card.face:SetTexture(b.icon)          -- (masked round: no tex coords allowed)
   else

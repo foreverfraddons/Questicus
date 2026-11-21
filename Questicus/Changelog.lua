@@ -10,7 +10,10 @@ Q.Changelog = {
     fixed = {
       "The yellow waypoint marker no longer covers the step icon on the world map: it turns see-through while it sits on the icon.",
       "The world map window's close and full-screen buttons are no longer hidden under the quest log's search bar.",
-      "Boss tracker: every boss gets its own round portrait (no more blank skulls), and names sit under the pictures instead of running over them.",
+      "Boss tracker: every boss gets its own still, round portrait (no more blank skulls or moving models), and names sit under the pictures instead of running over them.",
+    },
+    added = {
+      "Boss tracker: a boss you've killed this run turns into a skull with a tick; hover it to see what it dropped and who got it.",
     },
   },
   { v = "0.9.21",
