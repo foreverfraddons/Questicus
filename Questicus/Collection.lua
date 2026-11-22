@@ -99,6 +99,11 @@ function CM:Set(on)
     if Q.Planner then Q.Planner:BuildAsync() end
     Q:ShowGuide()
   end
+  -- the map and minimap: emptied of Questicus' icons in collection mode, back when it's off
+  if Q.Pins then
+    if Q.Pins.RefreshWorld then Q.Pins:RefreshWorld(true) end
+    if Q.Pins.RefreshMinimap then Q.Pins:RefreshMinimap() end
+  end
 end
 
 -- how much has been collected

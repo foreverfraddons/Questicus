@@ -137,7 +137,7 @@ local function signature(mapID, cw, ch)
   local parts = { mapID or 0, math.floor((cw or 0) + 0.5), math.floor((ch or 0) + 0.5),
     pins.size or 1, tostring(pins.world), tostring(pins.objectives), tostring(pins.others),
     tostring(pins.areas), tostring(pins.areasNext), tostring(Q.prefs.collectibles),
-    tostring(D:Ready()), tostring(Q.char.surveyDone), QS.logCount or 0,
+    tostring(D:Ready()), tostring(Q.char.surveyDone), QS.logCount or 0, tostring(Q.CollectOnly and Q.CollectOnly() or false),
     Q.OnTaxi() and "t" or "g", Q.Guide.focus or 1 }
   if D:Ready() and Q.char.surveyDone then
     for k, e in ipairs(PN.RouteSteps()) do
@@ -237,7 +237,7 @@ function PN:RefreshWorld(force)
         for x in (PN.sig .. "|"):gmatch("([^|]*)|") do a[#a + 1] = x end
         for x in (sig .. "|"):gmatch("([^|]*)|") do b[#b + 1] = x end
         local NAMES = { "map", "width", "height", "size", "world", "objectives", "others", "areas", "areasNext",
-          "collectibles", "db", "survey", "log", "taxi", "focus" }
+          "collectibles", "db", "survey", "log", "collect", "taxi", "focus" }
         for j = 1, math.max(#a, #b) do if a[j] ~= b[j] then i = j break end end
         why = (NAMES[i] or ("step part " .. i)) .. " " .. tostring(a[i]) .. " -> " .. tostring(b[i])
       end
@@ -251,7 +251,8 @@ function PN:RefreshWorld(force)
   PN:ReleaseAreas()
   for _, l in ipairs(PN.lines) do l.bg:Hide(); l.fg:Hide() end
   local mapID = WorldMapFrame:GetMapID()
-  if not (Q.db.pins.world and D:Ready() and Q.char.surveyDone) then
+  -- (collection mode: Questicus only records - nothing of its own on the map)
+  if not (Q.db.pins.world and D:Ready() and Q.char.surveyDone) or (Q.CollectOnly and Q.CollectOnly()) then
     lastMap, lastScale, lastW, lastH = mapID, canvasScale(sc), canvas:GetWidth(), canvas:GetHeight()
     PN.leg = nil
     PN:DrawLeg()
@@ -1131,7 +1132,7 @@ function PN:RefreshMinimap()
     PN.mmLines = mlineN
     for i = mlineN + 1, #mlines do mlines[i].bg:Hide(); mlines[i].fg:Hide() end
   end
-  if not (Q.db.pins.minimap and Q.char.surveyDone and P.steps) then hideLines(); return end
+  if not (Q.db.pins.minimap and Q.char.surveyDone and P.steps) or (Q.CollectOnly and Q.CollectOnly()) then hideLines(); return end
   local here = D:PlayerPos()
   if not here then hideLines(); return end
   local lines = Q.db.pins.mmRoute ~= false

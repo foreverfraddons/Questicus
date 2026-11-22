@@ -14,6 +14,9 @@ Q.Changelog = {
     changed = {
       "The options window is tidied into sections (General, Questing, Map & minimap, Tracker & alerts, Dungeons, Highlights, Advanced), each a short page with plainer wording.",
     },
+    fixed = {
+      "Collection mode no longer shows quest objectives and other Questicus icons on the map and minimap.",
+    },
   },
   { v = "0.9.023",
     fixed = {
