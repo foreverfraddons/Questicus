@@ -265,6 +265,7 @@ local function find()
   return false
 end
 G.Find = find
+function G.Unit() return UNIT end
 
 -- -> category, state ("far" | "ready" | "locked"), name, cursor file, quest id
 function G.Classify()

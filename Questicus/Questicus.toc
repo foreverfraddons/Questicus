@@ -24,6 +24,7 @@ Arrow.lua
 Pins.lua
 Auto.lua
 Collect.lua
+Record.lua
 Popup.lua
 Details.lua
 Learn.lua

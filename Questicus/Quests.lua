@@ -57,11 +57,16 @@ function QS.RewardXP(id, plvl)
   -- no data: what someone really got for it (your own turn-ins, any character)
   local rec = Q.Learn and Q.Learn:RecordedXP(id, plvl)
   if rec then return rec, true, true end
+  -- what the quest window said (ForeverDB qinfo, or this account's own recording)
+  local qi = (D.db and D.db.qinfo and D.db.qinfo[id]) or (QuesticusCollect and QuesticusCollect.qinfo and QuesticusCollect.qinfo[id])
+  if qi and qi.xp and qi.xp > 0 then return qi.xp, true, true end
   return math.floor(QS.QuestXP(q and q[2] or plvl, plvl)), false
 end
 function QS.RewardMoney(id)
   local r = QS.Rewards(id)
-  return r and r[1] or 0
+  if r and r[1] then return r[1] end
+  local qi = (D.db and D.db.qinfo and D.db.qinfo[id]) or (QuesticusCollect and QuesticusCollect.qinfo and QuesticusCollect.qinfo[id])
+  return qi and qi.m or 0
 end
 
 -- highest level that is grey (no XP to speak of) for a player of level plvl
@@ -339,6 +344,17 @@ function QS:Available(id, st)
   -- turn-ins, which can unlock it). Only for the live state, not for planning ahead.
   if not st and Q.char.blocked and Q.char.blocked[id] then return false end
   if st and st.blocked and st.blocked[id] then return false end
+  -- other players' recordings: every one of its givers didn't offer it at this level or higher
+  -- (ForeverDB qmiss), so it needs something the database doesn't know yet
+  local miss = D.db and D.db.qmiss and D.db.qmiss[id]
+  if miss and info.givers and #info.givers > 0 then
+    local all = true
+    for _, k in ipairs(info.givers) do
+      local npc = tonumber(tostring(k):match("^c:?(%d+)$"))
+      if not (npc and miss[npc] and level <= miss[npc]) then all = false break end
+    end
+    if all then return false end
+  end
   local x = info.x
   if not x[3] and not x[4] and QS.prevOf and QS.prevOf[id] then
     if not anyOf(QS.prevOf[id], done) then return false end
