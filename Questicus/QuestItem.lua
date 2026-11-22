@@ -173,7 +173,7 @@ end
 local function fight() return InCombatLockdown and InCombatLockdown() end
 
 function QI:Refresh()
-  if Q.db.questItem and Q.db.questItem.off then if btn and not fight() then btn:Hide() end return end
+  if (Q.db.questItem and Q.db.questItem.off) or (Q.CollectOnly and Q.CollectOnly()) then if btn and not fight() then btn:Hide() end return end
   if not (D:Ready() and Q.char and Q.char.surveyDone) then return end
   if fight() then QI.pending = true; return end      -- protected: wait for the fight to end
   if not btn then build() end

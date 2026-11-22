@@ -194,7 +194,7 @@ local function build()
   p = page("Highlights", "Ore, herbs, quest objects, chests and your fishing bobber light up as you come up to them.")
   check(p, "Highlights on", function() return Q.Glow.cfg().on end, function(v) Q.Glow.SetOn(v) end,
     "Off: Questicus gives the game back your own targeting settings.")
-  buttons(p, { { "Highlight settings", 150, function() frame:Hide(); Q.Glow.ShowSettings() end, "Effects, colours, what lights up and when (also /qc glow)." } })
+  buttons(p, { { "Highlight settings", 150, function() frame:Hide(); Q.Glow.ShowSettings(true) end, "Effects, colours, what lights up and when (also /qc glow)." } })
 
   -- 7. Advanced
   p = page("Advanced", "Recording and database helpers. You can leave these alone.")
@@ -224,6 +224,9 @@ local function build()
   news:SetScript("OnClick", function() Q.News:Show(nil) end)
 
   frame:SetScript("OnShow", function() for _, f in ipairs(refresh) do f() end end)
+  function frame.ShowPage(title)
+    for i, t in ipairs(tabs) do if t.label:GetText() == title then show(i) return end end
+  end
   show(1)
 end
 
@@ -235,8 +238,9 @@ function Q.MapSettings()
   Q:Print("Questicus Maps isn't running")
 end
 
-function Q:ShowOptions()
+function Q:ShowOptions(pageTitle)
   if not frame then build() end
+  if pageTitle and frame.ShowPage then frame.ShowPage(pageTitle) end
   frame:Show()
   frame:UpdateMeta()
 end

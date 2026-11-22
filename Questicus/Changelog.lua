@@ -12,10 +12,10 @@ Q.Changelog = {
       "Highlights options: hide the light in combat, in instances, on things you can't use yet or on herbs and ore without the profession; ignore objects; pick the range and direction; set the interact key; cut the light out around your character; alternate Find Herbs and Find Minerals if you have both.",
     },
     changed = {
-      "The options window is tidied into sections (General, Questing, Map & minimap, Tracker & alerts, Dungeons, Highlights, Advanced), each a short page with plainer wording.",
+      "The options window is tidied into sections (General, Questing, Map & minimap, Tracker & alerts, Dungeons, Highlights, Advanced), each a short page with plainer wording; closing the highlight settings takes you back to it.",
     },
     fixed = {
-      "Collection mode no longer shows quest objectives and other Questicus icons on the map and minimap.",
+      "Collection mode now turns every Questicus feature off - map and minimap icons, nameplate marks and tooltip lines, the quest tracker, pop-ups, the quest item button, the boss tracker and highlights - and back on when you leave it.",
     },
   },
   { v = "0.9.023",

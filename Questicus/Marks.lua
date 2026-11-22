@@ -117,7 +117,7 @@ function M:Plate(unit)
   if not (C_NamePlate and C_NamePlate.GetNamePlateForUnit) then return end
   local plate = C_NamePlate.GetNamePlateForUnit(unit)
   if not plate or (plate.IsForbidden and plate:IsForbidden()) then return end
-  local kind = Q.db.marks.plates and M:Kind(unit)
+  local kind = Q.db.marks.plates and not (Q.CollectOnly and Q.CollectOnly()) and M:Kind(unit)
   local o = overlays[plate]
   if not kind then if o then o:Hide() end return end
   o = overlay(plate)
@@ -213,6 +213,7 @@ end
 
 -- tooltip line on units we mark (modern tooltip API; never in combat, never on forbidden tooltips)
 local function tipLine(tt)
+  if (Q.CollectOnly and Q.CollectOnly()) then return end        -- collection mode: Questicus adds nothing
   if not tt or (tt.IsForbidden and tt:IsForbidden()) or (InCombatLockdown and InCombatLockdown()) then return end
   local ok, _, unit = pcall(tt.GetUnit, tt)
   if not ok or type(unit) ~= "string" then return end

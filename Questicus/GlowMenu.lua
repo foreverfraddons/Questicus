@@ -346,11 +346,16 @@ local function build()
     G.ApplyCVars()
     refreshAll()
   end)
-  win:HookScript("OnHide", function() win.outlineOn = false; showOutline(false) end)
+  win:HookScript("OnHide", function()
+    win.outlineOn = false; showOutline(false)
+    -- opened from the options window: back to it, on the Highlights page
+    if win.fromOptions then win.fromOptions = false; Q:ShowOptions("Highlights") end
+  end)
 end
 
-function G.ShowSettings()
+function G.ShowSettings(fromOptions)
   if not win then build() end
+  win.fromOptions = fromOptions and true or false
   refreshAll()
   win:Show()
 end

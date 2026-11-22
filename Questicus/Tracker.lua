@@ -105,7 +105,7 @@ TR.rowData = {}
 function TR:Refresh()
   local c = cfg()
   if not frame then return end
-  if not c.on then frame:Hide(); return end
+  if not c.on or (Q.CollectOnly and Q.CollectOnly()) then frame:Hide(); return end
   frame:Show()
   if not TR.sizing then frame:SetWidth(c.width) end
   frame.bg:SetVertexColor(T.c.bg[1], T.c.bg[2], T.c.bg[3], c.alpha)
@@ -456,7 +456,7 @@ end
 function TR:ApplyBlizzard()
   local f = ObjectiveTrackerFrame or WatchFrame
   if not f or (InCombatLockdown and InCombatLockdown()) then return end
-  local hide = cfg().on and cfg().hideBlizzard
+  local hide = cfg().on and cfg().hideBlizzard and not (Q.CollectOnly and Q.CollectOnly())
   if hide then
     if not TR.hooked and f.HookScript then
       TR.hooked = true

@@ -990,7 +990,7 @@ end)
 -- pop up inside a dungeon, and when the route's dungeon step comes up
 local lastAuto
 local function auto()
-  if Q.db.bossTracker == false then return end
+  if Q.db.bossTracker == false or (Q.CollectOnly and Q.CollectOnly()) then return end
   local e = BT:Current()
   if not e then
     local s = P.steps and P.steps[1]

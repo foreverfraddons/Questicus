@@ -127,7 +127,7 @@ end
 local fishing = false
 function G.ApplyCVars()
   local c = G.cfg()
-  if not c.on then
+  if not c.on or (Q.CollectOnly and Q.CollectOnly()) then
     -- off: the game gets back exactly what it had
     if c.orig then
       for n, v in pairs(c.orig) do setc(n, v) end
@@ -328,6 +328,7 @@ end
 function G.Wanted(cat, state, name)
   local c = G.cfg()
   if not c.on then return nil, "off" end
+  if (Q.CollectOnly and Q.CollectOnly()) then return nil, "collection mode" end
   if cat == "service" then return nil, "a character or a service" end
   if not G.cats()[cat] then return nil, "category off" end
   if name and c.ignored[name:lower()] then return nil, "ignored" end

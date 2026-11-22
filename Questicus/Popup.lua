@@ -103,7 +103,7 @@ end
 
 -- show a card: { title, text, icon, have, need, done, complete }
 function PU:Show(o)
-  if not (cfg().on and Q.char and Q.char.surveyDone ~= nil) then return end
+  if not (cfg().on and Q.char and Q.char.surveyDone ~= nil) or (Q.CollectOnly and Q.CollectOnly()) then return end
   if not anchor then buildAnchor() end
   -- the same quest + text again: update that card instead of stacking a new one
   local card

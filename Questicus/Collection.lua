@@ -99,10 +99,26 @@ function CM:Set(on)
     if Q.Planner then Q.Planner:BuildAsync() end
     Q:ShowGuide()
   end
-  -- the map and minimap: emptied of Questicus' icons in collection mode, back when it's off
-  if Q.Pins then
-    if Q.Pins.RefreshWorld then Q.Pins:RefreshWorld(true) end
-    if Q.Pins.RefreshMinimap then Q.Pins:RefreshMinimap() end
+  CM.ApplyAll()
+end
+
+-- Collection mode turns every Questicus feature off (it only records), and back on with it off:
+-- map and minimap icons, nameplate marks and tooltip lines, the quest tracker (the game's own comes
+-- back), pop-ups, the quest item button, the boss tracker, highlights (the game's targeting settings
+-- given back), the guide and arrow, automatic accepting / handing in / flying, the map pin.
+function CM.ApplyAll()
+  local function try(f, ...) if f then pcall(f, ...) end end
+  local on = Q.CollectOnly()
+  if Q.Pins then try(Q.Pins.RefreshWorld, Q.Pins, true); try(Q.Pins.RefreshMinimap, Q.Pins) end
+  if Q.Marks then try(Q.Marks.RefreshPlates, Q.Marks) end
+  if Q.Tracker then try(Q.Tracker.ApplyBlizzard, Q.Tracker); try(Q.Tracker.Refresh, Q.Tracker) end
+  if Q.QuestItem then try(Q.QuestItem.Refresh, Q.QuestItem) end
+  if Q.Glow then try(Q.Glow.ApplyCVars) end
+  if on then
+    for _, n in ipairs({ "QuesticusBosses", "QuesticusBoss" }) do
+      local f = _G[n]
+      if f and f.Hide then f:Hide() end
+    end
   end
 end
 
@@ -118,7 +134,7 @@ function CM:Counts()
   return n
 end
 
-Q:On("QC_READY", function() if Q.CollectOnly() then hideGuiding() end end)
+Q:On("QC_READY", function() if Q.CollectOnly() then hideGuiding(); Q.After(1, CM.ApplyAll) end end)
 
 Q:Command("collectonly", "collection mode: only record (routes, quests, XP, rewards), no guiding - on / off", function()
   CM:Set(not Q.CollectOnly())
