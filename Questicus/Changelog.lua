@@ -13,6 +13,7 @@ Q.Changelog = {
       "Highlights options: hide the light in combat, in instances, on things you can't use yet or on herbs and ore without the profession; ignore objects; pick the range and direction; set the interact key; cut the light out around your character; alternate Find Herbs and Find Minerals if you have both.",
     },
     changed = {
+      "Vendor gear on the route: no more plain white items (weapons still count), and only when buying it still leaves enough gold for your class training at the next level (what your trainer showed you, or the usual cost).",
       "Quests that let you choose a profession book (Mining for Dummies, Wild Harvest, Pelt Collecting for Beginners ...) are never handed in with a pick made for you: the reward window stays open so you choose.",
       "Kill and collect objectives: the arrow points to the closest spot, leaning toward your next step so you work through the area in that direction. Spots you just cleared, or where there was nothing, are skipped until they respawn; respawn times are measured while you play and shared through the database (1 minute until one is known). A quest object nobody has timed yet asks you once to wait for it to come back, so no one else has to. /qc respawn shows them.",
       "The options window is tidied into sections (General, Questing, Map & minimap, Tracker & alerts, Dungeons, Highlights, Advanced), each a short page with plainer wording; closing the highlight settings takes you back to it.",

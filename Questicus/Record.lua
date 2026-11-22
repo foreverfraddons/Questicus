@@ -320,18 +320,26 @@ Q:On("TRAINER_SHOW", function()
       if not id then return end
       noteUnit("npc"); noteSpot("c:" .. id)
       local list = {}
+      -- a class trainer of yours: what each level's training costs (Gear.lua keeps money for it)
+      local trade = IsTradeskillTrainer and IsTradeskillTrainer()
+      local costs = (not trade) and {} or nil
       for i = 1, GetNumTrainerServices() do
-        local name, sub = GetTrainerServiceInfo(i)
+        local name, sub, cat = GetTrainerServiceInfo(i)
         name = clean(name)
         if name then
           local okC, cost = pcall(GetTrainerServiceCost, i)
           local okL, lvl = pcall(GetTrainerServiceLevelReq or function() end, i)
+          local state = clean(cat) or clean(sub)
+          if costs and okC and okL and clean(cost) and clean(lvl) and state ~= "used" then
+            costs[lvl] = (costs[lvl] or 0) + cost
+          end
           local okK, skill, rank = pcall(GetTrainerServiceSkillReq or function() end, i)
           list[name .. (sub and sub ~= "" and (" (" .. sub .. ")") or "")] = { okC and clean(cost) or nil, okL and clean(lvl) or nil,
             okK and clean(skill) or nil, okK and clean(rank) or nil }
         end
       end
-      if next(list) then db().trn[id] = { t = time(), s = list } end
+      if next(list) then db().trn[id] = { t = time(), s = list, cls = (not trade) and Q.player.class or nil } end
+      if costs and next(costs) and Q.char then Q.char.trainCost = costs; Q.char.trainCostAt = UnitLevel("player") end
     end)
   end)
 end)

@@ -285,12 +285,39 @@ function G:BestChoice()
   return bestI or sellI, bestI ~= nil, bestPct
 end
 
+-- what class training at a level costs (copper): what your class trainer listed last time, else
+-- the usual classic amount (about 3 spells of 6 x level^2 copper each)
+function G.TrainingCost(level)
+  local t = Q.char and Q.char.trainCost
+  if t and t[level] ~= nil then return t[level] end
+  if t and Q.char.trainCostAt and level <= (Q.char.trainCostAt or 0) then return 0 end
+  -- the trainer listed this level and showed nothing for it: nothing to learn then
+  if t and next(t) then
+    local top = 0
+    for l in pairs(t) do if l > top then top = l end end
+    if level < top then return 0 end
+  end
+  return 18 * level * level
+end
+-- what an item costs at a vendor: recorded prices (Questicus, Command Center), else 4 x its sell price
+function G.BuyPrice(item, npc, it)
+  for _, src in ipairs({ QuesticusCollect, CommandCenterCollect }) do
+    local v = type(src) == "table" and src.vend and src.vend[npc]
+    local e = v and v[item]
+    if type(e) == "table" and tonumber(e[1]) then return tonumber(e[1]) end
+  end
+  return (it and it.sell or 0) * 4
+end
+
 -- vendor upgrades near a point: list of { item, npc, pct, point }
+--  * white (and grey) items only when they're weapons
+--  * only when you can buy it and still pay for your next level's class training
 function G:VendorUpgrades(level, near, radius)
   local out = {}
   if not D.db.vend then return out end
   radius = radius or 400
   local money = GetMoney and GetMoney() or 0
+  local keep = G.TrainingCost(level + 1)
   for item, npcs in pairs(D.db.vend) do
     local rec = D:Item(item)
     local req = rec and rec[3] or 0
@@ -300,7 +327,9 @@ function G:VendorUpgrades(level, near, radius)
         local p, d = D.Nearest(near, pts)
         if p and d <= radius then
           local gain, pct, _, _, it = G:Upgrade(item, level)
-          if gain and gain > 0 and pct >= 5 and it and money >= it.sell * 5 then
+          local plain = it and (it.quality or (rec and rec[2]) or 1) <= 1 and it.class ~= 2
+          if gain and gain > 0 and pct >= 5 and it and not plain
+            and money - G.BuyPrice(item, npc, it) >= keep then
             out[#out + 1] = { item = item, npc = npc, pct = pct, point = p }
           end
           break
