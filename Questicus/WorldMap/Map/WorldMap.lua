@@ -765,7 +765,15 @@ ticker:SetScript("OnUpdate", function(_, elapsed)
 		if u then S.SetPlayer(u, v, facing) else S.SetPlayer(nil) end
 	end
 
-	RaisePlayer()
+	-- the group's pins only need raising again when the map or its zoom changed, else twice a second
+	-- (this ran 10 times a second while the map was open: most of the map's garbage). Kept on the
+	-- ticker frame: no new locals (this file is near Lua's limit)
+	local cs = map.GetCanvasScale and map:GetCanvasScale() or 1
+	ticker.raiseN = (ticker.raiseN or 0) + 1
+	if ticker.raiseN >= 5 or ticker.raiseMap ~= mapID or ticker.raiseScale ~= cs then
+		ticker.raiseN, ticker.raiseMap, ticker.raiseScale = 0, mapID, cs
+		RaisePlayer()
+	end
 
 	stillFor = Settled() and stillFor + 0.1 or 0
 	if mod.db.autoSwitch and userMoved and stillFor >= SWITCH_AFTER and not InCombatLockdown() and not mod.benching then
@@ -887,8 +895,17 @@ end
 
 ApplyZoom = function()
 	if not active then return end
+	-- the same map at the same scale again in the same frame (opening the map announces the scale
+	-- several times: the zoom reset, the view, the zoom levels): nothing changed, so the whole zoom
+	-- isn't worked out again - that repeat was most of an opening's time. (Kept on mod: no new locals)
+	local id, cs, dk, now = map:GetMapID(), CanvasScale(), DetailK(), GetTime()
+	local last = mod.lastZoomApplied
+	if last and last.t == now and last.id == id and last.cs == cs and last.dk == dk and last.k == S.chartScale then ApplyView() return end
+	last = last or {}
+	mod.lastZoomApplied = last
+	last.t, last.id, last.cs, last.dk, last.k = now, id, cs, dk, S.chartScale
 	local g, t0 = Before(), Clock()
-	S.SetZoom(ZoomFor(map:GetMapID(), CanvasScale()) * DetailK(), CanvasScale())
+	S.SetZoom(ZoomFor(id, cs) * dk, cs)
 	After("zoom", g)
 	Clocked("Questicus Maps' zoom update", t0)
 	ApplyView()

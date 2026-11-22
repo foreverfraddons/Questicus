@@ -188,6 +188,29 @@ def replace_block(path, start, end, body):
     open(path, "w", encoding="utf-8", newline="\n").write(s)
 
 
+PATCHES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "map_patches")
+
+
+def apply_patches(tmp):
+    """Questicus' own changes to the map code (tools/map_patches/*.patch, paths a/Questicus/WorldMap/...),
+    applied again after every sync so an OpenMap update doesn't undo them. A patch that no longer fits
+    is skipped with a warning (the sync still goes through) - fix or drop it by hand."""
+    import subprocess
+    if not os.path.isdir(PATCHES):
+        return
+    for name in sorted(os.listdir(PATCHES)):
+        if not name.endswith(".patch"):
+            continue
+        path = os.path.join(PATCHES, name)
+        args = ["patch", "-d", tmp, "-p3", "--forward", "--batch", "--no-backup-if-mismatch", "-r", "-", "-i", path]
+        dry = subprocess.run(args + ["--dry-run"], capture_output=True, text=True)
+        if dry.returncode != 0:
+            print("WARNING: map patch", name, "no longer fits - skipped:\n" + dry.stdout + dry.stderr, file=sys.stderr)
+            continue
+        subprocess.run(args, check=True, capture_output=True, text=True)
+        print("map patch applied:", name)
+
+
 def code(upstream_root):
     up = os.path.join(upstream_root, "OpenMap")
     if not os.path.exists(os.path.join(up, "OpenMap.toc")):
@@ -221,6 +244,7 @@ def code(upstream_root):
             else:
                 shutil.copyfile(src, dst)
     open(os.path.join(tmp, "Guard.lua"), "w", encoding="utf-8", newline="\n").write(GUARD_FILE)
+    apply_patches(tmp)
     problems = check(tmp)
     if problems:
         raise SyncError("the new Questicus Maps still says OpenMap:\n  " + "\n  ".join(problems[:20]))

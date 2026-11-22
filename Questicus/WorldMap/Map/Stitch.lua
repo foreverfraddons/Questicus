@@ -322,9 +322,17 @@ function S.Stitched(mapID, host)
 end
 
 -- the map's art size (its canvas units)
+-- (kept per map: the game builds a new table on every GetMapArtLayers call, and this is asked
+-- thousands of times while the map is open - a map's art size never changes)
+S.artCache = S.artCache or {}      -- (on S: this file is at Lua's 200-locals limit)
 local function ArtSize(mapID)
-	local layers = C_Map.GetMapArtLayers(mapID)
-	local layer = layers and layers[1]
+	local artCache = S.artCache
+	local layer = mapID and artCache[mapID]
+	if layer == nil then
+		local layers = C_Map.GetMapArtLayers(mapID)
+		layer = layers and layers[1]
+		if mapID and layer then artCache[mapID] = layer end
+	end
 	if layer then return layer.layerWidth, layer.layerHeight, layer end
 end
 S.ArtSize = ArtSize
@@ -785,10 +793,17 @@ end
 
 -- sets a texture from a look: { atlas = } or { texture =, coords = }; an atlas this
 -- client lacks falls back to the texture, a missing texture to `fallback`
+-- (whether this client has an atlas, kept per name: GetAtlasInfo builds a new table on each call)
+S.atlasOK = S.atlasOK or {}
 local function Look(tex, look)
 	tex:SetTexCoord(0, 1, 0, 1)
 	tex:SetVertexColor(1, 1, 1, 1)
-	if look.atlas and (not C_Texture or not C_Texture.GetAtlasInfo or C_Texture.GetAtlasInfo(look.atlas)) then
+	local atlasOK = look.atlas and S.atlasOK[look.atlas]
+	if look.atlas and atlasOK == nil then
+		atlasOK = (not C_Texture or not C_Texture.GetAtlasInfo or C_Texture.GetAtlasInfo(look.atlas)) and true or false
+		S.atlasOK[look.atlas] = atlasOK
+	end
+	if look.atlas and atlasOK then
 		tex:SetAtlas(look.atlas)
 	else
 		local ok = tex:SetTexture(look.texture or look.fallback or "Interface\\Minimap\\ObjectIcons")
