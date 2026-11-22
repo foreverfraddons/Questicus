@@ -36,7 +36,8 @@ local W = {
 G.WEIGHTS = W
 G.STAT_NAMES = { STR = "Strength", AGI = "Agility", STA = "Stamina", INT = "Intellect", SPI = "Spirit", ARMOR = "Armor",
   AP = "Attack power", RAP = "Ranged attack power", SP = "Spell power", HEAL = "Healing", CRIT = "Crit", HIT = "Hit",
-  MP5 = "Mana per 5", DEF = "Defense", DODGE = "Dodge", BLOCK = "Block", DPS = "Weapon damage" }
+  MP5 = "Mana per 5", DEF = "Defense", DODGE = "Dodge", BLOCK = "Block", DPS = "Weapon damage",
+  RDPS = "Ranged weapon damage", WDPS = "Weapon damage (casters)" }
 G.STAT_ORDER = { "STR", "AGI", "STA", "INT", "SPI", "AP", "SP", "HEAL", "CRIT", "HIT", "MP5", "ARMOR", "DEF", "DODGE", "BLOCK", "DPS" }
 G.WEAPON_NAMES = { [0] = "One-hand axes", [1] = "Two-hand axes", [2] = "Bows", [3] = "Guns", [4] = "One-hand maces",
   [5] = "Two-hand maces", [6] = "Polearms", [7] = "One-hand swords", [8] = "Two-hand swords", [10] = "Staves",
@@ -50,9 +51,56 @@ local function learned()
 end
 G.Learned = learned
 
--- the weights actually used: role, then your stat priority (1st counts most), then what you said
--- about items you turned down ("bad stats for me" lowers those stats)
+-- weights you set yourself (Options > Stat weights), per character and role: used as they are
+local function custom(role)
+  local g = learned()
+  g.custom = type(g.custom) == "table" and g.custom or {}
+  if role then
+    local c = g.custom[role]
+    if type(c) == "table" and next(c) then return c end
+    return nil
+  end
+  return g.custom
+end
+G.CustomWeights = custom
+-- the stats a role has a weight for (the settings page lists these)
+function G:RoleStats(role)
+  local out, base = {}, W[role] or W.melee
+  for _, k in ipairs(G.STAT_ORDER) do out[#out + 1] = k end
+  for _, k in ipairs({ "RDPS", "WDPS" }) do if base[k] then out[#out + 1] = k end end
+  return out
+end
+-- the default weight of a stat for a role (0 when the role doesn't count it)
+function G.DefaultWeight(role, stat) return (W[role] or W.melee)[stat] or 0 end
+function G.SetWeight(role, stat, v)
+  local all = custom()
+  if not all[role] then
+    all[role] = {}
+    for k, d in pairs(W[role] or W.melee) do all[role][k] = d end   -- start from the defaults
+  end
+  all[role][stat] = math.max(0, tonumber(v) or 0)
+  G:Changed()
+end
+function G.ResetWeights(role)
+  custom()[role] = nil
+  G:Changed()
+end
+-- weights changed: scores worked out again, the route's gear steps too
+function G:Changed()
+  G:Reset()
+  if Q.Planner and Q.Planner.Replan then Q.Planner:Replan(1) end
+end
+
+-- the weights actually used: your own weights if you set them for this role; otherwise the role's,
+-- then your stat priority (1st counts most), then what you said about items you turned down
+-- ("bad stats for me" lowers those stats)
 function G:Weights(role)
+  local mine = custom(role)
+  if mine then
+    local w = {}
+    for k, v in pairs(mine) do w[k] = v end
+    return w
+  end
   local base = W[role] or W.melee
   local w = {}
   for k, v in pairs(base) do w[k] = v end

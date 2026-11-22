@@ -8,9 +8,11 @@ local Q = Questicus
 Q.Changelog = {
   { v = "next",
     added = {
+      "Options > Stat weights: set how much each stat is worth to you, per role. Gear upgrades and quest reward picks use your numbers (scroll over a number to nudge it; Back to defaults undoes it).",
       "Completionist routes now include WoW Forever's secret quest chains, starting with the Alcaz Operative Insignia (Alcaz Prison -> Moonbrook -> State Secrets), with step-by-step notes. Other routes leave secrets out.",
     },
     fixed = {
+      "Much less memory churn (the stutters every few seconds): minimap icons are only redrawn when you've moved, turned or the route changed, tooltips are made only when you point at an icon, and opening the world map no longer builds megabytes of temporary data.",
       "The route no longer sends you to quest givers who won't talk to you: quests that need reputation you don't have, quests from a faction you're unfriendly or hostile with (like Timbermaw before you've earned them), and quests whose NPCs you've seen are hostile to you are left out until that changes.",
     },
   },

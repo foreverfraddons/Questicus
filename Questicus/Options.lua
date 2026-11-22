@@ -190,13 +190,100 @@ local function build()
     function(v) db.bossLow = v; if Q.Bosses then Q.Bosses:Refresh() end end, "A plain list of the bosses, ticked off as you kill them. Click a name for its loot.")
   buttons(p, { { "Run history", 110, function() SlashCmdList.QUESTICUS("runs") end, "Every dungeon run: time, gold, XP and loot (also /qc runs)." } })
 
-  -- 6. Highlights
+  -- 6. Stat weights
+  p = page("Stat weights", "How much each stat is worth to you. Questicus uses these to find gear upgrades and pick quest rewards.")
+  local G = Q.Gear
+  local roleNow = function() return G:Role() end
+  local roles = {}
+  for _, r in ipairs(G.ROLES[Q.player.class] or { "melee" }) do
+    local nm = (G.ROLE_NAMES[r] or r):gsub(" %(.-%)", "")
+    roles[#roles + 1] = { r, nm }
+  end
+  local wrows, wnote = {}, nil
+  local function refreshWeights()
+    local role = roleNow()
+    local stats = G:RoleStats(role)
+    local mine = G.CustomWeights(role)
+    for i, r in ipairs(wrows) do
+      local k = stats[i]
+      r:SetShown(k ~= nil)
+      if k then
+        r.stat = k
+        r.label:SetText(G.STAT_NAMES[k] or k)
+        local v = (mine and mine[k]) or (not mine and G:Weights(role)[k]) or 0
+        r.box:SetText(("%g"):format(math.floor(v * 1000 + 0.5) / 1000))
+        local d = G.DefaultWeight(role, k)
+        r.label:SetTextColor(math.abs(v - d) > 1e-6 and 1 or 0.9, math.abs(v - d) > 1e-6 and 0.82 or 0.9, math.abs(v - d) > 1e-6 and 0.3 or 0.9)
+      end
+    end
+    if wnote then
+      wnote:SetText(mine and "Your own weights for this role (gold = changed from the default)."
+        or "The defaults for this role, adjusted by your stat priority from the setup questions. Change any number to use your own.")
+    end
+  end
+  if #roles > 1 then
+    group(p, "Role")
+    local seg = T.Segments(p, roles, roleNow, function(v) Q.prefs.role = v; G:Changed(); refreshWeights() end, 100)
+    seg:SetPoint("TOPLEFT", 8, p.y)
+    refresh[#refresh + 1] = seg.Refresh
+    p.y = p.y - 32
+  end
+  group(p, "Worth per point")
+  local top = p.y
+  for i = 1, 18 do
+    local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
+    local r = CreateFrame("Frame", nil, p)
+    r:SetSize(215, 22)
+    r:SetPoint("TOPLEFT", 8 + col * 225, top - row * 25)
+    r.label = T.Text(r, 11)
+    r.label:SetPoint("LEFT")
+    local box = CreateFrame("EditBox", nil, r)
+    box:SetSize(64, 20)
+    box:SetPoint("RIGHT")
+    box:SetAutoFocus(false)
+    box:SetFontObject(GameFontHighlightSmall)
+    box:SetJustifyH("CENTER")
+    box:SetMaxLetters(7)
+    T.RFill(box, T.c.bg2, 4)
+    local function commit(self)
+      local v = tonumber(self:GetText())
+      if v and r.stat then G.SetWeight(roleNow(), r.stat, v) end
+      self:ClearFocus()
+      refreshWeights()
+    end
+    box:SetScript("OnEnterPressed", commit)
+    box:SetScript("OnEditFocusLost", function(self) if self.dirty then self.dirty = false; commit(self) end end)
+    box:SetScript("OnTextChanged", function(self, user) if user then self.dirty = true end end)
+    box:SetScript("OnEscapePressed", function(self) self.dirty = false; self:ClearFocus(); refreshWeights() end)
+    -- mouse wheel over the number: up / down by a step that fits its size
+    box:EnableMouseWheel(true)
+    box:SetScript("OnMouseWheel", function(self, delta)
+      if not r.stat then return end
+      local v = tonumber(self:GetText()) or 0
+      local step = v >= 5 and 1 or (v >= 0.5 and 0.1 or 0.01)
+      G.SetWeight(roleNow(), r.stat, math.max(0, v + delta * step))
+      refreshWeights()
+    end)
+    r.box = box
+    wrows[i] = r
+  end
+  p.y = top - 9 * 25 - 4
+  wnote = T.Text(p, 10, T.c.dim)
+  wnote:SetPoint("TOPLEFT", 8, p.y)
+  wnote:SetWidth(440)
+  wnote:SetJustifyH("LEFT")
+  p.y = p.y - 28
+  buttons(p, { { "Back to defaults", 130, function() G.ResetWeights(roleNow()); refreshWeights() end,
+    "Forget your own weights for this role and use the defaults again." } })
+  refresh[#refresh + 1] = refreshWeights
+
+  -- 7. Highlights
   p = page("Highlights", "Ore, herbs, quest objects, chests and your fishing bobber light up as you come up to them.")
   check(p, "Highlights on", function() return Q.Glow.cfg().on end, function(v) Q.Glow.SetOn(v) end,
     "Off: Questicus gives the game back your own targeting settings.")
   buttons(p, { { "Highlight settings", 150, function() frame:Hide(); Q.Glow.ShowSettings(true) end, "Effects, colours, what lights up and when (also /qc glow)." } })
 
-  -- 7. Advanced
+  -- 8. Advanced
   p = page("Advanced", "Recording and database helpers. You can leave these alone.")
   check(p, "Help fill the database", function() return db.collect ~= false end, function(v) db.collect = v end,
     "Saves where quest objectives count up and what you looted for them. Fills map spots ForeverDB is missing, for you right away and for everyone once your recordings are synced.")
