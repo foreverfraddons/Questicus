@@ -297,6 +297,21 @@ function G.TrainingCost(level)
     for l in pairs(t) do if l > top then top = l end end
     if level < top then return 0 end
   end
+  -- every class's training costs, recorded by players at their trainers (ForeverDB train)
+  local all = D.db and D.db.train and D.db.train[Q.player.class]
+  if all and next(all) then
+    G.trainByLevel = G.trainByLevel or {}
+    local by = G.trainByLevel[Q.player.class]
+    if not by then
+      by = {}
+      for _, e in pairs(all) do
+        local cost, lv = tonumber(e[1]), tonumber(e[2])
+        if cost and lv then by[lv] = (by[lv] or 0) + cost end
+      end
+      G.trainByLevel[Q.player.class] = by
+    end
+    return by[level] or 0
+  end
   return 18 * level * level
 end
 -- what an item costs at a vendor: recorded prices (Questicus, Command Center), else 4 x its sell price

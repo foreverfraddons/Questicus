@@ -329,10 +329,14 @@ Q:On("TRAINER_SHOW", function()
         if name then
           local okC, cost = pcall(GetTrainerServiceCost, i)
           local okL, lvl = pcall(GetTrainerServiceLevelReq or function() end, i)
-          local state = clean(cat) or clean(sub)
+          -- (this client: name, "available" / "unavailable" / "used"; others: name, rank, that state)
+          local STATES = { available = true, unavailable = true, used = true }
+          local state, rankText = clean(cat), clean(sub)
+          if rankText and STATES[rankText] then state, rankText = rankText, nil end
           if costs and okC and okL and clean(cost) and clean(lvl) and state ~= "used" then
             costs[lvl] = (costs[lvl] or 0) + cost
           end
+          sub = rankText
           local okK, skill, rank = pcall(GetTrainerServiceSkillReq or function() end, i)
           list[name .. (sub and sub ~= "" and (" (" .. sub .. ")") or "")] = { okC and clean(cost) or nil, okL and clean(lvl) or nil,
             okK and clean(skill) or nil, okK and clean(rank) or nil }
