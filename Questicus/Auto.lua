@@ -90,11 +90,55 @@ Q:On("QUEST_PROGRESS", function()
   if IsQuestCompletable and IsQuestCompletable() then after(function() CompleteQuest() end) end
 end)
 
+-- does the reward choice teach a profession? Forever's starting quests offer "Mining for Dummies",
+-- "Wild Harvest", "Pelt Collecting for Beginners" ...: the book's name, its tooltip ("Use: Teaches you
+-- Mining") or its kind (recipe / profession item) gives it away
+local PROFS = { "mining", "herbalism", "skinning", "alchemy", "blacksmithing", "enchanting", "engineering",
+  "leatherworking", "tailoring", "jewelcrafting", "inscription", "cooking", "fishing", "first aid", "archaeology" }
+local function teaches(text)
+  if type(text) ~= "string" or Q.Secret(text) then return false end
+  local t = text:lower()
+  if t:find("for dummies", 1, true) or t:find("for beginners", 1, true) then return true end
+  if t:find("teaches you", 1, true) or t:find("learn ", 1, true) then
+    for _, p in ipairs(PROFS) do if t:find(p, 1, true) then return true end end
+  end
+  return false
+end
+local function choiceTeaches(i)
+  local name = GetQuestItemInfo and GetQuestItemInfo("choice", i)
+  if teaches(name) then return true end
+  local link = GetQuestItemLink and GetQuestItemLink("choice", i)
+  local id = type(link) == "string" and not Q.Secret(link) and tonumber(link:match("item:(%d+)"))
+  if not id then return false end
+  if teaches(Q.GetItemInfo and Q.GetItemInfo(id)) then return true end
+  local cls = C_Item and C_Item.GetItemInfoInstant and select(6, C_Item.GetItemInfoInstant(id))
+  if cls == 9 then return true end                       -- recipes / profession books
+  if C_TooltipInfo and C_TooltipInfo.GetItemByID then
+    local ok, data = pcall(C_TooltipInfo.GetItemByID, id)
+    for _, l in ipairs(ok and data and data.lines or {}) do
+      if teaches(l.leftText) then return true end
+    end
+  end
+  return false
+end
+function Q.ProfessionChoice(n)
+  for i = 1, n or 0 do
+    if choiceTeaches(i) then return true end
+  end
+  return false
+end
+
 Q:On("QUEST_COMPLETE", function()
   if paused() or not Q.prefs.autoTurnIn then return end
   local n = GetNumQuestChoices and GetNumQuestChoices() or 0
   if n <= 1 then return after(function() GetQuestReward(n) end) end
   if not Q.prefs.autoReward then return end
+  -- a choice of professions (Forever's starting quests: "Mining for Dummies", "Herbalism for
+  -- Dummies" ...): yours to pick, never picked for you
+  if Q.ProfessionChoice and Q.ProfessionChoice(n) then
+    Q:Print("pick the profession you want from the rewards - Questicus leaves that choice to you")
+    return
+  end
   local i, isUpgrade, pct = G:BestChoice()
   if not i then return end
   local link = GetQuestItemLink("choice", i)
