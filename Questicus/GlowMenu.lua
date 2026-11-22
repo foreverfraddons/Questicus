@@ -32,25 +32,40 @@ local function slider(parent, label, lo, hi, step, get, set, fmt, tip)
   f.label:SetPoint("TOPLEFT")
   f.value = T.Text(f, 11, T.c.text)
   f.value:SetPoint("TOPRIGHT")
+  -- a plain slider: thin groove, the filled part in the accent colour, and a knob you drag
   local track = CreateFrame("Button", nil, f)
-  track:SetPoint("BOTTOMLEFT", 0, 4); track:SetPoint("BOTTOMRIGHT", 0, 4); track:SetHeight(12)
-  T.RFill(track, T.c.bg2, 4)
+  track:SetPoint("BOTTOMLEFT", 0, 0); track:SetPoint("BOTTOMRIGHT", 0, 0); track:SetHeight(16)
+  local groove = track:CreateTexture(nil, "BACKGROUND")
+  groove:SetColorTexture(T.c.bg2[1], T.c.bg2[2], T.c.bg2[3], 1)
+  groove:SetPoint("LEFT", 0, 0); groove:SetPoint("RIGHT", 0, 0); groove:SetHeight(4)
+  local edge = track:CreateTexture(nil, "BORDER")
+  edge:SetColorTexture(0, 0, 0, 0.6)
+  edge:SetPoint("TOPLEFT", groove, "TOPLEFT", -1, 1); edge:SetPoint("BOTTOMRIGHT", groove, "BOTTOMRIGHT", 1, -1)
+  edge:SetDrawLayer("BACKGROUND", -1)
   local bar = track:CreateTexture(nil, "ARTWORK")
-  bar:SetTexture(Q.MEDIA .. "rfill")
-  bar:SetPoint("LEFT"); bar:SetHeight(12)
-  bar:SetVertexColor(T.c.accent[1], T.c.accent[2], T.c.accent[3], 0.8)
+  bar:SetColorTexture(T.c.accent[1], T.c.accent[2], T.c.accent[3], 0.9)
+  bar:SetPoint("LEFT", groove, "LEFT"); bar:SetHeight(4)
+  local knob = CreateFrame("Frame", nil, track)
+  knob:SetSize(10, 16)
+  T.RFill(knob, T.c.accent, 3)
+  T.Border(knob, { 0, 0, 0, 0.8 }, 3)
+  knob:EnableMouse(false)
   f.tip = tip
   local function show()
     local v = get()
     f.label:SetText(label)
     f.value:SetText((fmt or "%d"):format(v))
     local w = track:GetWidth() or 250
-    bar:SetWidth(math.max(1, w * (v - lo) / (hi - lo)))
+    if not w or w <= 0 then w = 250 end
+    local k = math.max(0, math.min(1, (v - lo) / (hi - lo)))
+    bar:SetWidth(math.max(1, (w - 10) * k + 5))
+    knob:ClearAllPoints()
+    knob:SetPoint("CENTER", track, "LEFT", 5 + (w - 10) * k, 0)
   end
   local function fromX(x)
     local l, w = track:GetLeft(), track:GetWidth()
-    if not (x and l and w and w > 0) then return end
-    local k = math.max(0, math.min(1, (x - l) / w))
+    if not (x and l and w and w > 10) then return end
+    local k = math.max(0, math.min(1, (x - l - 5) / (w - 10)))
     local v = lo + k * (hi - lo)
     v = math.floor(v / step + 0.5) * step
     set(v); show()
@@ -69,6 +84,7 @@ local function slider(parent, label, lo, hi, step, get, set, fmt, tip)
     if f.tip then GameTooltip:SetOwner(s, "ANCHOR_RIGHT"); GameTooltip:SetText(f.tip, 1, 1, 1, 1, true); GameTooltip:Show() end
   end)
   track:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  track:SetScript("OnSizeChanged", function() show() end)
   f.Refresh = show
   refreshers[#refreshers + 1] = show
   show()

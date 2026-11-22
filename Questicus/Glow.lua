@@ -185,15 +185,44 @@ local function objectives()
   for i = 1, C_QuestLog.GetNumQuestLogEntries() do
     local id = C_QuestLog.GetQuestIDForLogIndex and C_QuestLog.GetQuestIDForLogIndex(i)
     if id and id > 0 then
+      local open = false
       for _, o in ipairs(C_QuestLog.GetQuestObjectives(id) or {}) do
-        if not o.finished and type(o.text) == "string" then objectiveText[#objectiveText + 1] = { o.text:lower(), id } end
+        if not o.finished and type(o.text) == "string" and not S(o.text) then
+          objectiveText[#objectiveText + 1] = { o.text:lower(), id }
+          open = true
+        end
+      end
+      -- the line under the quest's title ("Collect 15 Windstone Clusters from Raw Windstones"): the
+      -- progress lines only name the item, the object it comes from is named here
+      if open then
+        local txt
+        if GetQuestLogQuestText then
+          local ok, _, obj = pcall(GetQuestLogQuestText, i)
+          if ok and type(obj) == "string" and not S(obj) then txt = obj end
+        end
+        local rec = (QuesticusCollect and QuesticusCollect.qinfo and QuesticusCollect.qinfo[id])
+          or (Q.Data.db and Q.Data.db.qinfo and Q.Data.db.qinfo[id])
+        if not txt and rec and type(rec.o) == "string" then txt = rec.o end
+        if txt and txt ~= "" then objectiveText[#objectiveText + 1] = { txt:lower(), id } end
       end
     end
   end
   return objectiveText
 end
 Q:On("QUEST_LOG_UPDATE", function() objectiveText = nil end)
-local function questFor(name)
+local function questFor(name, objId)
+  -- the object is where a quest you have gets its items (ForeverDB / recordings: quest sources)
+  local QS = Q.Quests
+  if objId and QS and QS.log then
+    local key = "o" .. objId
+    for qid, e in pairs(QS.log) do
+      local src = (Q.Data.db and Q.Data.db.qsrc and Q.Data.db.qsrc[qid])
+      local own = QuesticusCollect and QuesticusCollect.qsrc and QuesticusCollect.qsrc[qid]
+      if (src and src[key]) or (own and (own[key] or own["o:" .. objId])) then
+        if not (type(e) == "table" and e.complete) then return qid end
+      end
+    end
+  end
   if not name then return end
   local n = name:lower()
   for _, e in ipairs(objectives()) do
@@ -290,11 +319,16 @@ function G.Classify()
   -- tied to a quest you have: the game says so, or an objective names it
   local okQ, rel = pcall(C_QuestLog and C_QuestLog.UnitIsRelatedToActiveQuest or function() end, UNIT)
   if okQ and rel == true then cat = "quest" end
+  local guid = UnitGUID and UnitGUID(UNIT)
+  local objId
+  if type(guid) == "string" and not S(guid) then
+    local kind, id = Q.ParseGUID(guid)
+    if kind == "GameObject" then objId = id end
+  end
   if cat ~= "service" then
-    qid = questFor(name)
+    qid = questFor(name, objId)
     if qid then cat = "quest" end
   end
-  local guid = UnitGUID and UnitGUID(UNIT)
   if type(guid) == "string" and not S(guid) then
     local kind, id = Q.ParseGUID(guid)
     if kind == "GameObject" and id and BOBBER[id] then cat = "bobber" end
@@ -318,6 +352,7 @@ function G.Classify()
     end
   end
   cat = cat or "other"
+  G.lastCursor = cur                         -- (the game's own cursor: usable unless "Unable...")
   local state = "far"
   local okR, inR = pcall(UnitIsInInteractRange or function() end, UNIT)
   if okR and inR == true then state = "ready" end
@@ -336,7 +371,8 @@ function G.Wanted(cat, state, name)
   if c.hideCombat and UnitAffectingCombat and UnitAffectingCombat("player") then return nil, "in combat" end
   if c.hideInstance and IsInInstance and select(2, IsInInstance()) ~= "none" and select(2, IsInInstance()) ~= nil then return nil, "in an instance" end
   if c.hideLocked and state == "locked" then return nil, "unusable for now" end
-  if c.hideUntrained and (cat == "herb" or cat == "ore") and not professions()[cat] then return nil, "profession not learned" end
+  if c.hideUntrained and (cat == "herb" or cat == "ore") and not professions()[cat]
+    and (state == "locked" or not G.lastCursor) then return nil, "profession not learned" end
   return true
 end
 
