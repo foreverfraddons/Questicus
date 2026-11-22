@@ -692,8 +692,14 @@ local function build()
   local acc = 0
   frame:SetScript("OnUpdate", function(_, el)
     acc = acc + el
-    if acc < (Q.OnTaxi() and 1.5 or 0.5) then return end
+    if acc < 0.5 then return end
     acc = 0
+    -- on a flight path the distance isn't measured: "in flight" once, measured again when you land
+    if Q.OnTaxi() then
+      if not frame.inFlight then frame.inFlight = true; if cur and cur.info then cur.info:SetText("in flight") end end
+      return
+    end
+    frame.inFlight = nil
     GD:RefreshDistance()
   end)
 end
