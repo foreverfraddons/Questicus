@@ -372,6 +372,14 @@ Q:On("PLAYER_LOGIN", function()
   local sc = WorldMapFrame.ScrollContainer
   if sc and sc.Child then
     sc.Child:HookScript("OnSizeChanged", function(_, w, h) Q.Trace(("canvas %dx%d"):format(w or 0, h or 0)) end)
+    -- (who sizes it, the first few times after opening)
+    local told = 0
+    for _, fn in ipairs({ "SetSize", "SetWidth", "SetHeight", "SetScale" }) do
+      hooksecurefunc(sc.Child, fn, function(_, a1, a2)
+        if trace and told < 6 then told = told + 1; Q.Trace(("canvas:%s(%s,%s) from %s"):format(fn, tostring(a1), tostring(a2), caller())) end
+      end)
+    end
+    WorldMapFrame:HookScript("OnShow", function() told = 0 end)
   end
 end)
 for _, ev in ipairs({ "SUPER_TRACKING_CHANGED", "USER_WAYPOINT_UPDATED", "QUEST_LOG_UPDATE", "QUEST_WATCH_LIST_CHANGED" }) do

@@ -186,6 +186,7 @@ function PN:FixLevel()
   lvl = math.min(MAX_LEVEL, lvl)
   local old = PN.overlay:GetFrameLevel() or lvl
   if old ~= lvl then
+    if Q.Trace then Q.Trace(("Questicus layer %d -> %d"):format(old, lvl)) end
     PN.overlay:SetFrameLevel(lvl)
     -- (each icon keeps its own distance above the layer: step icon over its ring over the dots)
     if wpool then
@@ -221,6 +222,8 @@ function PN:RefreshWorld(force)
   do
     local sig = signature(WorldMapFrame:GetMapID(), canvas:GetWidth(), canvas:GetHeight())
     if sig == PN.sig then
+      -- (the size the same to the pixel that counts: remembered, so the next frame doesn't check again)
+      lastW, lastH = canvas:GetWidth(), canvas:GetHeight()
       local cs = canvasScale(sc)
       if lastScale and math.abs(cs - lastScale) > lastScale * 1e-4 then PN:Rescale(cs) end
       PN:DrawLeg()
@@ -961,6 +964,10 @@ local function hookWorldMap()
   -- have the size it had while shut, a redraw for nothing, then another)
   WorldMapFrame:HookScript("OnShow", function()
     PN.openedAt = GetTime and GetTime() or 0
+    -- (Questicus Maps lays its art out again as the map opens, higher up: Questicus' layer is put back
+    -- over it at once and on every frame while that settles - found under it for a moment, the
+    -- quest areas and icons looked like they were drawn again)
+    PN:FixLevel()
     Q.After(0.1, function() PN:RefreshWorld() end)
     Q.After(0.3, function() PN:UncoverStep() end)
   end)
@@ -972,7 +979,9 @@ local function hookWorldMap()
     -- old size for a moment - the "flashing big" icons.
     local sc = WorldMapFrame.ScrollContainer
     local c = sc and sc.Child
-    local settling = PN.openedAt and GetTime and (GetTime() - PN.openedAt) < 0.1
+    local since = PN.openedAt and GetTime and (GetTime() - PN.openedAt) or 99
+    local settling = since < 0.1
+    if since < 2 then PN:FixLevel() end
     if c and lastMap and not settling then
       local w, h = c:GetWidth(), c:GetHeight()
       if WorldMapFrame:GetMapID() ~= lastMap or math.abs((w or 0) - (lastW or 0)) > 0.5
