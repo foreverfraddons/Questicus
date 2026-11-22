@@ -46,6 +46,8 @@ Minimap.lua
 Integrate.lua
 Changelog.lua
 News.lua
+Glow.lua
+GlowMenu.lua
 
 # Questicus Maps: one seamless world map, every zone stitched together - built from OpenMap (MIT). Its textures
 # are in Media\Textures (Forever tiles).

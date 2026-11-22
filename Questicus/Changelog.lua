@@ -6,7 +6,12 @@
 -- update goes out once "next" holds 10 lines (release.yml, MIN_CHANGES).
 local Q = Questicus
 Q.Changelog = {
-  { v = "next" },
+  { v = "next",
+    added = {
+      "Highlights: ore, herbs, quest objects, chests and your fishing bobber light up as you come up to them, with 15 light effects, the object's name and icon, colours per kind of object, and a live preview (Options > Highlights, or /qc glow).",
+      "Highlights options: hide the light in combat, in instances, on things you can't use yet or on herbs and ore without the profession; ignore objects; pick the range and direction; set the interact key; cut the light out around your character; alternate Find Herbs and Find Minerals if you have both.",
+    },
+  },
   { v = "0.9.023",
     fixed = {
       "Opening the world map no longer redraws the quest areas when nothing has changed.",
