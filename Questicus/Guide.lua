@@ -113,11 +113,31 @@ end
 -- ------------------------------------------------------------------ current target
 -- The point the arrow should point at: for objective steps, the nearest spot of an objective
 -- that is not finished yet.
+-- (the arrow, map, minimap and waypoint all ask many times a second: the answer for a "complete"
+-- step is worked out at most 4 times a second, or at once when the quest log / spots change)
+local tcache = {}
+GD.tver = 0
+Q:On("QC_QUESTS_CHANGED", function() GD.tver = GD.tver + 1 end)
+Q:On("QC_PLAN_UPDATED", function() GD.tver = GD.tver + 1 end)
 function GD:Target(index)
-  local s = P.steps and P.steps[index or GD.focus]
+  local idx = index or GD.focus
+  local s = P.steps and P.steps[idx]
   if not s then return end
   if s.type ~= "complete" then return s.point, s end
   if s.unknown then return D:QuestWaypoint(s.quests[1]) or s.point, s end
+  local c = tcache[idx]
+  local now = GetTime and GetTime() or 0
+  if c and c.s == s and c.ver == GD.tver and now - c.t < 0.25 and not (Q.Spots and Q.Spots.dirty) then
+    if idx == GD.focus then GD.targetOf = c.of end
+    return c.p, s, c.of
+  end
+  local p1, _, of1 = GD:TargetNow(idx, s)
+  c = c or {}
+  tcache[idx] = c
+  c.s, c.ver, c.t, c.p, c.of = s, GD.tver, now, p1, of1
+  return p1, s, of1
+end
+function GD:TargetNow(index, s)
   local here = D:PlayerPos()
   -- only objectives that aren't finished: the arrow moves on to the next one by itself
   -- remember which quest / objective the chosen spot belongs to (the arrow names that one)
@@ -138,13 +158,16 @@ function GD:Target(index)
       Q.Spots.entries = entries
       local pick = Q.Spots.Choose(entries, here, index or GD.focus)
       best = pick and pick.p
-      GD.spotPick = { s = s, t = now, p = best }
+      c = GD.spotPick or {}
+      GD.spotPick = c
+      c.s, c.t, c.p = s, now, best
     end
   end
   best = best or D.Nearest(here or s.point, pts)
   local e = best and of[best]
-  GD.targetOf = e and { id = e.id, li = e.li, key = best.key } or nil
-  return best or s.point, s, GD.targetOf
+  local tof = e and { id = e.id, li = e.li, key = best.key } or nil
+  if (index or GD.focus) == GD.focus then GD.targetOf = tof end
+  return best or s.point, s, tof
 end
 
 -- Mobs for other quests in your log that live along the way to this step: kill them as you pass.

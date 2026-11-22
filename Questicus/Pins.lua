@@ -27,20 +27,24 @@ local function pool(parent, size)
       b.num = T.Text(b, 9, T.c.text, "OUTLINE")
       b.num:SetPoint("BOTTOMRIGHT", 3, -2)
       b:SetScript("OnEnter", function(s)
-        if not s.tip then return end
+        local tip = s.tip
+        if not tip and s.tipFn then tip = s.tipFn(s) end        -- built only when you point at it
+        if not tip then return end
         GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
-        for i, l in ipairs(s.tip) do
+        for i, l in ipairs(tip) do
           if i == 1 then GameTooltip:AddLine(l, 1, 0.82, 0.3, true) else GameTooltip:AddLine(l, 0.9, 0.9, 0.9, true) end
         end
-        if s.spot then GameTooltip:AddLine("Ctrl-click: wrong spot? Remove it from the database", 0.6, 0.6, 0.6, true) end
+        if s.spot or s.spotK then GameTooltip:AddLine("Ctrl-click: wrong spot? Remove it from the database", 0.6, 0.6, 0.6, true) end
         GameTooltip:Show()
       end)
       b:SetScript("OnLeave", function() GameTooltip:Hide() end)
       b:SetScript("OnClick", function(s)
         -- Ctrl-click: nothing is there - remove the spot (for you now, for everyone via the recordings)
-        if s.spot and IsControlKeyDown and IsControlKeyDown() then
+        local key, where = s.spotK, s.spotP
+        if not key and s.spot then key, where = s.spot[1], s.spot[2] end
+        if key and IsControlKeyDown and IsControlKeyDown() then
           GameTooltip:Hide()
-          D:RemoveSpot(s.spot[1], s.spot[2])
+          D:RemoveSpot(key, where)
           return
         end
         if s.step then Q.Guide.focus = s.step; Q.Guide:Refresh() end
@@ -53,7 +57,11 @@ local function pool(parent, size)
     return b
   end
   function p:Release()
-    for i = 1, #self.list do self.list[i]:Hide(); self.list[i].tip = nil; self.list[i].step = nil; self.list[i].spot = nil end
+    for i = 1, #self.list do
+      local b = self.list[i]
+      b:Hide(); b.tip = nil; b.step = nil; b.spot = nil
+      b.tipFn, b.spotK, b.spotP, b.ta, b.tb, b.tc, b.td = nil, nil, nil, nil, nil, nil, nil
+    end
     self.used = 0
   end
   return p
@@ -165,6 +173,15 @@ local function eachWaypointPin(fn)
   end
 end
 local MAX_LEVEL = 9800
+-- (no new functions per call: FixLevel runs every frame for 2 s after the map opens)
+local fixLvl = 0
+local function raiseOver(pin)
+  local pl = pin.GetFrameLevel and pin:GetFrameLevel() or 0
+  if pl >= fixLvl and pl + 10 <= MAX_LEVEL then fixLvl = pl + 10 end
+end
+local function pushUnder(pin)
+  if pin.SetFrameLevel and (pin:GetFrameLevel() or 0) >= fixLvl then pcall(pin.SetFrameLevel, pin, fixLvl - 1) end
+end
 function PN:FixLevel()
   if not (PN.overlay and canvas) then return end
   local lvl = (canvas:GetFrameLevel() or 1) + 2500
@@ -179,11 +196,9 @@ function PN:FixLevel()
       if okL and tonumber(il) then lvl = math.max(lvl, il + 8) end
     end
   end
-  eachWaypointPin(function(pin)
-    local pl = pin.GetFrameLevel and pin:GetFrameLevel() or 0
-    if pl >= lvl and pl + 10 <= MAX_LEVEL then lvl = pl + 10 end
-  end)
-  lvl = math.min(MAX_LEVEL, lvl)
+  fixLvl = lvl
+  eachWaypointPin(raiseOver)
+  lvl = math.min(MAX_LEVEL, fixLvl)
   local old = PN.overlay:GetFrameLevel() or lvl
   if old ~= lvl then
     if Q.Trace then Q.Trace(("Questicus layer %d -> %d"):format(old, lvl)) end
@@ -195,9 +210,8 @@ function PN:FixLevel()
     if PN.areaLayer then PN.areaLayer:SetFrameLevel(math.max(1, lvl - 1)) end
   end
   -- a waypoint pin still at or above our layer (the game puts it high): down under it
-  eachWaypointPin(function(pin)
-    if pin.SetFrameLevel and (pin:GetFrameLevel() or 0) >= lvl then pcall(pin.SetFrameLevel, pin, lvl - 1) end
-  end)
+  fixLvl = lvl
+  eachWaypointPin(pushUnder)
 end
 
 -- the next draw happens whatever the signature says (a spot removed, a patrol recorded, a loading screen)
@@ -481,11 +495,8 @@ function PN:DrawLeg()
           PN.legLines[used] = l
         end
         local a1, b1, a2, b2 = ax * L.cw, -ay * L.ch, leg[1] * L.cw, -leg[2] * L.ch
-        for _, ln in ipairs({ l.bg, l.fg }) do
-          ln:SetStartPoint("TOPLEFT", canvas, a1, b1)
-          ln:SetEndPoint("TOPLEFT", canvas, a2, b2)
-          ln:Show()
-        end
+        l.bg:SetStartPoint("TOPLEFT", canvas, a1, b1); l.bg:SetEndPoint("TOPLEFT", canvas, a2, b2); l.bg:Show()
+        l.fg:SetStartPoint("TOPLEFT", canvas, a1, b1); l.fg:SetEndPoint("TOPLEFT", canvas, a2, b2); l.fg:Show()
         l.fg:SetColorTexture(L.col[1], L.col[2], L.col[3], 0.95)
         l.px = 5
         l.fg:SetThickness(5 / cs)
@@ -539,27 +550,55 @@ local function screenCenter(f)
   k = k or 1
   return x * k, y * k, (w or 0) * k
 end
+-- (reused between runs: walking the map's frames made a table per frame - megabytes on every open)
+local uncoverList, uncoverKeep, uncoverN = {}, {}, 0
+local kidBufs = {}
+local function fillKids(t, ...)
+  local n = select("#", ...)
+  for i = 1, n do t[i] = (select(i, ...)) end
+  for i = n + 1, #t do t[i] = nil end
+  return n
+end
+local function uncoverWalk(p, depth)
+  if depth > 7 or uncoverN > 6000 then return end
+  local buf = kidBufs[depth] or {}
+  kidBufs[depth] = buf
+  local k = fillKids(buf, p:GetChildren())
+  for i = 1, k do
+    local c = buf[i]
+    if c and not (c.IsForbidden and c:IsForbidden()) then
+      uncoverN = uncoverN + 1
+      uncoverList[uncoverN] = c
+      if c ~= PN.overlay and (c.GetNumChildren and c:GetNumChildren() or 0) > 0 then uncoverWalk(c, depth + 1) end
+    end
+  end
+end
+local function hasUserWaypoint()
+  if C_Map and C_Map.HasUserWaypoint then
+    local ok, v = pcall(C_Map.HasUserWaypoint)
+    if ok and v and not Q.Secret(v) then return true end
+  end
+  if C_SuperTrack and C_SuperTrack.IsSuperTrackingAnything then
+    local ok, v = pcall(C_SuperTrack.IsSuperTrackingAnything)
+    if ok and v and not Q.Secret(v) then return true end
+  end
+  return false
+end
 function PN:UncoverStep()
   local ic = PN.leg and PN.leg.icon
-  local keep = {}
-  if ic and ic:IsVisible() and EnumerateFrames and WorldMapFrame and WorldMapFrame:IsShown() then
+  local keep = uncoverKeep
+  wipe(keep)
+  -- no waypoint / quest being followed: nothing of the game's to move out of the way
+  if ic and ic:IsVisible() and WorldMapFrame and WorldMapFrame:IsShown() and hasUserWaypoint() then
     local ix, iy, iw = screenCenter(ic)
     if ix then
       local near = math.max(10, iw * 0.6)
       -- only the map's own frames (the markers are all on it), not every frame in the game
-      local list, n = {}, 0
-      local function walk(p, depth)
-        if depth > 7 or n > 6000 then return end
-        for _, c in ipairs({ p:GetChildren() }) do
-          if not (c.IsForbidden and c:IsForbidden()) then
-            n = n + 1
-            list[#list + 1] = c
-            if c ~= PN.overlay then walk(c, depth + 1) end
-          end
-        end
-      end
-      walk(WorldMapFrame, 0)
-      for _, f in ipairs(list) do
+      uncoverN = 0
+      uncoverWalk(WorldMapFrame, 0)
+      for j = uncoverN + 1, #uncoverList do uncoverList[j] = nil end
+      for j = 1, uncoverN do
+        local f = uncoverList[j]
         if f ~= ic and f.IsVisible and f:IsVisible() then
           local x, y, w = screenCenter(f)
           if x and w < 80 and math.abs(x - ix) < near and math.abs(y - iy) < near and f:GetParent() ~= PN.overlay
@@ -725,11 +764,8 @@ function PN:ShowPatrolTop(e)
       topLines[n] = l
     end
     local a, b = e.pts[j], e.pts[j + 1]
-    for _, ln in ipairs({ l.bg, l.fg }) do
-      ln:SetStartPoint("TOPLEFT", canvas, a[1] * e.cw, -a[2] * e.ch)
-      ln:SetEndPoint("TOPLEFT", canvas, b[1] * e.cw, -b[2] * e.ch)
-      ln:Show()
-    end
+    l.bg:SetStartPoint("TOPLEFT", canvas, a[1] * e.cw, -a[2] * e.ch); l.bg:SetEndPoint("TOPLEFT", canvas, b[1] * e.cw, -b[2] * e.ch); l.bg:Show()
+    l.fg:SetStartPoint("TOPLEFT", canvas, a[1] * e.cw, -a[2] * e.ch); l.fg:SetEndPoint("TOPLEFT", canvas, b[1] * e.cw, -b[2] * e.ch); l.fg:Show()
     l.fg:SetColorTexture(math.min(1, col[1] + 0.25), math.min(1, col[2] + 0.25), math.min(1, col[3] + 0.25), 1)
     l.fg:SetThickness(6 / (lastScale or e.cs))
     l.bg:SetThickness(10 / (lastScale or e.cs))
@@ -928,11 +964,8 @@ function PN:Line(i, x1, y1, x2, y2, col, px, cw, ch, cs)
     PN.lines[i] = l
   end
   local a1, b1, a2, b2 = x1 * cw, -y1 * ch, x2 * cw, -y2 * ch
-  for _, ln in ipairs({ l.bg, l.fg }) do
-    ln:SetStartPoint("TOPLEFT", canvas, a1, b1)
-    ln:SetEndPoint("TOPLEFT", canvas, a2, b2)
-    ln:Show()
-  end
+  l.bg:SetStartPoint("TOPLEFT", canvas, a1, b1); l.bg:SetEndPoint("TOPLEFT", canvas, a2, b2); l.bg:Show()
+  l.fg:SetStartPoint("TOPLEFT", canvas, a1, b1); l.fg:SetEndPoint("TOPLEFT", canvas, a2, b2); l.fg:Show()
   l.fg:SetColorTexture(col[1], col[2], col[3], 0.95)
   l.fg:SetThickness(px / cs)
   l.bg:SetThickness((px + 3) / cs)
@@ -1089,11 +1122,8 @@ local function mmLine(x1, y1, x2, y2, col, w, alpha)
     l.bg:SetColorTexture(0, 0, 0, 0.6)
     mlines[mlineN] = l
   end
-  for _, ln in ipairs({ l.bg, l.fg }) do
-    ln:SetStartPoint("CENTER", Minimap, a1, b1)
-    ln:SetEndPoint("CENTER", Minimap, a2, b2)
-    ln:Show()
-  end
+  l.bg:SetStartPoint("CENTER", Minimap, a1, b1); l.bg:SetEndPoint("CENTER", Minimap, a2, b2); l.bg:Show()
+  l.fg:SetStartPoint("CENTER", Minimap, a1, b1); l.fg:SetEndPoint("CENTER", Minimap, a2, b2); l.fg:Show()
   l.fg:SetColorTexture(col[1], col[2], col[3], alpha or 0.95)
   l.fg:SetThickness(w)
   l.bg:SetThickness(w + 2)
@@ -1123,27 +1153,117 @@ local function minimapXY(here, pt, clamp)
   return ex * scale, ny * scale, dist <= radius
 end
 
-function PN:RefreshMinimap()
+-- minimap pins' tooltips, built only when you point at one (no tables per refresh)
+local MMTIP = {}
+function MMTIP.giver(b) return QS:QuestTip(b.ta, D:Name(b.tb), "Quest you can pick up") end
+function MMTIP.skull(b) return { D:Name("c" .. b.ta), "Kill for: " .. tostring(b.tb), "Current step" } end
+function MMTIP.mob(b) return { D:Name("c" .. b.ta), "For: " .. tostring(b.tb) } end
+function MMTIP.obj(b)
+  local info = QS:Info(b.tb)
+  return { D:Name(b.ta or ""), info and info.title or "", PN.LABELS[b.tc] }
+end
+function MMTIP.step(b)
+  local t = { Q.Guide.StepText(b.ta), PN.LABELS[b.tb] .. " - step " .. b.tc .. " of your route" }
+  local note = b.td and D:Note(b.td)
+  if note then t[#t + 1] = note end
+  return t
+end
+
+local function mmHideLines()
+  PN.mmLines = mlineN
+  for i = mlineN + 1, #mlines do mlines[i].bg:Hide(); mlines[i].fg:Hide() end
+end
+local function mmPut(b, x, y)
+  b:ClearAllPoints()
+  b:SetPoint("CENTER", Minimap, "CENTER", x, y)
+end
+local mmMobN = 0
+local function mmMobs(here, list, skull)
+  for npc, title in pairs(list) do
+    if skull or not Q.Marks.main[npc] then
+      for _, mp in ipairs(D:Points("c" .. npc)) do
+        if mmMobN >= 50 then break end
+        if mp.i == here.i and not mp.dungeon and D.Dist(here, mp) < 260 then
+          local x, y = minimapXY(here, mp)
+          if x then
+            local b = mpool:Get()
+            if skull then
+              style(b, PN.SKULL8, 13, 1, 1, 1, 1)
+              b:SetFrameLevel(b:GetFrameLevel() + 2)
+              b.tipFn = MMTIP.skull
+            else
+              style(b, PN.CROSS, 11, 1, 1, 1, 0.9)
+              b.tipFn = MMTIP.mob
+            end
+            b.ta, b.tb = npc, title
+            b.spotK, b.spotP = "c" .. npc, mp
+            mmPut(b, x, y)
+            mmMobN = mmMobN + 1
+          end
+        end
+      end
+    end
+  end
+end
+
+-- the first leg's path, worked out again only when you've moved a few yards or the step changed
+local navCache = {}
+local function navRoute(here, pt)
+  local c = navCache
+  if c.pt == pt and c.i == here.i and math.abs(c.x - here.x) < 4 and math.abs(c.y - here.y) < 4 then return c.path end
+  c.pt, c.i, c.x, c.y = pt, here.i, here.x, here.y
+  c.path = Q.Nav:Route(here, pt)
+  return c.path
+end
+
+-- what the minimap pins depend on: nothing changed since the last draw = nothing to draw
+local mmLast = {}
+local function mmUnchanged(here, firstPt)
+  local L = mmLast
+  local rot = GetCVar and GetCVar("rotateMinimap") == "1"
+  local facing = rot and GetPlayerFacing and GetPlayerFacing() or 0
+  local zoom = Minimap:GetZoom() or 0
+  local w = Minimap:GetWidth() or 0
+  local mver = Q.Marks and Q.Marks.ver or 0
+  local same = L.i == here.i and L.x and math.abs(L.x - here.x) < 1 and math.abs(L.y - here.y) < 1
+    and math.abs((L.f or 0) - facing) < 0.03 and L.z == zoom and L.w == w and L.mv == mver
+    and L.steps == P.steps and L.focus == (Q.Guide.focus or 1) and L.pt == firstPt
+    and L.px == (firstPt and firstPt.x) and L.py == (firstPt and firstPt.y)
+    and L.fly == (Q.OnTaxi() or (IsFlying and IsFlying()) or false) and L.ver == (PN.mmVer or 0)
+    and L.indoor == (IsIndoors and IsIndoors() or false)
+    and L.lines == (Q.db.pins.mmRoute ~= false) and L.others == (Q.db.pins.others and true or false)
+  if same then return true end
+  L.lines, L.others = Q.db.pins.mmRoute ~= false, Q.db.pins.others and true or false
+  L.i, L.x, L.y, L.f, L.z, L.w, L.mv = here.i, here.x, here.y, facing, zoom, w, mver
+  L.steps, L.focus, L.pt = P.steps, Q.Guide.focus or 1, firstPt
+  L.px, L.py = firstPt and firstPt.x, firstPt and firstPt.y
+  L.fly, L.ver, L.indoor = Q.OnTaxi() or (IsFlying and IsFlying()) or false, PN.mmVer or 0, IsIndoors and IsIndoors() or false
+  return false
+end
+-- something the pins show changed (settings, quest log, a spot taken off): draw again
+function PN.MinimapDirty() PN.mmVer = (PN.mmVer or 0) + 1 end
+for _, ev in ipairs({ "QC_QUESTS_CHANGED", "QC_PLAN_UPDATED", "QC_TARGET_CHANGED", "MINIMAP_UPDATE_ZOOM", "QC_SETTINGS" }) do
+  Q:On(ev, function() PN.MinimapDirty() end)
+end
+
+function PN:RefreshMinimap(force)
   if not Minimap then return end
   if not mpool then mpool = pool(Minimap, 14) end
+  if not (Q.db.pins.minimap and Q.char.surveyDone and P.steps) or (Q.CollectOnly and Q.CollectOnly()) then
+    if mpool.used > 0 or mlineN > 0 then mpool:Release(); mlineN = 0; mmHideLines() end
+    mmLast.i = nil
+    return
+  end
+  local here = D:PlayerPos()
+  if not here then mpool:Release(); mlineN = 0; mmHideLines(); return end
+  local route = PN.RouteSteps()
+  if not force and mmUnchanged(here, route[1] and route[1].point) then return end
   mpool:Release()
   mlineN = 0
-  local function hideLines()
-    PN.mmLines = mlineN
-    for i = mlineN + 1, #mlines do mlines[i].bg:Hide(); mlines[i].fg:Hide() end
-  end
-  if not (Q.db.pins.minimap and Q.char.surveyDone and P.steps) or (Q.CollectOnly and Q.CollectOnly()) then hideLines(); return end
-  local here = D:PlayerPos()
-  if not here then hideLines(); return end
   local lines = Q.db.pins.mmRoute ~= false
   -- flying (flight path or flying mount): no route lines or trails, just the icons
   local flying = Q.OnTaxi() or (IsFlying and IsFlying()) or false
   if flying then lines = false end
-  local function put(b, x, y)
-    b:ClearAllPoints()
-    b:SetPoint("CENTER", Minimap, "CENTER", x, y)
-  end
-  local half = (Minimap:GetWidth() or 140) / 2
   -- quest givers you can pick up from, nearby: star
   if Q.db.pins.others then
     for _, id in ipairs(availableQuests()) do
@@ -1155,9 +1275,9 @@ function PN:RefreshMinimap()
             if x then
               local b = mpool:Get()
               style(b, PN.STAR, 12, 1, 1, 1, 0.95)
-              b.tip = QS:QuestTip(id, D:Name(k), "Quest you can pick up")
-              b.spot = { k, gp }
-              put(b, x, y)
+              b.tipFn, b.ta, b.tb = MMTIP.giver, id, k
+              b.spotK, b.spotP = k, gp
+              mmPut(b, x, y)
             end
           end
         end
@@ -1167,41 +1287,17 @@ function PN:RefreshMinimap()
   -- mobs you still need for quests in your log (kills and every mob that drops a quest item): X
   -- the current step's mobs get a skull and are drawn first
   if Q.Marks and Q.Marks.need then
-    local n = 0
-    local function mobs(list, skull)
-      for npc, title in pairs(list) do
-        if skull or not Q.Marks.main[npc] then
-          for _, mp in ipairs(D:Points("c" .. npc)) do
-            if n >= 50 then break end
-            if mp.i == here.i and not mp.dungeon and D.Dist(here, mp) < 260 then
-              local x, y = minimapXY(here, mp)
-              if x then
-                local b = mpool:Get()
-                if skull then
-                  style(b, PN.SKULL8, 13, 1, 1, 1, 1)
-                  b:SetFrameLevel(b:GetFrameLevel() + 2)
-                  b.tip = { D:Name("c" .. npc), "Kill for: " .. title, "Current step" }
-                else
-                  style(b, PN.CROSS, 11, 1, 1, 1, 0.9)
-                  b.tip = { D:Name("c" .. npc), "For: " .. title }
-                end
-                b.spot = { "c" .. npc, mp }
-                put(b, x, y)
-                n = n + 1
-              end
-            end
-          end
-        end
-      end
-    end
-    mobs(Q.Marks.main, true)
-    mobs(Q.Marks.need, false)
+    mmMobN = 0
+    mmMobs(here, Q.Marks.main, true)
+    mmMobs(here, Q.Marks.need, false)
   end
   local prev, prevX, prevY = here, 0, 0
-  for k, e in ipairs(PN.RouteSteps()) do
+  local patrolled = PN.mmPatrolled or {}
+  PN.mmPatrolled = patrolled
+  for k, e in ipairs(route) do
     local col, s, pt = PN.COLORS[k], e.step, e.point
     if s.type == "complete" and k <= 2 then
-      local patrolled = {}
+      wipe(patrolled)
       for _, sp in ipairs(P.StepPoints(s)) do
         local op, id = sp.p, sp.id
         local path = D:Patrol(op.key)
@@ -1231,9 +1327,9 @@ function PN:RefreshMinimap()
             if x then
               local b = mpool:Get()
               style(b, DOT, k == 1 and 8 or 6, col[1], col[2], col[3], k == 1 and 0.9 or 0.6)
-              b.tip = { D:Name(op.key or ""), (QS:Info(id) and QS:Info(id).title or ""), PN.LABELS[k] }
-              if op.key and op.key:sub(1, 1) ~= "t" then b.spot = { op.key, op } end
-              put(b, x, y)
+              b.tipFn, b.ta, b.tb, b.tc = MMTIP.obj, op.key, id, k
+              if op.key and op.key:sub(1, 1) ~= "t" then b.spotK, b.spotP = op.key, op end
+              mmPut(b, x, y)
             end
           end
         end
@@ -1244,16 +1340,17 @@ function PN:RefreshMinimap()
       -- route line from the previous point (you, then the step before); the first leg follows
       -- the less obstructed path. Lines are clipped at the minimap's edge, so they still show
       -- the way to steps that are further away.
-      local legs = { pt }
-      if k == 1 and Q.Nav and not Q.OnTaxi() then
-        local path = Q.Nav:Route(here, pt)
-        if path and #path > 1 then legs = path end
-      end
       local ax, ay = minimapRaw(here, prev)
-      for _, wpt in ipairs(legs) do
-        local bx, by = minimapRaw(here, wpt)
+      local path = k == 1 and Q.Nav and not Q.OnTaxi() and navRoute(here, pt)
+      if path and #path > 1 then
+        for _, wpt in ipairs(path) do
+          local bx, by = minimapRaw(here, wpt)
+          mmLine(ax, ay, bx, by, col, 3, 0.95)
+          ax, ay = bx, by
+        end
+      else
+        local bx, by = minimapRaw(here, pt)
         mmLine(ax, ay, bx, by, col, k == 1 and 3 or 2, k == 1 and 0.95 or 0.75)
-        ax, ay = bx, by
       end
     elseif not flying then
       -- lines off: the old dotted trail to the first step
@@ -1263,27 +1360,26 @@ function PN:RefreshMinimap()
       for j = 1, n - 1 do
         local d = mpool:Get()
         style(d, DOT, k == 1 and 4 or 3, col[1], col[2], col[3], k == 1 and 0.95 or 0.75)
-        put(d, prevX + dx * j / n, prevY + dy * j / n)
+        mmPut(d, prevX + dx * j / n, prevY + dy * j / n)
       end
     end
     local x, y, inside = minimapXY(here, pt, k == 1)
     if x then
       local ring = mpool:Get()
       style(ring, DOT, k == 1 and 20 or 15, col[1], col[2], col[3], 0.9)
-      put(ring, x, y)
+      mmPut(ring, x, y)
       local b = mpool:Get()
       style(b, s.type == "turnin" and ICON.turnin or (s.type == "accept" and ICON.accept) or
         (s.type == "buy" and ICON.buy or ICON[s.type] or ICON.kill), k == 1 and 14 or 11, 1, 1, 1, 1)
       b:SetFrameLevel(ring:GetFrameLevel() + 2)
-      b.tip = { Q.Guide.StepText(s), PN.LABELS[k] .. " - step " .. e.index .. " of your route" }
-      if pt.key and (pt.key:sub(1, 1) == "c" or pt.key:sub(1, 1) == "o") then b.spot = { pt.key, pt } end
-      if pt.key and D:Note(pt.key) then table.insert(b.tip, D:Note(pt.key)) end
-      put(b, x, y)
+      b.tipFn, b.ta, b.tb, b.tc, b.td = MMTIP.step, s, k, e.index, pt.key
+      if pt.key and (pt.key:sub(1, 1) == "c" or pt.key:sub(1, 1) == "o") then b.spotK, b.spotP = pt.key, pt end
+      mmPut(b, x, y)
     end
     if not lines and not inside then break end   -- dotted trail: nothing beyond the edge
     prev, prevX, prevY = pt, x or prevX, y or prevY
   end
-  hideLines()
+  mmHideLines()
 end
 
 local function startMinimap()
@@ -1292,7 +1388,8 @@ local function startMinimap()
   local acc = 0
   mframe:SetScript("OnUpdate", function(_, el)
     acc = acc + el
-    if acc < (Q.OnTaxi() and 1 or 0.1) then return end
+    -- 4 times a second (once a second in flight); RefreshMinimap itself skips when nothing moved
+    if acc < (Q.OnTaxi() and 1 or 0.25) then return end
     acc = 0
     PN:RefreshMinimap()
   end)

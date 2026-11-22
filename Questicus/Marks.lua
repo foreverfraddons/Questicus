@@ -22,7 +22,9 @@ local function npcID(unit)
 end
 
 -- what to mark, rebuilt when the quest log or the route changes
+M.ver = 0
 function M:Rebuild()
+  M.ver = M.ver + 1
   wipe(need); wipe(givers)
   if not (D:Ready() and QS.pool) then return end
   for id, e in pairs(QS.log) do
@@ -79,6 +81,7 @@ function M:RebuildMain(force)
   local sig = s and (s.type .. ":" .. table.concat(s.quests or {}, ",")) or ""
   if sig == mainSig and not force then return end
   mainSig = sig
+  M.ver = (M.ver or 0) + 1
   wipe(main)
   if s and s.type == "complete" then
     for _, e in ipairs(P.StepPoints(s)) do
