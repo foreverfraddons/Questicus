@@ -26,6 +26,7 @@ function D:Load()
     return false
   end
   D.db = DB
+  if Q.SecretsPatch then pcall(Q.SecretsPatch, DB) end      -- (Secrets.lua: hidden quest chains)
   D:Index()
   return true
 end

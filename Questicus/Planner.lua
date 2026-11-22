@@ -663,6 +663,7 @@ function P.Kind(id)
   end
 end
 function P.StaticKind(id)
+  if Q.Secrets and Q.Secrets.Is(id) then return "secret" end
   local info = QS:Info(id)
   local x = (info and info.x) or D:QuestExtra(id) or {}
   if not info then local q = D:Quest(id); info = q and { title = q[1] } end
@@ -726,6 +727,8 @@ function optedOut(id)
   local want = (kind == "escort" and pr.escort ~= false) or ((kind == "cooking" or kind == "recipe") and pr.cooking ~= false)
     or (kind == "pvp" and pr.pvp == true)
   if want then return false end
+  -- secret quest chains (easter eggs): only on a Completionist route
+  if kind == "secret" then return not (Q.Secrets and Q.Secrets.Wanted()) end
   if kind == "pvp" or kind == "escort" then return true end   -- PvP / escort quests off: no exceptions
   -- (an escort you add yourself - tracker "+", a dungeon's "Get all quests" - still goes on the route)
   local need = P.NeededFor(id)

@@ -7,6 +7,9 @@
 local Q = Questicus
 Q.Changelog = {
   { v = "next",
+    added = {
+      "Completionist routes now include WoW Forever's secret quest chains, starting with the Alcaz Operative Insignia (Alcaz Prison -> Moonbrook -> State Secrets), with step-by-step notes. Other routes leave secrets out.",
+    },
     fixed = {
       "The route no longer sends you to quest givers who won't talk to you: quests that need reputation you don't have, quests from a faction you're unfriendly or hostile with (like Timbermaw before you've earned them), and quests whose NPCs you've seen are hostile to you are left out until that changes.",
     },

@@ -13,6 +13,7 @@
 Core.lua
 Theme.lua
 Data.lua
+Secrets.lua
 Flight.lua
 Quests.lua
 Gear.lua
