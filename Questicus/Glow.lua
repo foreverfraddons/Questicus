@@ -10,7 +10,8 @@ local T = Q.T
 local G = {}
 Q.Glow = G
 
-local UNIT = "softinteract"
+local SOFT = "softinteract"
+local UNIT = SOFT       -- what the game picked, as a unit: "softinteract", or its nameplate's unit (find())
 local M = Q.MEDIA
 local S = Q.Secret
 
@@ -240,9 +241,34 @@ local function tooltipLines()
   return out
 end
 
+-- the object the game picked. Asked as "softinteract" on some clients; on this one that unit stays
+-- empty for objects - their nameplate's unit ("nameplate3") is the way to it
+local function find()
+  if UnitExists and UnitExists(SOFT) then UNIT = SOFT return true end
+  if C_NamePlate and C_NamePlate.GetNamePlates then
+    local okP, plates = pcall(C_NamePlate.GetNamePlates)
+    local obj
+    for _, p in ipairs(okP and plates or {}) do
+      local tok = rawget(p, "namePlateUnitToken") or rawget(p, "unitToken")
+      if type(tok) == "string" and not S(tok) then
+        local okS, same = pcall(UnitIsUnit, tok, SOFT)
+        if okS and same == true then UNIT = tok return true end
+        if not obj and UnitIsGameObject then
+          local okO, isObj = pcall(UnitIsGameObject, tok)
+          if okO and isObj == true then obj = tok end
+        end
+      end
+    end
+    if obj then UNIT = obj return true end
+  end
+  UNIT = SOFT
+  return false
+end
+G.Find = find
+
 -- -> category, state ("far" | "ready" | "locked"), name, cursor file, quest id
 function G.Classify()
-  if not (UnitExists and UnitExists(UNIT)) then return end
+  if not find() then return end
   local okN, name = pcall(UnitName, UNIT)
   if not okN or S(name) then name = nil end
   if UnitIsPlayer and UnitIsPlayer(UNIT) then return end
@@ -881,6 +907,7 @@ end
 -- ------------------------------------------------------------------ ignoring objects
 function G.Ignore(name)
   if not name then
+    find()
     local ok, n = pcall(UnitName, UNIT)
     name = ok and not S(n) and n or nil
   end
