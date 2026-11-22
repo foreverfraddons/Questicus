@@ -73,7 +73,9 @@ local function travel(a, b, level)
   end
   -- real walks are longer than the straight line: learned per zone from your own walks (Paths.lua)
   local k = Q.Paths and Q.Paths.Factor(P.MapOf(a)) or 1
-  local walk = math.max(D.Dist(a, b) * k, D.WalkDist(a, b)) / sp
+  -- zone borders (mountains, walls, sea) between the two: the way round them (ForeverDB zbord)
+  local d = D.Dist(a, b)
+  local walk = math.max(d * k, D.WalkDist(a, b), d + (D.BorderExtra and D.BorderExtra(a, b) or 0)) / sp
   -- a flight is faster for the long legs (Flight.lua: known flight masters only)
   if walk > 60 and Q.Flight then
     local leg = Q.Flight:Leg(a, b, sp, P.dset ~= nil)

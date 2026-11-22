@@ -12,6 +12,7 @@ Q.Changelog = {
       "Completionist routes now include WoW Forever's secret quest chains, starting with the Alcaz Operative Insignia (Alcaz Prison -> Moonbrook -> State Secrets), with step-by-step notes. Other routes leave secrets out.",
     },
     changed = {
+      "The arrow and the route now know WoW Forever's zone borders (from ForeverDB): paths stay off the mountains, walls and open sea between zones and go through the passes people really walk, travel times count the way round, and far targets in another zone are reached through a known crossing. Where you cross a border is recorded and shared through ForeverDB (/qc zone shows where you are).",
       "Objective steps now say how to do them: the quest's own instruction (\"Use the Holy Water on the corrupted Moonwell\"), the quest item to use and on what (with its key), and where each item drops from or is found.",
       "Flights: on a flight path the arrow and the guide just say \"in flight\" (nothing is measured until you land), and every route you fly is timed once - the planner uses your real flight times from then on, and they go into the shared database with your recordings.",
       "The arrow and the route learn your way around much sooner: a wall, gate, cliff or mountain range you had to walk round is remembered (one long detour is enough), walks through caves and dungeons on the way are kept instead of dropped, ground you've walked yourself is preferred, and a chat line tells you when it learned something (/qc paths shows the last walk).",

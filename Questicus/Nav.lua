@@ -17,6 +17,11 @@ local MAX_EXPAND = 7000
 local MARGIN = 30               -- cells around start / goal the search may use
 local OFF = 100000
 local FAR = 2500                -- yards: no path search further than this
+-- ForeverDB zone borders (Data.lua D:ZoneAt): ground nobody stood on is likelier a wall where it's a
+-- zone's edge, and open sea / off the map where it's in no zone at all
+local VOID_COST = 2.6           -- unknown ground in no zone costs this much more again
+local BORDER_COST = 2.0         -- stepping over a zone border onto ground nobody stood on
+local OTHER_ZONE = 1.3          -- unknown ground in a third zone (start and goal share one)
 
 local walk = {}                 -- [instance] = { [cellKey] = true }
 local built = {}                -- [instance] = true / [ "m" .. uiMap ] = true
@@ -85,9 +90,51 @@ function N:Prepare(pos)
   buildMap(map)
 end
 
+-- zone of a pathing cell (its centre), remembered per continent
+local zcell, zcellN = {}, 0
+local function zoneOfCell(inst, k, cx, cy)
+  local t = zcell[inst]
+  if not t then t = {}; zcell[inst] = t end
+  local z = t[k]
+  if z == nil then
+    z = D:ZoneAt(inst, (cx + 0.5) * CELL, (cy + 0.5) * CELL) or false
+    if zcellN >= 80000 then wipe(t); zcellN = 0 end
+    t[k] = z
+    zcellN = zcellN + 1
+  end
+  return z
+end
+N.ZoneOfCell = zoneOfCell
+
+-- where you walk from one zone into the next is a pass through its border: remembered for the pathing
+-- and the route's travel times (QuesticusCollect.zcross, sent to ForeverDB with the recordings)
+local lastZ
+local CROSS_KEEP = 12
+local function noteCrossing(pos)
+  local z = D:ZoneAt(pos.i, pos.x, pos.y)
+  if not z or z == 0 then return end
+  local l = lastZ
+  lastZ = { i = pos.i, x = pos.x, y = pos.y, z = z }
+  if not l or l.i ~= pos.i or l.z == z or D.Dist(l, pos) > 90 then return end
+  if not QuesticusCollect or Q.db.collect == false then return end
+  local zc = QuesticusCollect.zcross or {}
+  QuesticusCollect.zcross = zc
+  local ci = zc[pos.i] or {}
+  zc[pos.i] = ci
+  local k = D.ZonePair(l.z, z)
+  local list = ci[k] or {}
+  ci[k] = list
+  local mx, my = math.floor((l.x + pos.x) / 2 + 0.5), math.floor((l.y + pos.y) / 2 + 0.5)
+  for j = 1, #list - 1, 2 do
+    if (list[j] - mx) ^ 2 + (list[j + 1] - my) ^ 2 < 40 * 40 then return end   -- (known already)
+  end
+  if #list < CROSS_KEEP * 2 then list[#list + 1] = mx; list[#list + 1] = my end
+end
+
 -- note a place you walked (called by Collect.lua every couple of seconds)
 function N:Walked(pos)
   if not pos then return end
+  pcall(noteCrossing, pos)
   local cx, cy = cellOf(pos.x, pos.y)
   local k = keyOf(cx, cy)
   local w = walk[pos.i]
@@ -148,8 +195,17 @@ function N:Path(from, to)
   local dist = D.Dist(from, to)
   -- (further than this a search covers thousands of cells - 50 ms and more - for a way that will be
   -- worked out again long before you get there: a straight line until you're closer)
-  if dist > FAR then return { to } end
+  if dist > FAR then
+    -- far, into another zone: through the border's pass people walked (the path is worked out from there)
+    local via = D.BorderVia and D:BorderVia(from, to)
+    if via and D.Dist(from, via) > 60 then return { via, to } end
+    return { to }
+  end
   if not w or dist < CELL * 2 or lineClear(w, from.x, from.y, to.x, to.y) then return { to } end
+  local zones = D:HasBorders(from.i)
+  local zgoal = zones and D:ZoneAt(from.i, to.x, to.y)
+  local zstart = zones and D:ZoneAt(from.i, from.x, from.y)
+  local oneZone = zgoal and zgoal ~= 0 and zgoal == zstart
   local sx, sy = cellOf(from.x, from.y)
   local gx, gy = cellOf(to.x, to.y)
   local minx, maxx = math.min(sx, gx) - MARGIN, math.max(sx, gx) + MARGIN
@@ -172,7 +228,18 @@ function N:Path(from, to)
           if nx >= minx and nx <= maxx and ny >= miny and ny <= maxy then
             local nk = keyOf(nx, ny)
             local step = (dx ~= 0 and dy ~= 0) and 1.414 or 1
-            if not w[nk] then step = step * UNKNOWN_COST elseif tr and tr[nk] then step = step * WALKED_COST end
+            if not w[nk] then
+              step = step * UNKNOWN_COST
+              if zones then
+                local zn = zoneOfCell(from.i, nk, nx, ny)
+                if zn == 0 then step = step * VOID_COST
+                elseif zn then
+                  local zc = zoneOfCell(from.i, cur, cx, cy)
+                  if zc and zc ~= 0 and zc ~= zn then step = step * BORDER_COST end
+                  if oneZone and zn ~= zgoal then step = step * OTHER_ZONE end
+                end
+              end
+            elseif tr and tr[nk] then step = step * WALKED_COST end
             step = step * avoidCost(nk)
             local ng = g[cur] + step
             if not g[nk] or ng < g[nk] then
@@ -213,7 +280,7 @@ end
 -- most of Questicus' lag while guiding). A target is keyed to 10 yards; the path's last point is
 -- always the exact target. Recomputed when the target changes, after 8 s, or when you leave the path
 local cache, cacheN = {}, 0
-function N:Forget() wipe(cache); cacheN = 0 end
+function N:Forget() wipe(cache); cacheN = 0; wipe(zcell) end
 local function airborne()
   return (Q.OnTaxi and Q.OnTaxi()) or (IsFlying and IsFlying()) or false
 end
@@ -251,3 +318,19 @@ function N:Next(here, to)
   local p = N:Route(here, to)
   return p and p[1] or to
 end
+
+Q:Command("zone", "the zone / sub-zone ForeverDB's borders put you in, and the border crossings known", function()
+  local pos = D:PlayerPos()
+  if not pos then Q:Print("no position here."); return end
+  local z, s = D:ZoneAt(pos.i, pos.x, pos.y), D:SubZoneAt(pos.i, pos.x, pos.y)
+  if z == nil then Q:Print("ForeverDB has no zone borders for this continent (update ForeverDB)."); return end
+  local function nm(id)
+    local n = id and C_Map and C_Map.GetAreaInfo and C_Map.GetAreaInfo(id)
+    return (n or "?") .. " (" .. tostring(id) .. ")"
+  end
+  local mine, all = 0, 0
+  for _, l in pairs(QuesticusCollect and QuesticusCollect.zcross and QuesticusCollect.zcross[pos.i] or {}) do mine = mine + #l / 2 end
+  for _, l in pairs(D.db.zcross and D.db.zcross[pos.i] or {}) do all = all + #l / 2 end
+  Q:Print(("zone %s%s. Border crossings on this continent: %d you walked, %d from ForeverDB."):format(
+    z == 0 and "none (outside every zone)" or nm(z), s and (", sub-zone " .. nm(s)) or "", mine, all))
+end)

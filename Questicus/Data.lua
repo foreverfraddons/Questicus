@@ -587,3 +587,199 @@ function D.Cluster(pts, radius, anchor)
   for _, p in ipairs(mem) do r = math.max(r, D.Dist(snap, p)) end
   return snap, r, mem
 end
+
+-- ------------------------------------------------------------------ zone borders (ForeverDB zbord / agrid / abord)
+-- ForeverDB has every zone's (and sub-zone's) outline from the WoW Forever client's own terrain: which
+-- zone each 33-yard map chunk belongs to. Zone borders are mostly mountains, walls and sea; the pathing
+-- and the route's travel times use them (Nav.lua, Planner.lua). Lookups work one chunk row at a time:
+-- the row's zones as y intervals, from ForeverDBFull's agrid when another addon loaded it, else worked out
+-- from the zbord outlines (a scan line through the polygons). Zone 0 = no zone (open sea, off the map).
+local GO, GC = 17066.67, 33.333          -- agrid origin / chunk size (the same for every continent)
+local rows, rowsN = {}, 0                -- [kind .. inst] = { [row] = { ylo, yhi, zone, ... } }
+local polys = {}                         -- [kind .. inst] = { { id, minx, maxx, loops }, ... }
+local ROWS_MAX = 2500
+local function polyList(kind, inst)
+  local key = kind .. inst
+  local l = polys[key]
+  if l then return l end
+  l = {}
+  polys[key] = l
+  local src = kind == "z" and DB and DB.zbord or (_G.ForeverDBFull and _G.ForeverDBFull.abord)
+  for id, e in pairs(src or {}) do
+    if e.c == inst and e.w then
+      local minx, maxx = math.huge, -math.huge
+      for _, loop in ipairs(e.w) do
+        for j = 1, #loop - 1, 2 do
+          local x = loop[j]
+          if x < minx then minx = x end
+          if x > maxx then maxx = x end
+        end
+      end
+      l[#l + 1] = { id, minx, maxx, e.w }
+    end
+  end
+  return l
+end
+D._polyList = polyList
+-- zones along the line x = xr: even-odd fill of each zone's loops -> y intervals
+local function scanRow(list, xr)
+  local out, ys = {}, {}
+  for _, z in ipairs(list) do
+    if xr >= z[2] and xr <= z[3] then
+      local n = 0
+      for _, loop in ipairs(z[4]) do
+        local m = #loop
+        local px, py = loop[m - 1], loop[m]
+        for j = 1, m - 1, 2 do
+          local x, y = loop[j], loop[j + 1]
+          if (px <= xr) ~= (x <= xr) then
+            n = n + 1
+            ys[n] = py + (xr - px) * (y - py) / (x - px)
+          end
+          px, py = x, y
+        end
+      end
+      if n > 1 then
+        for j = n + 1, #ys do ys[j] = nil end
+        table.sort(ys)
+        for j = 1, n - 1, 2 do
+          local o = #out
+          out[o + 1], out[o + 2], out[o + 3] = ys[j], ys[j + 1], z[1]
+        end
+      end
+    end
+  end
+  return out
+end
+-- agrid row string "zone*count,..." (columns from y = o downwards) -> y intervals
+local function gridRow(s, o, c)
+  local out, col = {}, 0
+  for z, n in s:gmatch("(%d+)%*(%d+)") do
+    z, n = tonumber(z), tonumber(n)
+    if z ~= 0 then
+      local o2 = #out
+      out[o2 + 1], out[o2 + 2], out[o2 + 3] = o - (col + n) * c, o - col * c, z
+    end
+    col = col + n
+  end
+  return out
+end
+local function rowOf(kind, inst, x)
+  local g = kind == "z" and _G.ForeverDBFull and _G.ForeverDBFull.agrid and _G.ForeverDBFull.agrid[inst]
+  local o, c = (g and g.o) or GO, (g and g.c) or GC
+  local r = math.floor((o - x) / c)
+  local key = kind .. inst
+  local t = rows[key]
+  if not t then t = {}; rows[key] = t end
+  local row = t[r]
+  if row then return row end
+  if rowsN >= ROWS_MAX then wipe(rows); rowsN = 0; t = {}; rows[key] = t end
+  local s = g and g.z and g.z[r]
+  if s then row = gridRow(s, o, c)
+  else row = scanRow(polyList(kind, inst), o - (r + 0.5) * c) end
+  t[r] = row
+  rowsN = rowsN + 1
+  return row
+end
+local function lookup(kind, i, x, y)
+  if not (i and x and y) then return nil end
+  local row = rowOf(kind, i, x)
+  for j = 1, #row - 2, 3 do
+    if y >= row[j] and y < row[j + 1] then return row[j + 2] end
+  end
+  return 0
+end
+-- does ForeverDB know this continent's zones?
+local hasZones = {}
+function D:HasBorders(i)
+  if not DB or not DB.zbord or not i then return false end
+  local h = hasZones[i]
+  if h == nil then h = #polyList("z", i) > 0; hasZones[i] = h end
+  return h
+end
+-- zone (areaID) at a world point: 0 = in no zone (sea, off the map), nil = no border data here
+function D:ZoneAt(i, x, y)
+  if not D:HasBorders(i) then return nil end
+  return lookup("z", i, x, y)
+end
+-- sub-zone (town, camp, ...) at a world point: needs ForeverDBFull (abord), else nil
+function D:SubZoneAt(i, x, y)
+  if not (i and _G.ForeverDBFull and _G.ForeverDBFull.abord) then return nil end
+  local z = lookup("a", i, x, y)
+  return z ~= 0 and z or nil
+end
+function D:ForgetBorders() wipe(rows); rowsN = 0; wipe(polys); wipe(hasZones) end
+
+-- zone border crossings: where people really walked from one zone into the next (Nav.lua records yours,
+-- QuesticusCollect.zcross; ForeverDB zcross has everyone's). [continent][lowZone .. "-" .. highZone] = { x, y, ... }
+local function pairKey(a, b) if a > b then a, b = b, a end return a .. "-" .. b end
+D.ZonePair = pairKey
+function D:Crossings(i, za, zb)
+  local k = pairKey(za, zb)
+  local own = QuesticusCollect and QuesticusCollect.zcross and QuesticusCollect.zcross[i]
+  local db = DB and DB.zcross and DB.zcross[i]
+  return own and own[k], db and db[k]
+end
+local function bestCrossing(list, ax, ay, bx, by, best, bd)
+  for j = 1, #(list or {}) - 1, 2 do
+    local cx, cy = list[j], list[j + 1]
+    local d = math.sqrt((ax - cx) ^ 2 + (ay - cy) ^ 2) + math.sqrt((bx - cx) ^ 2 + (by - cy) ^ 2)
+    if not bd or d < bd then best, bd = j, d; D._cx, D._cy = cx, cy end
+  end
+  return best, bd
+end
+
+-- the straight line from a to b against the zone borders: how many borders it crosses, how much of it
+-- runs through no zone (sea), and the extra yards a walk round them is likely to need (through a known
+-- crossing where there is one, else a typical detour). Remembered (points to 50 yards).
+local BORDER_EXTRA = 140        -- yards: going round to a border's pass nobody recorded yet
+local VOID_EXTRA = 0.7          -- a stretch over open sea / off the map costs this much more again
+local memo, memoN = {}, 0
+function D.BorderExtra(a, b)
+  if not (a and b) or a.i ~= b.i or not D:HasBorders(a.i) then return 0, 0, 0 end
+  local s = D.Dist(a, b)
+  if s < 60 then return 0, 0, 0 end
+  local f = math.floor                -- (a number key: 50-yard cells of both ends; continents up to 9000)
+  local key = (((a.i * 1000 + f(a.x / 50) + 500) * 1000 + f(a.y / 50) + 500) * 1000 + f(b.x / 50) + 500) * 1000 + f(b.y / 50) + 500
+  local e = memo[key]
+  if e then return e[1], e[2], e[3] end
+  local n = math.min(80, math.max(2, math.floor(s / 50)))
+  local dx, dy = (b.x - a.x) / n, (b.y - a.y) / n
+  local prev = D:ZoneAt(a.i, a.x, a.y)
+  local lastZone, lastX, lastY = prev ~= 0 and prev or nil, a.x, a.y
+  local borders, void, extra = 0, 0, 0
+  for k = 1, n do
+    local x, y = a.x + dx * k, a.y + dy * k
+    local z = D:ZoneAt(a.i, x, y)
+    if z == 0 then void = void + s / n
+    elseif z ~= lastZone then
+      if lastZone then
+        borders = borders + 1
+        local own, db = D:Crossings(a.i, lastZone, z)
+        local j, bd = bestCrossing(own, lastX, lastY, x, y)
+        j, bd = bestCrossing(db, lastX, lastY, x, y, j, bd)
+        local straight = math.sqrt((x - lastX) ^ 2 + (y - lastY) ^ 2)
+        extra = extra + (bd and math.min(BORDER_EXTRA * 3, bd - straight) or BORDER_EXTRA)
+      end
+      lastZone = z
+    end
+    if z ~= 0 then lastX, lastY = x, y end
+  end
+  extra = math.min(s, extra + void * VOID_EXTRA)
+  if memoN >= 5000 then wipe(memo); memoN = 0 end
+  memo[key] = { extra, borders, void }
+  memoN = memoN + 1
+  return extra, borders, void
+end
+
+-- a far target in another zone: the known crossing to walk through first (nil: none known / not worth it)
+function D:BorderVia(from, to)
+  if not (from and to) or from.i ~= to.i or not D:HasBorders(from.i) then return nil end
+  local za, zb = D:ZoneAt(from.i, from.x, from.y), D:ZoneAt(to.i, to.x, to.y)
+  if not za or za == 0 or not zb or zb == 0 or za == zb then return nil end
+  local own, db = D:Crossings(from.i, za, zb)
+  local j, bd = bestCrossing(own, from.x, from.y, to.x, to.y)
+  j, bd = bestCrossing(db, from.x, from.y, to.x, to.y, j, bd)
+  if not bd or bd > D.Dist(from, to) * 1.6 then return nil end
+  return { i = from.i, x = D._cx, y = D._cy }
+end
