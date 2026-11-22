@@ -3,132 +3,228 @@ local Q = Questicus
 local T = Q.T
 local frame
 
-local function scaleRow(parent, text, get, set, y)
-  local l = T.Text(parent, 12)
-  l:SetPoint("TOPLEFT", 16, y)
+-- The window: a list of sections on the left, one short page on the right. Each page groups the
+-- settings by what they're for, with a line saying what the page is about.
+local W, H, SIDE = 640, 520, 150
+
+local function sizeRow(parent, text, get, set)
+  local f = CreateFrame("Frame", nil, parent)
+  f:SetSize(440, 26)
+  local l = T.Text(f, 12)
+  l:SetPoint("LEFT")
   l:SetText(text)
-  local seg = T.Segments(parent, { { 0.8, "Small" }, { 1, "Normal" }, { 1.25, "Large" } }, get, set, 72)
-  seg:SetPoint("TOPLEFT", 200, y + 4)
-  return seg
+  local seg = T.Segments(f, { { 0.8, "Small" }, { 1, "Normal" }, { 1.25, "Large" } }, get, set, 72)
+  seg:SetPoint("LEFT", 170, 0)
+  f.Refresh = seg.Refresh
+  return f
 end
 
 local function build()
-  frame = T.Window("QuesticusOptions", 440, 944, "Questicus options", nil)
+  frame = T.Window("QuesticusOptions", W, H, "Questicus options", nil)
   frame:SetFrameStrata("DIALOG")
   local db, pr = Q.db, function() return Q.prefs end
-  local w = {}
-  local y = -38
-  local function check(text, get, set, tip)
-    local b = T.Check(frame, text, get, function(v) set(v); Q:Send("QC_OPTION") end, tip)
-    b:SetPoint("TOPLEFT", 16, y)
-    b:SetWidth(400)
-    w[#w + 1] = b
-    y = y - 24
+  local refresh = {}
+  local pages, tabs = {}, {}
+
+  -- left: the sections
+  local side = CreateFrame("Frame", nil, frame)
+  side:SetPoint("TOPLEFT", 10, -34)
+  side:SetPoint("BOTTOMLEFT", 10, 40)
+  side:SetWidth(SIDE)
+  T.RFill(side, T.c.bg2, 6)
+
+  local function show(i)
+    for k, pg in ipairs(pages) do pg:SetShown(k == i) end
+    for k, t in ipairs(tabs) do
+      local on = k == i
+      t.sel:SetShown(on)
+      t.label:SetTextColor(on and 1 or 0.8, on and 0.85 or 0.8, on and 0.35 or 0.82)
+    end
+    frame.page = i
   end
-  check("Show the guide window", function() return db.guide.shown end, function(v)
+
+  -- one page: title, one line about it, then settings added top to bottom
+  local function page(title, about)
+    local i = #pages + 1
+    local pg = CreateFrame("Frame", nil, frame)
+    pg:SetPoint("TOPLEFT", side, "TOPRIGHT", 16, 0)
+    pg:SetPoint("BOTTOMRIGHT", -16, 40)
+    pg:Hide()
+    local h = T.Text(pg, 15, T.c.gold)
+    h:SetPoint("TOPLEFT", 0, -4)
+    h:SetText(title)
+    local a = T.Text(pg, 11, T.c.dim)
+    a:SetPoint("TOPLEFT", 0, -26)
+    a:SetPoint("RIGHT", 0, 0)
+    a:SetJustifyH("LEFT")
+    a:SetText(about)
+    pg.y = -56
+    pages[i] = pg
+    local t = CreateFrame("Button", nil, side)
+    t:SetSize(SIDE - 8, 26)
+    t:SetPoint("TOPLEFT", 4, -6 - (i - 1) * 30)
+    t.sel = T.RFill(t, { T.c.accent[1] * 0.35, T.c.accent[2] * 0.35, T.c.accent[3] * 0.35, 1 }, 5)
+    t.label = T.Text(t, 12)
+    t.label:SetPoint("LEFT", 10, 0)
+    t.label:SetText(title)
+    t:SetScript("OnClick", function() show(i) end)
+    tabs[i] = t
+    return pg
+  end
+  local function group(pg, text)
+    pg.y = pg.y - 6
+    local g = T.Text(pg, 12, T.c.gold)
+    g:SetPoint("TOPLEFT", 0, pg.y)
+    g:SetText(text)
+    pg.y = pg.y - 20
+  end
+  local function check(pg, text, get, set, tip)
+    local b = T.Check(pg, text, get, function(v) set(v); Q:Send("QC_OPTION") end, tip)
+    b:SetPoint("TOPLEFT", 8, pg.y)
+    b:SetWidth(440)
+    refresh[#refresh + 1] = function() b:Refresh() end
+    pg.y = pg.y - 23
+    return b
+  end
+  local function size(pg, text, get, set)
+    local r = sizeRow(pg, text, get, set)
+    r:SetPoint("TOPLEFT", 8, pg.y)
+    refresh[#refresh + 1] = r.Refresh
+    pg.y = pg.y - 30
+  end
+  local function buttons(pg, list)
+    pg.y = pg.y - 6
+    local x = 8
+    for _, b in ipairs(list) do
+      local btn = T.Button(pg, b[1], b[2], 24)
+      btn:SetPoint("TOPLEFT", x, pg.y)
+      btn.tip = b[4]
+      btn:SetScript("OnClick", b[3])
+      x = x + b[2] + 8
+    end
+    pg.y = pg.y - 32
+  end
+
+  -- 1. General
+  local p = page("General", "The guide window, the arrow that points the way, and where to start over.")
+  group(p, "Guide window")
+  check(p, "Show the guide window", function() return db.guide.shown end, function(v)
     db.guide.shown = v
     if v then Q:ShowGuide() elseif Q.Guide.Frame() then Q.Guide.Frame():Hide() end
   end)
-  check("Show the arrow", function() return db.arrow.shown end, function(v) db.arrow.shown = v; Q.Arrow:Refresh() end)
-  check("Lock the arrow", function() return db.arrow.locked end, function(v) db.arrow.locked = v end)
-  check("Show the minimap button", function() return not db.minimap.hide end,
-    function(v) db.minimap.hide = not v; if Q.Minimap then Q.Minimap:Refresh() end end)
-  check("Lock the guide window", function() return db.guide.locked end, function(v) db.guide.locked = v end)
-  check("World map pins", function() return db.pins.world end, function(v) db.pins.world = v; Q.Pins:RefreshWorld() end)
-  check("Minimap pins", function() return db.pins.minimap end, function(v) db.pins.minimap = v end)
-  check("Boss tracker in dungeons", function() return db.bossTracker ~= false end,
-    function(v) db.bossTracker = v end, "Pops up inside a dungeon (and when the route's dungeon step comes up): boss portraits, fights, loot, ticked off as you kill them.")
-  check("Boss tracker: low profile (just the names)", function() return db.bossLow == true end,
-    function(v) db.bossLow = v; if Q.Bosses then Q.Bosses:Refresh() end end, "A plain list of the bosses, ticked off as you kill them. Click a name for its loot.")
-  check("Route lines on the minimap", function() return db.pins.mmRoute ~= false end,
-    function(v) db.pins.mmRoute = v end, "Draws your next steps as lines on the minimap, and the patrol paths of the mobs you're after.")
-  check("Quest objectives on the map (like Questie)", function() return db.pins.objectives ~= false end,
-    function(v) db.pins.objectives = v; Q.Pins:RefreshWorld() end,
-    "Every open objective of the quests in your log on the world map, with an icon for what to do there (kill, loot, use), and a ? where finished quests are handed in.")
-  check("Quest tracker on the right", function() return Q.Tracker.cfg().on end,
-    function(v) Q.Tracker.cfg().on = v; Q.Tracker:ApplyBlizzard(); Q.Tracker:Refresh() end,
-    "Your quest log with progress bars, in Questicus' look. Right-click a quest to focus it or add it to your route. More settings: the cog in its title.")
-  check("Collection mode (record only, no guiding)", function() return Q.CollectOnly() end,
-    function(v) Q.CollectMode:Set(v) end,
-    "Questicus stops guiding and only records: routes you take, quests, XP and rewards, objective spots. For this character.")
-  check("Every quest you can pick up on the map", function() return db.pins.others end,
-    function(v) db.pins.others = v; Q.Pins:RefreshWorld() end)
-  check("PvP and battleground quests in routes", function() return Q.prefs.pvp == true end,
-    function(v) Q.prefs.pvp = v; Q:Send("QC_PREFS_CHANGED") end, "Off: Warsong Gulch, Arathi Basin, Alterac Valley, Darkspear Islands and other PvP quests are left out.")
-  check("Use flight paths in routes", function() return Q.prefs.flights ~= false end,
-    function(v) Q.prefs.flights = v; Q.Planner:Build() end, "Flies when it beats running, with the flight masters you know. Unknown ones nearby become a step.")
-  check("Take the flight automatically", function() return Q.prefs.autoFly ~= false end,
-    function(v) Q.prefs.autoFly = v end, "Talking to the flight master of a fly step takes the flight. Hold Shift to choose yourself.")
-  check("Shade the area where objectives can be", function() return db.pins.areas ~= false end,
-    function(v) db.pins.areas = v; Q.Pins:RefreshWorld() end)
-  check("Rares and notable drops on the map", function() return pr().collectibles end,
-    function(v) pr().collectibles = v; Q.Pins:RefreshWorld() end)
-  check("Auto accept route quests", function() return pr().autoAccept end, function(v) pr().autoAccept = v end)
-  check("Auto turn in", function() return pr().autoTurnIn end, function(v) pr().autoTurnIn = v end)
-  check("Auto pick the best reward", function() return pr().autoReward end, function(v) pr().autoReward = v end)
-  check("Pin the current objective on the map automatically", function() return db.pins.autoPin ~= false end,
-    function(v) db.pins.autoPin = v; if v then Q.Waypoint:Follow() else Q.Waypoint:Clear() end end)
-  check("Skull / X / star over mobs and quest NPCs (nameplates)", function() return db.marks.plates end,
-    function(v) db.marks.plates = v; Q.Marks:RefreshPlates() end)
-  check("Pop-ups when you loot a quest item or an objective moves", function() return db.popups.on end,
-    function(v) db.popups.on = v end, "Shift-drag a pop-up to move them. Right-click one to close it. /qc popuptest shows one.")
-  check("Pop-up sound", function() return db.popups.sound end, function(v) db.popups.sound = v end)
-  check("Help fill the database (record quest spots and item sources)", function() return db.collect ~= false end,
-    function(v) db.collect = v end,
-    "Saves where quest objectives count up and what you looted for them. Fills map spots ForeverDB is missing, for you right away and for everyone once your recordings are synced.")
-  y = y - 6
-  w[#w + 1] = scaleRow(frame, "Guide size", function() return db.guide.scale end, function(v)
+  check(p, "Lock it in place", function() return db.guide.locked end, function(v) db.guide.locked = v end)
+  size(p, "Size", function() return db.guide.scale end, function(v)
     db.guide.scale = v
     local f = Q.Guide.Frame()
     if f then f:SetScale(v) end
-  end, y)
-  y = y - 30
-  w[#w + 1] = scaleRow(frame, "Arrow size", function() return db.arrow.scale end, function(v)
-    db.arrow.scale = v; Q.Arrow:Refresh()
-  end, y)
-  y = y - 30
-  w[#w + 1] = scaleRow(frame, "Map pin size", function() return db.pins.size end, function(v)
-    db.pins.size = v; Q.Pins:RefreshWorld()
-  end, y)
-  local survey = T.Button(frame, "Questions again", 130, 24)
-  survey:SetPoint("BOTTOMLEFT", 16, 14)
-  survey.tip = "Answer the setup questions again (style, completionist, gear, helpers)"
-  survey:SetScript("OnClick", function() frame:Hide(); Q.Survey:Show() end)
-  local plan = T.Button(frame, "Rebuild route", 120, 24)
-  plan:SetPoint("LEFT", survey, "RIGHT", 8, 0)
-  plan:SetScript("OnClick", function() Q.Planner:Build() end)
-  local unskip = T.Button(frame, "Unskip all", 100, 24)
-  unskip:SetPoint("LEFT", plan, "RIGHT", 8, 0)
-  unskip:SetScript("OnClick", function() SlashCmdList.QUESTICUS("unskip") end)
-  local trk = T.Button(frame, "Tracker settings", 120, 24)
-  trk:SetPoint("BOTTOMLEFT", 134, 44)
-  trk:SetScript("OnClick", function() Q.Tracker:Settings() end)
-  local mapb = T.Button(frame, "Map settings", 96, 24)
-  mapb:SetPoint("BOTTOMLEFT", 262, 44)
-  mapb.tip = "Questicus Maps: the stitched world map's own settings (also /qc map)"
-  mapb:SetScript("OnClick", function() frame:Hide(); Q.MapSettings() end)
-  local glow = T.Button(frame, "Highlights", 66, 24)
-  glow:SetPoint("BOTTOMRIGHT", -14, 44)
-  glow.tip = "Highlights: ore, herbs, quest objects, chests and your bobber light up as you come up to them (also /qc glow)"
-  glow:SetScript("OnClick", function() frame:Hide(); Q.Glow.ShowSettings() end)
-  local news = T.Button(frame, "News", 40, 24)
-  news:SetPoint("BOTTOMRIGHT", -14, 14)
-  news.tip = "What's new: the patch notes for this version (also /qc news)"
-  news:SetScript("OnClick", function() Q.News:Show(nil) end)
-  local patrol = T.Button(frame, "Record patrol", 110, 24)
-  patrol:SetPoint("BOTTOMLEFT", 16, 44)
-  patrol.tip = "Record the path of a mob that walks around (target it, then follow it). Shown as a line on the map."
-  patrol:SetScript("OnClick", function() Q.Patrol:Show() end)
-  frame:SetScript("OnShow", function() for _, x in ipairs(w) do x:Refresh() end end)
-  local meta = T.Text(frame, 10, T.c.dim)
-  meta:SetPoint("BOTTOMLEFT", 16, 76)
-  meta:SetWidth(400)
+  end)
+  group(p, "Arrow")
+  check(p, "Show the arrow", function() return db.arrow.shown end, function(v) db.arrow.shown = v; Q.Arrow:Refresh() end)
+  check(p, "Lock it in place", function() return db.arrow.locked end, function(v) db.arrow.locked = v end)
+  size(p, "Size", function() return db.arrow.scale end, function(v) db.arrow.scale = v; Q.Arrow:Refresh() end)
+  check(p, "Show the minimap button", function() return not db.minimap.hide end,
+    function(v) db.minimap.hide = not v; if Q.Minimap then Q.Minimap:Refresh() end end)
+  buttons(p, {
+    { "Setup questions again", 160, function() frame:Hide(); Q.Survey:Show() end, "Answer the setup questions again: play style, quests, gear, helpers." },
+    { "Rebuild route", 110, function() Q.Planner:Build() end, "Works the route out again now." },
+    { "Unskip all", 90, function() SlashCmdList.QUESTICUS("unskip") end, "Brings back every quest and step you skipped." },
+  })
+
+  -- 2. Questing
+  p = page("Questing", "What Questicus does for you at quest givers and flight masters.")
+  group(p, "Quest givers")
+  check(p, "Accept route quests automatically", function() return pr().autoAccept end, function(v) pr().autoAccept = v end)
+  check(p, "Hand in quests automatically", function() return pr().autoTurnIn end, function(v) pr().autoTurnIn = v end)
+  check(p, "Pick the best reward automatically", function() return pr().autoReward end, function(v) pr().autoReward = v end,
+    "The reward that's the biggest upgrade for you (or sells for the most).")
+  group(p, "Travel")
+  check(p, "Use flight paths in the route", function() return Q.prefs.flights ~= false end,
+    function(v) Q.prefs.flights = v; Q.Planner:Build() end, "Flies when it beats running, with the flight masters you know. Unknown ones nearby become a step.")
+  check(p, "Take the flight automatically", function() return Q.prefs.autoFly ~= false end,
+    function(v) Q.prefs.autoFly = v end, "Talking to the flight master of a fly step takes the flight. Hold Shift to choose yourself.")
+  group(p, "Route")
+  check(p, "Include PvP and battleground quests", function() return Q.prefs.pvp == true end,
+    function(v) Q.prefs.pvp = v; Q:Send("QC_PREFS_CHANGED") end, "Off: Warsong Gulch, Arathi Basin, Alterac Valley, Darkspear Islands and other PvP quests are left out.")
+  check(p, "Pin the next objective on the map automatically", function() return db.pins.autoPin ~= false end,
+    function(v) db.pins.autoPin = v; if v then Q.Waypoint:Follow() else Q.Waypoint:Clear() end end,
+    "Puts the game's waypoint on the step you're on, so the game's own arrow and the minimap point there too.")
+
+  -- 3. Map
+  p = page("Map & minimap", "What Questicus draws on the world map and the minimap.")
+  group(p, "World map")
+  check(p, "Show the route on the map", function() return db.pins.world end, function(v) db.pins.world = v; Q.Pins:RefreshWorld() end)
+  check(p, "Quest objectives (like Questie)", function() return db.pins.objectives ~= false end,
+    function(v) db.pins.objectives = v; Q.Pins:RefreshWorld() end,
+    "Every open objective of the quests in your log, with an icon for what to do there, and a ? where finished quests are handed in.")
+  check(p, "Every quest you can pick up", function() return db.pins.others end, function(v) db.pins.others = v; Q.Pins:RefreshWorld() end)
+  check(p, "Shade the area objectives can be in", function() return db.pins.areas ~= false end,
+    function(v) db.pins.areas = v; Q.Pins:RefreshWorld() end)
+  check(p, "Rares and notable drops", function() return pr().collectibles end, function(v) pr().collectibles = v; Q.Pins:RefreshWorld() end)
+  size(p, "Icon size", function() return db.pins.size end, function(v) db.pins.size = v; Q.Pins:RefreshWorld() end)
+  group(p, "Minimap")
+  check(p, "Show the route on the minimap", function() return db.pins.minimap end, function(v) db.pins.minimap = v end)
+  check(p, "Route lines on the minimap", function() return db.pins.mmRoute ~= false end,
+    function(v) db.pins.mmRoute = v end, "Your next steps as lines on the minimap, and the paths of mobs that walk around.")
+  buttons(p, { { "Questicus Maps settings", 180, function() frame:Hide(); Q.MapSettings() end, "The stitched world map's own settings (also /qc map)." } })
+
+  -- 4. Tracker & alerts
+  p = page("Tracker & alerts", "Your quest list on the screen, pop-ups and the marks over mobs.")
+  group(p, "Quest tracker")
+  check(p, "Show the quest tracker", function() return Q.Tracker.cfg().on end,
+    function(v) Q.Tracker.cfg().on = v; Q.Tracker:ApplyBlizzard(); Q.Tracker:Refresh() end,
+    "Your quest log with progress bars, in Questicus' look. Right-click a quest to focus it or add it to your route.")
+  buttons(p, { { "Tracker settings", 130, function() Q.Tracker:Settings() end, "Size, what it shows, folding (also the cog in its title)." } })
+  group(p, "Pop-ups")
+  check(p, "Pop-ups for quest items and objective progress", function() return db.popups.on end,
+    function(v) db.popups.on = v end, "Shift-drag a pop-up to move them. Right-click one to close it. /qc popuptest shows one.")
+  check(p, "Play a sound with them", function() return db.popups.sound end, function(v) db.popups.sound = v end)
+  group(p, "Nameplates")
+  check(p, "Marks over mobs you need and quest NPCs", function() return db.marks.plates end,
+    function(v) db.marks.plates = v; Q.Marks:RefreshPlates() end, "An X over mobs your quests need, a star over quest givers.")
+
+  -- 5. Dungeons
+  p = page("Dungeons", "The boss tracker that opens inside a dungeon.")
+  check(p, "Boss tracker in dungeons", function() return db.bossTracker ~= false end,
+    function(v) db.bossTracker = v end, "Boss portraits, fights and loot, ticked off as you kill them. Also when the route's dungeon step comes up.")
+  check(p, "Low profile (just the names)", function() return db.bossLow == true end,
+    function(v) db.bossLow = v; if Q.Bosses then Q.Bosses:Refresh() end end, "A plain list of the bosses, ticked off as you kill them. Click a name for its loot.")
+  buttons(p, { { "Run history", 110, function() SlashCmdList.QUESTICUS("runs") end, "Every dungeon run: time, gold, XP and loot (also /qc runs)." } })
+
+  -- 6. Highlights
+  p = page("Highlights", "Ore, herbs, quest objects, chests and your fishing bobber light up as you come up to them.")
+  check(p, "Highlights on", function() return Q.Glow.cfg().on end, function(v) Q.Glow.SetOn(v) end,
+    "Off: Questicus gives the game back your own targeting settings.")
+  buttons(p, { { "Highlight settings", 150, function() frame:Hide(); Q.Glow.ShowSettings() end, "Effects, colours, what lights up and when (also /qc glow)." } })
+
+  -- 7. Advanced
+  p = page("Advanced", "Recording and database helpers. You can leave these alone.")
+  check(p, "Help fill the database", function() return db.collect ~= false end, function(v) db.collect = v end,
+    "Saves where quest objectives count up and what you looted for them. Fills map spots ForeverDB is missing, for you right away and for everyone once your recordings are synced.")
+  check(p, "Collection mode (record only, no guiding)", function() return Q.CollectOnly() end, function(v) Q.CollectMode:Set(v) end,
+    "Questicus stops guiding and only records: routes you take, quests, XP and rewards, objective spots. For this character.")
+  buttons(p, { { "Record a patrol", 130, function() Q.Patrol:Show() end, "Record the path of a mob that walks around (target it, then follow it). Shown as a line on the map." } })
+  local meta = T.Text(p, 10, T.c.dim)
+  meta:SetPoint("TOPLEFT", 8, p.y - 8)
+  meta:SetWidth(440)
+  meta:SetJustifyH("LEFT")
   function frame:UpdateMeta()
     local m = Q.Data:Meta()
     local pool = Q.Quests.pool and #Q.Quests.pool or 0
-    meta:SetText(("Questicus %s - ForeverDB %s (%s) - %d quests possible for this character")
+    meta:SetText(("Questicus %s\nForeverDB %s (%s)\n%d quests possible for this character")
       :format(Q.version, m and m.build or "missing", m and m.hash or "-", pool))
   end
+
+  -- footer
+  local ver = T.Text(frame, 10, T.c.dim)
+  ver:SetPoint("BOTTOMLEFT", 16, 16)
+  ver:SetText("Questicus " .. Q.version .. "  -  /qc help: all commands")
+  local news = T.Button(frame, "What's new", 100, 24)
+  news:SetPoint("BOTTOMRIGHT", -14, 10)
+  news.tip = "The patch notes for this version (also /qc news)"
+  news:SetScript("OnClick", function() Q.News:Show(nil) end)
+
+  frame:SetScript("OnShow", function() for _, f in ipairs(refresh) do f() end end)
+  show(1)
 end
 
 -- Questicus Maps' settings (the map's menu, or its options window when the map is off)
