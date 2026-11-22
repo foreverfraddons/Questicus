@@ -106,7 +106,8 @@ end
 -- ------------------------------------------------------------------ game settings (soft targeting)
 local CV = {
   "SoftTargetInteract", "SoftTargetInteractRange", "SoftTargetInteractArc", "SoftTargetNameplateInteract",
-  "SoftTargetIconInteract", "SoftTargetIconGameObject",
+  "SoftTargetIconInteract", "SoftTargetIconGameObject", "SoftTargetInteractOnlyInRange", "SoftTargetInteractRangeIsHard",
+  "nameplateGameObjectMaxDistance",
 }
 local function getc(n)
   local f = (C_CVar and C_CVar.GetCVar) or GetCVar
@@ -133,13 +134,17 @@ function G.ApplyCVars()
     end
     return
   end
-  if not c.orig then
-    c.orig = {}
-    for _, n in ipairs(CV) do c.orig[n] = getc(n) end
-  end
+  -- (the game's own values, kept once to give back; a setting added later is kept the first time too)
+  c.orig = c.orig or {}
+  for _, n in ipairs(CV) do if c.orig[n] == nil then c.orig[n] = getc(n) end end
   setc("SoftTargetInteract", 3)                                  -- always, mouse and keyboard too
   setc("SoftTargetInteractRange", fishing and 60 or c.range)     -- (a bobber often lands further out)
   setc("SoftTargetInteractArc", c.arc)
+  setc("SoftTargetInteractOnlyInRange", 0)      -- picked while still out of reach too (left on, nothing until you're on top of it)
+  setc("SoftTargetInteractRangeIsHard", 0)
+  -- (objects' nameplates as far out as a bobber can land)
+  local far = tonumber(c.orig.nameplateGameObjectMaxDistance or "") or 0
+  if far < 60 then setc("nameplateGameObjectMaxDistance", 60) end
   setc("SoftTargetNameplateInteract", 1)                         -- the object gets a nameplate: the light's anchor
   -- the game's icon on objects stays on: it's what makes the game give an object its nameplate,
   -- which the light hangs from (turned off, objects got no plate and no light)
