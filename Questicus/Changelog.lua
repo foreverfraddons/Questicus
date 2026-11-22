@@ -6,7 +6,8 @@
 -- update goes out once "next" holds 10 lines (release.yml, MIN_CHANGES).
 local Q = Questicus
 Q.Changelog = {
-  { v = "next",
+  { v = "next" },
+  { v = "0.9.023",
     fixed = {
       "Opening the world map no longer redraws the quest areas when nothing has changed.",
       "Fixed an error (\"secret number value\") with the world map open while another addon's frames were in combat.",
