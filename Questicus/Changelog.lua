@@ -6,7 +6,8 @@
 -- update goes out once "next" holds 10 lines (release.yml, MIN_CHANGES).
 local Q = Questicus
 Q.Changelog = {
-  { v = "next",
+  { v = "next" },
+  { v = "0.9.024",
     added = {
       "Highlights: ore, herbs, quest objects, chests and your fishing bobber light up as you come up to them, with 15 light effects, the object's name and icon, colours per kind of object, and a live preview (Options > Highlights, or /qc glow).",
       "Questicus now records much more for the shared quest database while you play (money and skinning per creature, fishing per zone, flight prices, trainers and every ability's training cost, everything vendors sell with its price, limits, token costs and requirements, quest details and reputation, which quests NPCs really offer, rares, subzones, encounters, gathering skill levels) - /qc recorded shows what it has. Turn it off under Options > Advanced.",
