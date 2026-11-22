@@ -315,7 +315,17 @@ function G.TrainingCost(level)
   return 18 * level * level
 end
 -- what an item costs at a vendor: recorded prices (Questicus, Command Center), else 4 x its sell price
+-- what a vendor asks for an item, as recorded in game (yours, then everyone's through ForeverDB)
+function G.VendorRow(item, npc)
+  local own = QuesticusCollect and QuesticusCollect.vendx and QuesticusCollect.vendx[npc]
+  local row = own and own.i and own.i[item]
+  if row then return row end
+  local shared = D.db and D.db.vendx and D.db.vendx[npc]
+  return shared and shared[item]
+end
 function G.BuyPrice(item, npc, it)
+  local row = G.VendorRow(item, npc)
+  if row and tonumber(row.p) then return tonumber(row.p) end
   for _, src in ipairs({ QuesticusCollect, CommandCenterCollect }) do
     local v = type(src) == "table" and src.vend and src.vend[npc]
     local e = v and v[item]
@@ -343,7 +353,10 @@ function G:VendorUpgrades(level, near, radius)
         if p and d <= radius then
           local gain, pct, _, _, it = G:Upgrade(item, level)
           local plain = it and (it.quality or (rec and rec[2]) or 1) <= 1 and it.class ~= 2
-          if gain and gain > 0 and pct >= 5 and it and not plain
+          -- can't buy it (reputation, tokens, ...): the vendor said so when it was recorded
+          local row = G.VendorRow(item, npc)
+          local blocked = row and (row.u == false or row.c ~= nil)
+          if gain and gain > 0 and pct >= 5 and it and not plain and not blocked
             and money - G.BuyPrice(item, npc, it) >= keep then
             out[#out + 1] = { item = item, npc = npc, pct = pct, point = p }
           end

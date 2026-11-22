@@ -28,7 +28,7 @@ local R = {}
 Q.Record = R
 
 local SPOT_NEAR, SPOT_MAX = 15, 40
-local KEYS = { "qdiff", "gold", "skinl", "fishl", "gathl", "taxi", "trn", "qinfo", "qoff", "qmiss", "qrep", "area", "enc", "rare",
+local KEYS = { "qdiff", "vendx", "vdiff", "gold", "skinl", "fishl", "gathl", "taxi", "trn", "qinfo", "qoff", "qmiss", "qrep", "area", "enc", "rare",
   "oskill", "itemx", "ctype", "loot", "vend", "npc", "obj", "sp", "item", "recentR" }
 
 local function on() return Q.db and Q.db.collect ~= false end
@@ -675,27 +675,94 @@ objFrame:SetScript("OnUpdate", function(_, el)
 end)
 
 -- ------------------------------------------------------------------ vendors (when Command Center isn't recording them)
+-- everything a vendor sells, with what it costs and what it takes to buy it - recorded every visit,
+-- Command Center or not (vendx), and the plain list in Command Center's layout when it isn't there:
+--   vendx[npc] = { t, i = { [item] = { p = copper, s = stack, n = limited count, c = { {item or "cur:id",
+--     amount}, ... } other costs, r = { "Requires ..." tooltip lines: reputation, level, skill, class },
+--     u = false when you can't buy / use it } } }
+-- vdiff[npc][item] = { what changed, before, now } when a visit shows something else than the
+-- database (ForeverDB vendx) or the last visit
+local function merchantRow(i)
+  local price, stack, avail, ext, usable, purch
+  if C_MerchantFrame and C_MerchantFrame.GetItemInfo then
+    local ok, t = pcall(C_MerchantFrame.GetItemInfo, i)
+    if ok and type(t) == "table" then
+      price, stack, avail, ext, usable, purch = t.price, t.stackCount, t.numAvailable, t.hasExtendedCost, t.isUsable, t.isPurchasable
+    end
+  elseif GetMerchantItemInfo then
+    local _, _, p, st, a, u, e = GetMerchantItemInfo(i)
+    price, stack, avail, usable, ext = p, st, a, u, e
+  end
+  local row = { p = clean(price) or 0, s = clean(stack) or 1 }
+  avail = clean(avail)
+  if avail and avail > 0 then row.n = avail end
+  -- other costs: tokens, marks, items
+  if clean(ext) and GetMerchantItemCostInfo then
+    local okN, n = pcall(GetMerchantItemCostInfo, i)
+    if okN and clean(n) then
+      row.c = {}
+      for k = 1, n do
+        local ok2, tex, amount, link, curName = pcall(GetMerchantItemCostItem, i, k)
+        if ok2 and clean(amount) then
+          local what
+          link = clean(link)
+          if type(link) == "string" then
+            what = tonumber(link:match("item:(%d+)")) or (link:match("currency:(%d+)") and ("cur:" .. link:match("currency:(%d+)")))
+          end
+          what = what or clean(curName) or clean(tex)
+          row.c[#row.c + 1] = { what, amount }
+        end
+      end
+      if #row.c == 0 then row.c = nil end
+    end
+  end
+  -- requirements as the tooltip says them (red lines: reputation, level, skill, class ...)
+  if C_TooltipInfo and C_TooltipInfo.GetMerchantItem then
+    local ok, data = pcall(C_TooltipInfo.GetMerchantItem, i)
+    for _, l in ipairs(ok and data and data.lines or {}) do
+      local txt = clean(l.leftText)
+      if type(txt) == "string" and (txt:find("^Requires") or txt:find("^Classes:") or txt:find("^Races:")) then
+        row.r = row.r or {}
+        row.r[#row.r + 1] = txt
+      end
+    end
+  end
+  if clean(usable) == false or clean(purch) == false then row.u = false end
+  return row
+end
+local function sameRow(a, b)
+  if not (a and b) then return false end
+  if a.p ~= b.p or (a.s or 1) ~= (b.s or 1) or a.n ~= b.n then return false end
+  local function flat(t) local o = {} for _, v in ipairs(t or {}) do o[#o + 1] = tostring(v[1] or v) .. "x" .. tostring(v[2] or "") end table.sort(o) return table.concat(o, ",") end
+  return flat(a.c) == flat(b.c) and table.concat(a.r or {}, "|") == table.concat(b.r or {}, "|")
+end
 local function onMerchant()
-  if not on() or ccRecords() then return end
+  if not on() then return end
   local id = npcId("npc")
   if not id then return end
   noteUnit("npc"); noteSpot("c:" .. id)
-  local list = {}
+  local c = db()
+  c.vendx = type(c.vendx) == "table" and c.vendx or {}
+  c.vdiff = type(c.vdiff) == "table" and c.vdiff or {}
+  local before = c.vendx[id] and c.vendx[id].i or {}
+  local shared = D.db and D.db.vendx and D.db.vendx[id]
+  local rows, list = {}, {}
   for i = 1, (GetMerchantNumItems and GetMerchantNumItems() or 0) do
     local item = noteItem(GetMerchantItemLink and GetMerchantItemLink(i))
     if item then
-      local price, stack, avail
-      if C_MerchantFrame and C_MerchantFrame.GetItemInfo then
-        local ok, t = pcall(C_MerchantFrame.GetItemInfo, i)
-        if ok and type(t) == "table" then price, stack, avail = t.price, t.stackCount, t.numAvailable end
-      elseif GetMerchantItemInfo then
-        local _, _, p, s, a = GetMerchantItemInfo(i)
-        price, stack, avail = p, s, a
+      local row = merchantRow(i)
+      rows[item] = row
+      list[item] = { row.p, row.s, row.n }
+      -- different from the database or the last visit: noted for the database fixes
+      local known = before[item] or (shared and shared[item])
+      if known and not sameRow(known, row) then
+        c.vdiff[id] = c.vdiff[id] or {}
+        c.vdiff[id][item] = { t = time(), was = known, now = row }
       end
-      list[item] = { clean(price) or 0, clean(stack) or 1, (clean(avail) or -1) > 0 and avail or nil }
     end
   end
-  if next(list) then list.t = time(); db().vend[id] = list end
+  if next(rows) then c.vendx[id] = { t = time(), i = rows } end
+  if next(list) and not ccRecords() then list.t = time(); c.vend[id] = list end
 end
 Q:On("MERCHANT_SHOW", function() Q.After(0.3, function() pcall(onMerchant) end) end)
 

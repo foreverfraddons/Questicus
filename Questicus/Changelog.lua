@@ -9,7 +9,7 @@ Q.Changelog = {
   { v = "next",
     added = {
       "Highlights: ore, herbs, quest objects, chests and your fishing bobber light up as you come up to them, with 15 light effects, the object's name and icon, colours per kind of object, and a live preview (Options > Highlights, or /qc glow).",
-      "Questicus now records much more for the shared quest database while you play (money and skinning per creature, fishing per zone, flight prices, trainers, quest details and reputation, which quests NPCs really offer, rares, subzones, encounters, gathering skill levels) - /qc recorded shows what it has. Turn it off under Options > Advanced.",
+      "Questicus now records much more for the shared quest database while you play (money and skinning per creature, fishing per zone, flight prices, trainers and every ability's training cost, everything vendors sell with its price, limits, token costs and requirements, quest details and reputation, which quests NPCs really offer, rares, subzones, encounters, gathering skill levels) - /qc recorded shows what it has. Turn it off under Options > Advanced.",
       "Highlights options: hide the light in combat, in instances, on things you can't use yet or on herbs and ore without the profession; ignore objects; pick the range and direction; set the interact key; cut the light out around your character; alternate Find Herbs and Find Minerals if you have both.",
     },
     changed = {
