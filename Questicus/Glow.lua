@@ -36,7 +36,7 @@ local DEFAULTS = {
   intensity = 100,
   offsetY = -40,         -- the light, up / down from the object's nameplate
   follow = false,        -- fades with the nameplate (object behind scenery ...)
-  name = true,           -- the object's name over it, written by Questicus instead of the game
+  name = false,          -- the object's name over it, written by Questicus (the game already shows one on the plate)
   icon = true,           -- and its interaction icon
   textSize = 100,
   exclusive = true,      -- the game only points out what gets a light (no icons on every NPC)
@@ -72,7 +72,9 @@ local function fill(t, d)
 end
 function G.cfg()
   Q.db.glow = fill(type(Q.db.glow) == "table" and Q.db.glow or {}, DEFAULTS)
-  return Q.db.glow
+  local c = Q.db.glow
+  if (c.v or 1) < 2 then c.v = 2; c.name = false end     -- (the first build wrote a second name over the game's)
+  return c
 end
 function G.cats()
   Q.char.glowCats = fill(type(Q.char.glowCats) == "table" and Q.char.glowCats or {}, CHAR_DEFAULTS)
@@ -232,6 +234,11 @@ function G.Classify()
   local okN, name = pcall(UnitName, UNIT)
   if not okN or S(name) then name = nil end
   if UnitIsPlayer and UnitIsPlayer(UNIT) then return end
+  -- only things in the world (veins, herbs, chests, quest objects, the bobber): never characters
+  if UnitIsGameObject then
+    local okO, isObj = pcall(UnitIsGameObject, UNIT)
+    if okO and isObj == false then return "service", "far", name end
+  end
   local cur = cursorFile()
   local lc = cur and cur:lower() or ""
   local locked = lc:find("^unable") ~= nil
@@ -253,7 +260,7 @@ function G.Classify()
     local kind, id = Q.ParseGUID(guid)
     if kind == "GameObject" and id and BOBBER[id] then cat = "bobber" end
     if kind == "Creature" or kind == "Vehicle" or kind == "Pet" then
-      if not cat or cat == "other" then cat = "service" end   -- people and animals: not ours to light
+      cat = "service"                                    -- people and animals (quest givers too): not ours to light
     end
   end
   if (not cat or cat == "other") and name then
@@ -683,11 +690,9 @@ local function plateOf()
 end
 
 -- the game's own name on the object's nameplate: Questicus writes its own instead
-local function gameName(plate, show)
-  local uf = plate and (plate.UnitFrame or plate.unitFrame)
-  local nm = uf and (uf.name or uf.Name)
-  if nm and nm.SetAlpha then pcall(nm.SetAlpha, nm, show and 1 or 0) end
-end
+-- (nameplates are restricted regions for addons now: Questicus leaves the game's own name on them
+-- alone - its name option writes one more line only where the game shows none)
+local function gameName() end
 
 local function key()
   local g = UnitGUID and UnitGUID(UNIT)
@@ -728,7 +733,7 @@ local function poll()
   cur.showName, cur.showIcon = showName, showIcon
 end
 
-local lastX, lastY
+local lastPlate
 host:SetScript("OnUpdate", function(_, el)
   pollAcc = pollAcc + el
   if pollAcc >= POLL then pollAcc = 0; poll() end
@@ -739,18 +744,14 @@ host:SetScript("OnUpdate", function(_, el)
   local c = G.cfg()
   local cat = cur.cat or "other"
   local plate = cur.plate
-  if cur.on and plate and plate.IsShown and plate:IsShown() then
-    local x, y = plate:GetCenter()
-    if x and not S(x) then
-      local ps, us = plate:GetEffectiveScale(), UIParent:GetEffectiveScale()
-      lastX, lastY = x * ps / us, y * ps / us
-    end
-  end
-  if not lastX then return end
+  -- (the game doesn't let addons measure a nameplate - "restricted region" - but things can be
+  -- anchored to it: the light follows the plate by its anchor, kept on the last one while it fades)
+  if cur.on and plate and plate ~= lastPlate then lastPlate = plate end
+  if not lastPlate then return end
   local size = G.Look(cat, "size") or 110
   local off = G.Look(cat, "offsetY") or -40
   light:ClearAllPoints()
-  light:SetPoint("CENTER", UIParent, "BOTTOMLEFT", lastX, lastY + off)
+  light:SetPoint("CENTER", lastPlate, "CENTER", 0, off)
   light:SetSize(size, size)
   light:Use(G.Look(cat, "effect"))
   light:SetCutout(c.silhouette)
@@ -758,9 +759,9 @@ host:SetScript("OnUpdate", function(_, el)
   local t = GetTime() - (cur.since or GetTime())
   local inten = (G.Look(cat, "intensity") or 100) / 100
   local a = fade * inten * (shownState == "far" and 0.6 or shownState == "locked" and 0.5 or 1)
-  if G.Look(cat, "follow") and plate and plate.GetAlpha then
-    local pa = plate:GetAlpha()
-    if pa and not S(pa) then a = a * pa end
+  if G.Look(cat, "follow") and lastPlate and lastPlate.GetEffectiveAlpha then
+    local okA, pa = pcall(lastPlate.GetEffectiveAlpha, lastPlate)
+    if okA and type(pa) == "number" and not S(pa) then a = a * pa end
   end
   -- the moment it comes within reach: a flash
   local fl = GetTime() - flashT
@@ -772,7 +773,7 @@ host:SetScript("OnUpdate", function(_, el)
   if cur.showName and cur.name then
     label:SetFont(STANDARD_TEXT_FONT, 13 * ts, "OUTLINE")
     label:ClearAllPoints()
-    label:SetPoint("BOTTOM", UIParent, "BOTTOMLEFT", lastX, lastY + 6)
+    label:SetPoint("BOTTOM", lastPlate, "CENTER", 0, 6)
     local rgb = c.colors[cat] or c.colors.other
     label:SetTextColor(rgb[1] * 0.4 + 0.6, rgb[2] * 0.4 + 0.6, rgb[3] * 0.4 + 0.6, fade)
     label:SetText(cur.name)
@@ -784,7 +785,7 @@ host:SetScript("OnUpdate", function(_, el)
     icon:SetTexture("Interface\\Cursor\\" .. cur.cursor)
     icon:SetSize(22 * ts, 22 * ts)
     icon:ClearAllPoints()
-    if label:IsShown() then icon:SetPoint("BOTTOM", label, "TOP", 0, 2) else icon:SetPoint("BOTTOM", UIParent, "BOTTOMLEFT", lastX, lastY + 6) end
+    if label:IsShown() then icon:SetPoint("BOTTOM", label, "TOP", 0, 2) else icon:SetPoint("BOTTOM", lastPlate, "CENTER", 0, 6) end
     icon:SetAlpha(fade)
     icon:Show()
   else
