@@ -51,6 +51,15 @@ local function load()
       paths[a][b] = p.seconds
     end
   end
+  -- flights you took yourself, timed (QuesticusCollect.ftime, below): the real time beats the table's
+  for k, e in pairs(QuesticusCollect and QuesticusCollect.ftime or {}) do
+    local a, b = tostring(k):match("^(%d+)>(%d+)$")
+    a, b = tonumber(a), tonumber(b)
+    if a and b and type(e) == "table" and tonumber(e.s) then
+      paths[a] = paths[a] or {}
+      paths[a][b] = tonumber(e.s)
+    end
+  end
   return nodes
 end
 function F:Node(id) load(); return byId[id] end
@@ -274,6 +283,46 @@ end
 local flyingTo
 function F:FlyingTo() return flyingTo end
 
+-- Timing your flights: from the flight master you take off at to the one you land at, measured once
+-- per route and kept in QuesticusCollect.ftime["from>to"] = { s = seconds, at = when } (sent with your
+-- recordings for the shared database; off with "Help fill the database", like the rest). The route
+-- uses it straight away instead of the table's time.
+local takeoff
+local function nearestNode(here, within)
+  local n, d
+  for _, x in ipairs(load()) do
+    if x.i == here.i then local dd = D.Dist(here, x); if not d or dd < d then n, d = x, dd end end
+  end
+  if n and d <= within then return n end
+end
+local function noteTakeoff(dest)
+  if not dest then return end
+  local here = D:PlayerPos()
+  local from = here and nearestNode(here, 80)
+  if from and from.id ~= dest.id then takeoff = { from = from, to = dest, t = GetTime() } end
+end
+local function noteLanding()
+  local f = takeoff
+  takeoff = nil
+  if not f or not QuesticusCollect or (Q.db and Q.db.collect == false) then return end
+  local here = D:PlayerPos()
+  local at = here and nearestNode(here, 150)
+  if not at or at.id ~= f.to.id then return end             -- (landed somewhere else / got off early)
+  local secs = math.floor(GetTime() - f.t + 0.5)
+  if secs < 5 or secs > 1800 then return end
+  QuesticusCollect.ftime = type(QuesticusCollect.ftime) == "table" and QuesticusCollect.ftime or {}
+  local key = f.from.id .. ">" .. f.to.id
+  if QuesticusCollect.ftime[key] then return end            -- (each route is timed once)
+  QuesticusCollect.ftime[key] = { s = secs, at = time and time() or nil }
+  load()
+  paths[f.from.id] = paths[f.from.id] or {}
+  paths[f.from.id][f.to.id] = secs
+  F.cache = {}
+  F.version = F.version + 1
+  Q:Print(("flight %s -> %s took %d:%02d (recorded for the route)"):format(f.from.name, f.to.name, math.floor(secs / 60), secs % 60))
+end
+F.NoteLanding = noteLanding
+
 Q:On("TAXIMAP_OPENED", function()
   F:ReadTaxiMap()
   -- you're talking to this flight master, so you know it (even if the map didn't name it)
@@ -293,6 +342,7 @@ Q:On("TAXIMAP_OPENED", function()
     if n and n.slot and TakeTaxiNode then
       Q.After(0.3, function()
         flyingTo = n
+        noteTakeoff(n)
         pcall(TakeTaxiNode, n.slot)
         Q:Print("flying to " .. n.name)
       end)
@@ -303,12 +353,14 @@ end)
 if hooksecurefunc and TakeTaxiNode then
   hooksecurefunc("TakeTaxiNode", function(slot)
     for _, n in ipairs(load()) do if n.slot == slot then flyingTo = n end end
+    if not takeoff or takeoff.to ~= flyingTo then noteTakeoff(flyingTo) end
     -- the flight step is done: plan from where it lands
     if Q.Planner then Q.Planner.taxiPlanned = nil; Q.Planner:Replan(1.2) end
   end)
 end
 Q:On("PLAYER_CONTROL_GAINED", function()
   if flyingTo and not (UnitOnTaxi and UnitOnTaxi("player")) then
+    pcall(noteLanding)
     flyingTo = nil
     if Q.Planner then Q.Planner:Replan(0.5) end
   end

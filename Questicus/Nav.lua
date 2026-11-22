@@ -10,9 +10,13 @@ Q.Nav = N
 
 local CELL = 40                 -- yards per grid cell
 local UNKNOWN_COST = 2.2        -- crossing ground nobody has stood on costs this much more
+local WALKED_COST = 0.7         -- ground YOU walked (QuesticusCollect.trail) costs less than ground only known
+                                -- from spawns: routes follow your own roads, gates and ramps, and keep
+                                -- learning as you play
 local MAX_EXPAND = 7000
 local MARGIN = 30               -- cells around start / goal the search may use
 local OFF = 100000
+local FAR = 2500                -- yards: no path search further than this
 
 local walk = {}                 -- [instance] = { [cellKey] = true }
 local built = {}                -- [instance] = true / [ "m" .. uiMap ] = true
@@ -142,12 +146,16 @@ function N:Path(from, to)
   curInst = from.i
   local w = walk[from.i]
   local dist = D.Dist(from, to)
+  -- (further than this a search covers thousands of cells - 50 ms and more - for a way that will be
+  -- worked out again long before you get there: a straight line until you're closer)
+  if dist > FAR then return { to } end
   if not w or dist < CELL * 2 or lineClear(w, from.x, from.y, to.x, to.y) then return { to } end
   local sx, sy = cellOf(from.x, from.y)
   local gx, gy = cellOf(to.x, to.y)
   local minx, maxx = math.min(sx, gx) - MARGIN, math.max(sx, gx) + MARGIN
   local miny, maxy = math.min(sy, gy) - MARGIN, math.max(sy, gy) + MARGIN
   local start, goal = keyOf(sx, sy), keyOf(gx, gy)
+  local tr = QuesticusCollect and QuesticusCollect.trail and QuesticusCollect.trail[from.i]
   local g, came, open = { [start] = 0 }, {}, {}
   local cxOf, cyOf = { [start] = sx }, { [start] = sy }
   heapPush(open, start, 0)
@@ -164,7 +172,7 @@ function N:Path(from, to)
           if nx >= minx and nx <= maxx and ny >= miny and ny <= maxy then
             local nk = keyOf(nx, ny)
             local step = (dx ~= 0 and dy ~= 0) and 1.414 or 1
-            if not w[nk] then step = step * UNKNOWN_COST end
+            if not w[nk] then step = step * UNKNOWN_COST elseif tr and tr[nk] then step = step * WALKED_COST end
             step = step * avoidCost(nk)
             local ng = g[cur] + step
             if not g[nk] or ng < g[nk] then
@@ -200,22 +208,39 @@ function N:Path(from, to)
   return out
 end
 
--- cached path for the guide target; recomputed when the target changes or you leave the path
-local cache = { key = nil, path = nil, at = 0 }
-function N:Forget() cache.key, cache.path = nil, nil end
+-- cached paths, one per target (the arrow and the minimap ask for different targets: with a single
+-- cached path each one threw the other's away and the whole search ran again, 25 times a second -
+-- most of Questicus' lag while guiding). A target is keyed to 10 yards; the path's last point is
+-- always the exact target. Recomputed when the target changes, after 8 s, or when you leave the path
+local cache, cacheN = {}, 0
+function N:Forget() wipe(cache); cacheN = 0 end
+local function airborne()
+  return (Q.OnTaxi and Q.OnTaxi()) or (IsFlying and IsFlying()) or false
+end
 function N:Route(here, to)
   if not here or not to then return nil end
-  local key = ("%d:%d:%d"):format(to.i or 0, math.floor(to.x), math.floor(to.y))
+  -- in the air (flight path, flying mount) the ground's walls don't matter: straight at the target, no
+  -- search (moving that fast made a new search every half second: the stutters while flying)
+  if airborne() then return { to } end
+  local key = (to.i or 0) * 1e8 + math.floor(to.x / 10) * 1e4 + math.floor(to.y / 10)
   local now = GetTime and GetTime() or 0
-  local p = cache.path
-  local stale = cache.key ~= key or not p or now - cache.at > 8
-  if not stale and p[1] and D.Dist(here, p[1]) > 260 then stale = true end
+  local e = cache[key]
+  local p = e and e.path
+  local stale = not p or now - e.at > 8
+  -- (left the path: moved far from where it was worked out - the first corner itself can be 260+ yards
+  -- away, which made the old check search again on every call)
+  if not stale and e.from and D.Dist(here, e.from) > math.max(80, D.Dist(e.from, to) * 0.15) then stale = true end
   if stale then
-    cache.key, cache.at = key, now
+    if not e then
+      if cacheN >= 8 then wipe(cache); cacheN = 0 end
+      e = {}; cache[key] = e; cacheN = cacheN + 1
+    end
+    e.at, e.from = now, { i = here.i, x = here.x, y = here.y }
     local ok, res = pcall(N.Path, N, here, to)
-    cache.path = ok and res or { to }
-    p = cache.path
+    e.path = ok and res or { to }
+    p = e.path
   end
+  if p and #p > 0 then p[#p] = to end            -- (exactly the target, not the one 10 yards off)
   -- drop waypoints you reached
   while p and #p > 1 and D.Dist(here, p[1]) < 25 do table.remove(p, 1) end
   return p

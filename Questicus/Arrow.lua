@@ -57,8 +57,18 @@ local function build()
   local acc = 0
   frame:SetScript("OnUpdate", function(_, el)
     acc = acc + el
-    if acc < (Q.OnTaxi() and 0.5 or 0.05) then return end
+    if acc < 0.05 then return end
     acc = 0
+    -- on a flight path nothing is measured: "in flight" once, back to normal the moment you land
+    if Q.OnTaxi() then
+      if not frame.inFlight then
+        frame.inFlight = true
+        frame.arrow:Hide(); frame.here:Hide()
+        frame.dist:SetText("in flight")
+      end
+      return
+    end
+    frame.inFlight = nil
     A:Update()
   end)
 end

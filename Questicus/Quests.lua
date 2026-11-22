@@ -516,8 +516,31 @@ function QS:Available(id, st)
 end
 
 -- ------------------------------------------------------------------ events
+-- QUEST_LOG_UPDATE fires all the time (kills, loot, other players' quests nearby...). Only tell
+-- the rest of Questicus when the log really changed - a quest added / removed / completed / failed
+-- or an objective moved - otherwise the route was rebuilt every few seconds for nothing (lag).
+local function sameObjectives(a, b)
+  if #a ~= #b then return false end
+  for i = 1, #a do
+    local x, y = a[i], b[i]
+    if x.finished ~= y.finished or x.numFulfilled ~= y.numFulfilled or x.text ~= y.text then return false end
+  end
+  return true
+end
+local function sameLog(old, new)
+  if not old then return false end
+  for id, e in pairs(new) do
+    local o = old[id]
+    if not o or o.complete ~= e.complete or o.failed ~= e.failed or o.index ~= e.index
+      or not sameObjectives(o.objectives or {}, e.objectives or {}) then return false end
+  end
+  for id in pairs(old) do if not new[id] then return false end end
+  return true
+end
 local function changed()
+  local old = QS.log
   QS:ReadLog()
+  if sameLog(old, QS.log) then return end
   Q:Send("QC_QUESTS_CHANGED")
 end
 Q:On("QC_READY", function(ok)

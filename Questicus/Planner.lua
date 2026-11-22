@@ -1785,6 +1785,9 @@ driver:SetScript("OnUpdate", function(self)
   end
 end)
 function P:BuildAsync()
+  -- collection mode doesn't guide: no route to work out (leaving it builds one right away)
+  if Q.CollectOnly and Q.CollectOnly() then return end
+  P.lastAsyncAt = now()
   if _G.QUESTICUS_SYNC or not coroutine then return P:Build() end
   P.co = coroutine.create(function() P:Build() end)
   P.sliceStart = now()
@@ -1796,8 +1799,15 @@ function P:BuildAsync()
   end
   driver:Show()
 end
+-- a whole replan makes megabytes of garbage, so automatic ones are at least 5 s apart (changes
+-- in between are gathered into one)
+local REPLAN_GAP = 5
 function P:Replan(delay)
-  Q.Throttle("replan", delay or 0.4, function()
+  if Q.CollectOnly and Q.CollectOnly() then return end
+  delay = delay or 0.4
+  local since = P.lastAsyncAt and ((now() - P.lastAsyncAt) / 1000) or 999   -- (now() is in ms)
+  if since + delay < REPLAN_GAP then delay = REPLAN_GAP - since end
+  Q.Throttle("replan", delay, function()
     -- on a flight: plan once (from where it lands), then wait for the landing
     if Q.OnTaxi() then
       if P.taxiPlanned then P.afterTaxi = true; return end
@@ -1825,7 +1835,24 @@ function P:SkipQuest(id)
   P:BuildAsync()
 end
 
-Q:On("QC_QUESTS_CHANGED", function() P:Replan(0.2) end)
+-- a kill or a loot that only moves an objective's count (3/8 -> 4/8) doesn't change the route: replan
+-- when a quest comes, goes, is done or failed, or an objective finishes (a replan is megabytes of work)
+local lastLogSig
+local function logSig()
+  local parts = {}
+  for id, e in pairs(QS.log or {}) do
+    parts[#parts + 1] = id .. (e.complete and "c" or "") .. (e.failed and "f" or "")
+    for i, o in ipairs(e.objectives or {}) do if o.finished then parts[#parts + 1] = id .. "o" .. i end end
+  end
+  table.sort(parts)
+  return table.concat(parts, ",")
+end
+Q:On("QC_QUESTS_CHANGED", function()
+  local sig = logSig()
+  if sig == lastLogSig then return end
+  lastLogSig = sig
+  P:Replan(0.2)
+end)
 Q:On("QC_REPLAN", function() P:Replan(0.5) end)
 Q:On("PLAYER_LEVEL_UP", function() P:Replan(1) end)
 Q:On("ZONE_CHANGED_NEW_AREA", function() P:Replan(1) end)
