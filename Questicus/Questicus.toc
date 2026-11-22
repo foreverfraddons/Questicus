@@ -92,7 +92,9 @@ WorldMap\Data\Forever\ArtEdits.lua
 WorldMap\Data\Forever\Labels.lua
 WorldMap\Data\Forever\Banners.lua
 WorldMap\Data\Forever\ZoneArt.lua
+WorldMap\Data\Forever\Fog.lua
 WorldMap\Data\Forever\Chart.lua
+WorldMap\Data\Forever\Explore.lua
 WorldMap\Data\Forever\Changelog.lua
 WorldMap\Map\Stitch.lua
 WorldMap\Map\Chart.lua
@@ -101,8 +103,10 @@ WorldMap\Map\Close.lua
 WorldMap\Map\Extras.lua
 WorldMap\Map\Flights.lua
 WorldMap\Map\Routes.lua
+WorldMap\Map\Explore.lua
 WorldMap\Map\Townsfolk.lua
 WorldMap\Map\Quests.lua
+WorldMap\Map\DungeonJournal.lua
 WorldMap\Map\Dungeons.lua
 WorldMap\Map\Paint.lua
 WorldMap\Map\Sketch.lua
@@ -110,6 +114,7 @@ WorldMap\Map\Debug.lua
 WorldMap\Map\Bench.lua
 WorldMap\Map\Gamepad.lua
 WorldMap\Map\PadView.lua
+WorldMap\Map\OwnView.lua
 WorldMap\Map\Report.lua
 WorldMap\Map\Nav.lua
 WorldMap\Map\Combat.lua
