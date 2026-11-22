@@ -9,6 +9,7 @@ Q.Changelog = {
   { v = "next",
     fixed = {
       "Opening the world map no longer redraws the quest areas when nothing has changed.",
+      "The What's new window keeps its text inside the window, waits until you've answered the setup questions, and on a first install shows only the latest version's notes.",
     },
     added = {
       "Mob tooltips show about how much money a kill drops and, if you know Skinning, what skinning it gives (real WoW: Forever counts from Drop Tables). /qc mobinfo turns it off.",

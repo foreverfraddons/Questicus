@@ -74,6 +74,8 @@ local function build()
   win.scroll = CreateFrame("ScrollFrame", nil, win)
   win.scroll:SetPoint("TOPLEFT", 14, -54)
   win.scroll:SetPoint("BOTTOMRIGHT", -14, 46)
+  -- (long notes scroll inside the window instead of running out over whatever is under it)
+  if win.scroll.SetClipsChildren then win.scroll:SetClipsChildren(true) end
   win.body = CreateFrame("Frame", nil, win.scroll)
   win.body:SetSize(432, 1)
   win.scroll:SetScrollChild(win.body)
@@ -96,10 +98,16 @@ local function build()
   win.update:SetJustifyH("LEFT")
 end
 
--- since: show the versions after this one (nil = every version)
+-- since: show the versions after this one (nil = every version; "only" = just this version's)
 function N:Show(since, title)
   if not win then build() end
-  local entries = N.Entries(since)
+  local entries
+  if since == "only" then
+    entries = {}
+    for _, it in ipairs(N.Entries(nil)) do if it.v == Q.version then entries[#entries + 1] = it end end
+  else
+    entries = N.Entries(since)
+  end
   if #entries == 0 then entries = N.Entries(nil) end
   win.head:SetText(title or ("You're on version " .. Q.version .. "."))
   win.text:SetText(N.Text(entries))
@@ -115,10 +123,16 @@ end
 local function afterLogin()
   local seen = Q.db.newsSeen
   if seen == Q.version then return end
+  -- not over the setup questions: once they're answered (checked again every few seconds)
+  local sv = _G.QuesticusSurvey
+  if not (Q.char and Q.char.surveyDone) or (sv and sv.IsShown and sv:IsShown()) then
+    Q.After(3, afterLogin)
+    return
+  end
   Q.db.newsSeen = Q.version
   if Q.db.newsOff then return end
   if not seen then
-    N:Show(nil, "Thanks for using Questicus! Here's what's in version " .. Q.version .. ".")
+    N:Show("only", "Thanks for using Questicus! Here's what's new in version " .. Q.version .. ".")
   elseif N.Newer(Q.version, seen) then
     N:Show(seen, "Questicus was updated to " .. Q.version .. ". Here's what changed since " .. seen .. ".")
   end
