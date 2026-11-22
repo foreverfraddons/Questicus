@@ -312,12 +312,21 @@ Q:On("TAXIMAP_OPENED", function()
 end)
 
 -- ------------------------------------------------------------------ trainers
-Q:On("TRAINER_SHOW", function()
+-- the trainer's list fills in after the window opens (TRAINER_UPDATE), and the window hides spells
+-- you can't learn yet / already know: show them all while reading, then put the filters back
+local ignoreUntil = 0
+local function readTrainer()
   if not on() or not GetNumTrainerServices then return end
-  Q.After(0.3, function()
-    pcall(function()
+  local restore = {}
+  if GetTrainerServiceTypeFilter and SetTrainerServiceTypeFilter then
+    for _, k in ipairs({ "available", "unavailable", "used" }) do
+      local ok, v = pcall(GetTrainerServiceTypeFilter, k)
+      if ok and not v then restore[#restore + 1] = k; pcall(SetTrainerServiceTypeFilter, k, 1) end
+    end
+  end
+  local ok, err = pcall(function()
       local id = npcId("npc")
-      if not id then return end
+      if not id then R.lastTrainer = { err = "no trainer unit" } return end
       noteUnit("npc"); noteSpot("c:" .. id)
       local list = {}
       -- a class trainer of yours: what each level's training costs (Gear.lua keeps money for it)
@@ -344,8 +353,16 @@ Q:On("TRAINER_SHOW", function()
       end
       if next(list) then db().trn[id] = { t = time(), s = list, cls = (not trade) and Q.player.class or nil } end
       if costs and next(costs) and Q.char then Q.char.trainCost = costs; Q.char.trainCostAt = UnitLevel("player") end
-    end)
+      R.lastTrainer = { id = id, n = GetNumTrainerServices(), saved = next(list) ~= nil }
   end)
+  for _, k in ipairs(restore) do pcall(SetTrainerServiceTypeFilter, k, 0) end
+  if #restore > 0 then ignoreUntil = GetTime() + 0.5 end      -- (our own filter changes update the list)
+  if not ok then R.lastTrainer = { err = tostring(err) } end
+end
+Q:On("TRAINER_SHOW", function() Q.After(0.3, readTrainer); Q.After(1.5, readTrainer) end)
+Q:On("TRAINER_UPDATE", function()
+  if GetTime() < ignoreUntil then return end
+  Q.Throttle("rec-trainer", 0.5, readTrainer)
 end)
 
 -- ------------------------------------------------------------------ quests: details, offers, missing ones, item starts, reputation
@@ -791,5 +808,10 @@ Q:Command("recorded", "what Questicus has recorded for the database", function()
   local parts = {}
   for _, k in ipairs(KEYS) do if n[k] and n[k] > 0 then parts[#parts + 1] = k .. " " .. n[k] end end
   Q:Print("recorded: " .. (#parts > 0 and table.concat(parts, ", ") or "nothing yet") ..
-    (ccRecords() and " (loot, vendors and npcs: Command Center records those)" or ""))
+    (ccRecords() and " (loot and npcs: Command Center records those)" or ""))
+  local lt = R.lastTrainer
+  if lt then
+    Q:Print(lt.err and ("last trainer: not read (" .. lt.err .. ")") or
+      ("last trainer: npc %d, %d abilities, %s"):format(lt.id or 0, lt.n or 0, lt.saved and "saved" or "nothing to save"))
+  end
 end)
