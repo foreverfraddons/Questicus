@@ -129,9 +129,17 @@ function GD:Target(index)
   -- the arrow's step: closest open spot leaning toward the next step, spots just used / found empty
   -- left alone until they respawn (Spots.lua)
   if Q.Spots and (index == nil or index == GD.focus) then
-    Q.Spots.entries = entries
-    local pick = Q.Spots.Choose(entries, here, index or GD.focus)
-    best = pick and pick.p
+    -- (the arrow asks every frame: choose at most 4 times a second, unless a spot changed)
+    local now = GetTime()
+    local c = GD.spotPick
+    if c and c.s == s and now - c.t < 0.25 and not Q.Spots.dirty and of[c.p] then
+      best = c.p
+    else
+      Q.Spots.entries = entries
+      local pick = Q.Spots.Choose(entries, here, index or GD.focus)
+      best = pick and pick.p
+      GD.spotPick = { s = s, t = now, p = best }
+    end
   end
   best = best or D.Nearest(here or s.point, pts)
   local e = best and of[best]

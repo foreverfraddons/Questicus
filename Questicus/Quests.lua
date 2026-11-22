@@ -302,8 +302,10 @@ function QS:QuestTip(id, giverName, footer)
   return lines
 end
 
+local questNPCs     -- (Quests.lua, reputation: the NPCs of the quests you could do)
 function QS:BuildPool()
   QS.cache = {}
+  questNPCs = nil
   -- quests that name another as their next one: that next quest needs one of them first, even
   -- where the data has no prerequisite (The Goblin Trader -> Smuggler's Paradise)
   QS.prevOf = {}
@@ -359,8 +361,17 @@ end
 
 -- ------------------------------------------------------------------ reputation / hostile quest NPCs
 -- your standing with a faction: 1 hated .. 4 neutral .. 8 exalted (and the raw value), nil = not known
+local standCache = {}
+Q:On("UPDATE_FACTION", function() wipe(standCache) end)
 function QS.Standing(faction)
   if not faction then return end
+  local c = standCache[faction]
+  if c then return c[1], c[2] end
+  local r, v = QS.StandingNow(faction)
+  standCache[faction] = { r, v }
+  return r, v
+end
+function QS.StandingNow(faction)
   if C_Reputation and C_Reputation.GetFactionDataByID then
     local ok, d = pcall(C_Reputation.GetFactionDataByID, faction)
     if ok and type(d) == "table" and d.reaction and not Q.Secret(d.reaction) then return d.reaction, d.currentStanding end
@@ -372,19 +383,50 @@ function QS.Standing(faction)
 end
 -- quest NPCs seen hostile / unfriendly to this character (UnitReaction <= 3): they won't talk to you,
 -- and their camp attacks you. Cleared when seen friendly again (your reputation went up)
+-- the NPCs that give or take quests you could do (only those are worth remembering; rebuilt with the pool)
+local function isQuestNPC(npc)
+  if not questNPCs then
+    questNPCs = {}
+    for _, id in ipairs(QS.pool or {}) do
+      local info = QS:Info(id)
+      for _, list in ipairs({ info and info.givers or {}, info and info.enders or {} }) do
+        for _, k in ipairs(list) do
+          local n = tonumber(tostring(k):match("^c:?(%d+)$"))
+          if n then questNPCs[n] = true end
+        end
+      end
+    end
+    for id in pairs(QS.log or {}) do
+      local info = QS:Info(id)
+      for _, k in ipairs(info and info.enders or {}) do
+        local n = tonumber(tostring(k):match("^c:?(%d+)$"))
+        if n then questNPCs[n] = true end
+      end
+    end
+  end
+  return questNPCs[npc]
+end
+QS.IsQuestNPC = isQuestNPC
+Q:On("QC_QUESTS_CHANGED", function() questNPCs = nil end)
+-- (earlier versions remembered every hostile mob: keep only quest NPCs)
+Q:On("QC_READY", function()
+  Q.After(5, function()
+    local h = Q.char and Q.char.hostile
+    if type(h) ~= "table" then return end
+    for npc in pairs(h) do if not isQuestNPC(npc) then h[npc] = nil end end
+  end)
+end)
 function QS.NoteReaction(unit)
   if not (UnitExists and UnitExists(unit)) or (UnitIsPlayer and UnitIsPlayer(unit)) then return end
   local k = Q.UnitKey(unit)
   local npc = k and tonumber(k:match("^c(%d+)$"))
-  if not npc or not UnitReaction then return end
+  if not npc or not UnitReaction or not isQuestNPC(npc) then return end
   local ok, r = pcall(UnitReaction, unit, "player")
   if not ok or not r or Q.Secret(r) then return end
   Q.char.hostile = type(Q.char.hostile) == "table" and Q.char.hostile or {}
   local was = Q.char.hostile[npc]
   if r <= 3 then Q.char.hostile[npc] = time() elseif was then Q.char.hostile[npc] = nil end
-  if (r <= 3) ~= (was ~= nil) then
-    Q.Throttle("hostile-replan", 1, function() Q:Send("QC_QUESTS_CHANGED") end)
-  end
+  if (r <= 3) ~= (was ~= nil) and Q.Planner then Q.Planner:Replan(2) end
 end
 for _, ev in ipairs({ "PLAYER_TARGET_CHANGED", "UPDATE_MOUSEOVER_UNIT" }) do
   Q:On(ev, function() pcall(QS.NoteReaction, ev == "PLAYER_TARGET_CHANGED" and "target" or "mouseover") end)
