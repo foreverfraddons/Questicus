@@ -37,7 +37,7 @@ local DEFAULTS = {
   offsetY = -90,         -- the light, up / down from the object's nameplate (it floats above the object)
   follow = false,        -- fades with the nameplate (object behind scenery ...)
   name = false,          -- the object's name over it, written by Questicus (the game already shows one on the plate)
-  icon = true,           -- and its interaction icon
+  icon = false,          -- and its interaction icon (the game draws one on the plate already)
   textSize = 100,
   exclusive = true,      -- the game only points out what gets a light (no icons on every NPC)
   glowOnly = false,      -- the light only: name and icon left to the game
@@ -73,11 +73,16 @@ end
 function G.cfg()
   Q.db.glow = fill(type(Q.db.glow) == "table" and Q.db.glow or {}, DEFAULTS)
   local c = Q.db.glow
-  if (c.v or 1) < 2 then c.v = 2; c.name = false end     -- (the first build wrote a second name over the game's)
-  if c.v < 3 then                                          -- (and sat too high over the object)
-    c.v = 3
+  -- (settings from earlier builds: no second name over the game's, the game's icon back on the plate,
+  -- the light lower down over the object)
+  if (c.v or 1) < 4 then
+    c.v = 4
+    c.name, c.icon = false, false
     if c.offsetY == -40 then c.offsetY = -90 end
-    for _, own in pairs(c.own) do if own.offsetY == -40 then own.offsetY = -90 end end
+    for _, own in pairs(c.own) do
+      if own.offsetY == -40 then own.offsetY = -90 end
+      own.name, own.icon = nil, nil
+    end
   end
   return c
 end
@@ -136,14 +141,11 @@ function G.ApplyCVars()
   setc("SoftTargetInteractRange", fishing and 60 or c.range)     -- (a bobber often lands further out)
   setc("SoftTargetInteractArc", c.arc)
   setc("SoftTargetNameplateInteract", 1)                         -- the object gets a nameplate: the light's anchor
-  if c.glowOnly then
-    if c.orig.SoftTargetIconInteract then setc("SoftTargetIconInteract", c.orig.SoftTargetIconInteract) end
-    if c.orig.SoftTargetIconGameObject then setc("SoftTargetIconGameObject", c.orig.SoftTargetIconGameObject) end
-  else
-    -- Questicus draws the icon itself on lit objects; exclusive: none on NPCs either
-    setc("SoftTargetIconGameObject", 0)
-    setc("SoftTargetIconInteract", c.exclusive and 0 or 1)
-  end
+  -- the game's icon on objects stays on: it's what makes the game give an object its nameplate,
+  -- which the light hangs from (turned off, objects got no plate and no light)
+  setc("SoftTargetIconGameObject", 1)
+  -- exclusive: no icon on the NPCs and other things that get no light
+  setc("SoftTargetIconInteract", (c.exclusive and not c.glowOnly) and 0 or 1)
 end
 Q:On("PLAYER_REGEN_ENABLED", function()
   for n, v in pairs(pendingCV) do pendingCV[n] = nil; setc(n, v) end
@@ -713,6 +715,10 @@ local function poll()
   local want = cat and G.Wanted(cat, st, name)
   local plate = cat and plateOf()
   if hiddenPlate and hiddenPlate ~= plate then gameName(hiddenPlate, true); hiddenPlate = nil end
+  if want and not plate and G.cfg().debug and cur.noPlateFor ~= name then
+    cur.noPlateFor = name
+    dprint(tostring(name), "-> " .. tostring(cat) .. ", but the game gave it no nameplate (no light)")
+  end
   if not (want and plate) then
     if cat and plate and G.cfg().exclusive and not G.cfg().glowOnly then gameName(plate, false); hiddenPlate = plate end
     cur.on = false
@@ -910,7 +916,13 @@ local function status()
   Q:Print("lit on this character: " .. table.concat(on, ", ") .. " | herbalism " .. tostring(p.herb and true or false) .. ", mining " .. tostring(p.ore and true or false))
   for _, n in ipairs(CV) do Q:Print("  " .. n .. " = " .. tostring(getc(n))) end
   local cat, st, name, cursor = G.Classify()
-  if cat then Q:Print(("in front of you: %s -> %s, %s (cursor %s)"):format(tostring(name), cat, st, tostring(cursor))) end
+  if cat then
+    local okW, why = G.Wanted(cat, st, name)
+    Q:Print(("in front of you: %s -> %s, %s (cursor %s), nameplate %s, %s"):format(tostring(name), cat, st, tostring(cursor),
+      plateOf() and "yes" or "NO", okW and "lit" or ("not lit: " .. tostring(why))))
+  else
+    Q:Print("nothing in front of you the game picked (soft target).")
+  end
 end
 
 Q:Command("glow", "highlights: /qc glow [on | off | effect <name> | ignore | ignore list | ignore clear | status | debug]", function(arg)
