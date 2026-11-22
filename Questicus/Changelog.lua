@@ -12,10 +12,12 @@ Q.Changelog = {
       "Completionist routes now include WoW Forever's secret quest chains, starting with the Alcaz Operative Insignia (Alcaz Prison -> Moonbrook -> State Secrets), with step-by-step notes. Other routes leave secrets out.",
     },
     changed = {
+      "Objective steps now say how to do them: the quest's own instruction (\"Use the Holy Water on the corrupted Moonwell\"), the quest item to use and on what (with its key), and where each item drops from or is found.",
       "Flights: on a flight path the arrow and the guide just say \"in flight\" (nothing is measured until you land), and every route you fly is timed once - the planner uses your real flight times from then on, and they go into the shared database with your recordings.",
       "The arrow and the route learn your way around much sooner: a wall, gate, cliff or mountain range you had to walk round is remembered (one long detour is enough), walks through caves and dungeons on the way are kept instead of dropped, ground you've walked yourself is preferred, and a chat line tells you when it learned something (/qc paths shows the last walk).",
     },
     fixed = {
+      "The \"Help calibrate Questicus\" respawn pop-up no longer shows for objects that only appear when you use an item on a mob or kill it (like Broodling Essence) - those have no respawn timer.",
       "Much less lag and stutter while questing: the arrow and the map reuse the way they worked out instead of working it out again many times a second, the route is only planned again when a quest is taken, done or an objective finishes (at most every 5 seconds, never in collection mode), and opening, zooming and keeping the world map open makes much less garbage.",
       "Much less memory churn (the stutters every few seconds): minimap icons are only redrawn when you've moved, turned or the route changed, tooltips are made only when you point at an icon, and opening the world map no longer builds megabytes of temporary data.",
       "The route no longer sends you to quest givers who won't talk to you: quests that need reputation you don't have, quests from a faction you're unfriendly or hostile with (like Timbermaw before you've earned them), and quests whose NPCs you've seen are hostile to you are left out until that changes.",

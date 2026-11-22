@@ -196,9 +196,49 @@ end
 SP.Present = present
 
 -- a respawn measured: the spot was used at t0 and its mob / object is back
+-- ------------------------------------------------------------------ objects that don't respawn on a timer
+-- Some quest objects only appear when you do something (use an item on a mob and kill it: Broodling
+-- Essence): no respawn time to measure, no calibrating. They're told apart by:
+--  * no fixed spawn in the database (spw: the world's placed objects), or
+--  * picked up right after a kill (your target lies dead) or after using an item / the quest item.
+-- Remembered per object (Q.db.osummon) and recorded (QuesticusCollect.osummon) for the database.
+local lastItemUse = 0
+if UseContainerItem then hooksecurefunc("UseContainerItem", function() lastItemUse = GetTime() end) end
+if C_Container and C_Container.UseContainerItem then hooksecurefunc(C_Container, "UseContainerItem", function() lastItemUse = GetTime() end) end
+if UseItemByName then hooksecurefunc("UseItemByName", function() lastItemUse = GetTime() end) end
+Q:On("QC_READY", function()
+  local b = _G.QuesticusQuestItem
+  if b and b.HookScript then b:HookScript("PostClick", function() lastItemUse = GetTime() end) end
+end)
+function SP.IsSummoned(src)
+  if not (src and src:sub(1, 1) == "o") then return false end
+  Q.db.osummon = type(Q.db.osummon) == "table" and Q.db.osummon or {}
+  if Q.db.osummon[src] then return true end
+  local shared = D.db and D.db.osummon and D.db.osummon[src]
+  if shared then return true end
+  return not (D.db and D.db.spw and D.db.spw[src])          -- not a placed object
+end
+-- at a pickup: did it just appear because of what you did?
+local function noteSummoned(src)
+  if not (src and src:sub(1, 1) == "o") then return false end
+  local dead = UnitExists and UnitExists("target") and UnitIsDead and UnitIsDead("target")
+  if (dead and not Q.Secret(dead)) or GetTime() - lastItemUse < 60 then
+    Q.db.osummon = type(Q.db.osummon) == "table" and Q.db.osummon or {}
+    Q.db.osummon[src] = true
+    if QuesticusCollect and Q.db.collect ~= false then
+      QuesticusCollect.osummon = type(QuesticusCollect.osummon) == "table" and QuesticusCollect.osummon or {}
+      QuesticusCollect.osummon[src] = (QuesticusCollect.osummon[src] or 0) + 1
+    end
+    return true
+  end
+  return SP.IsSummoned(src)
+end
+SP.NoteSummoned = noteSummoned
+
 local function measured(src, secs)
   local r = rec()
   if not (r and src) or secs < 5 or secs > 3600 then return end
+  if SP.IsSummoned(src) then return end
   local e = r[src] or { n = 0, s = 0 }
   -- (seen back after this long: it can't be more than this; keep the shortest few)
   e.n, e.s = e.n + 1, e.s + secs
@@ -210,6 +250,7 @@ end
 local function notYet(src, secs)
   local r = rec()
   if not (r and src) or secs < 5 then return end
+  if SP.IsSummoned(src) then return end
   local e = r[src] or { n = 0, s = 0 }
   if not e.lo or secs > e.lo then e.lo = secs end
   r[src] = e
@@ -293,7 +334,7 @@ local function onProgress()
     SP.Cool(best.p, "used")
     SP.lastUsed = SP.lastUsed or {}
     SP.lastUsed[SP.Key(best.p)] = now()
-    SP.MaybeCalibrate(best.p)
+    if not noteSummoned(source(best.p)) then SP.MaybeCalibrate(best.p) end
     SP.Kick()
   end
 end
@@ -357,6 +398,7 @@ function SP.MaybeCalibrate(p)
   local src = source(p)
   if not src or src:sub(1, 1) ~= "o" or SP.calib then return end          -- quest objects only
   if not rec() or known(src) or asked()[src] then return end              -- once ever, per object
+  if SP.IsSummoned(src) then return end                                   -- appears when you do something
   if Q.CollectOnly and Q.CollectOnly() then return end
   asked()[src] = time()
   SP.calib = { p = p, key = SP.Key(p), src = src, t0 = now() }

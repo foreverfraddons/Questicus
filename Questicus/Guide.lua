@@ -88,15 +88,77 @@ function GD.StepText(s, short)
   return s.type
 end
 
--- objective lines with live progress (from the quest log when the quest is there)
+-- what the quest itself says to do: the line under its title in the quest log ("Use the Holy Water
+-- on the corrupted Moonwell"), from the game for quests in your log, else what was recorded when you
+-- (or anyone, through ForeverDB) read it at the quest giver. Cached per quest.
+local howCache = {}
+Q:On("QUEST_ACCEPTED", function(a, b) local id = b or a; if id then howCache[id] = nil end end)
+function GD.HowText(id)
+  local h = howCache[id]
+  if h ~= nil then return h or nil end
+  local txt
+  local idx = C_QuestLog and C_QuestLog.GetLogIndexForQuestID and C_QuestLog.GetLogIndexForQuestID(id)
+  if idx and GetQuestLogQuestText then
+    local ok, _, obj = pcall(GetQuestLogQuestText, idx)
+    if ok and type(obj) == "string" and not Q.Secret(obj) and obj ~= "" then txt = obj end
+  end
+  if not txt then
+    local rec = (QuesticusCollect and QuesticusCollect.qinfo and QuesticusCollect.qinfo[id]) or (D.db and D.db.qinfo and D.db.qinfo[id])
+    if rec and type(rec.o) == "string" and rec.o ~= "" then txt = rec.o end
+  end
+  if txt then txt = txt:gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "") end
+  -- not cached until the game has it (the log's text loads a moment after accepting)
+  if txt or not idx then howCache[id] = txt or false end
+  return txt
+end
+
+-- where an objective comes from, by its name in the quest's planning data: "(drops from Kobold
+-- Vermin)", "(from Raw Windstone)", "(sold by ...)"
+local function sourceHint(id, text)
+  local m = P.Meta(id)
+  if not (m and m.lines and type(text) == "string") then return "" end
+  local t = text:lower()
+  for _, l in ipairs(m.lines) do
+    if l.name and l.from and t:find(tostring(l.name):lower(), 1, true) then
+      local kind = l.from:sub(1, 1)
+      local who = D:Name(l.from)
+      if who and who ~= "" then
+        if l.kind == "buy" then return c(dim, " (sold by " .. who .. ")") end
+        return c(dim, (kind == "o" and " (from " or " (drops from ") .. who .. ")")
+      end
+    end
+  end
+  return ""
+end
+
+-- objective lines with live progress (from the quest log when the quest is there), plus how to do
+-- it: the quest's own line, the quest item to use and on what, where items come from
 local function objectiveLines(s)
   local out = {}
+  local items = Q.QuestItem and Q.QuestItem.Items and Q.QuestItem:Items() or {}
   for _, id in ipairs(s.quests) do
     local e = QS.log[id]
+    local how = GD.HowText(id)
+    if how and not (e and e.complete) then
+      out[#out + 1] = c(T.HEX.gold, "  How: ") .. c(white, how)
+    end
+    -- the quest's item to use (the quest item button / its key binding)
+    local item = items[id]
+    if item and not (e and e.complete) then
+      local key = GetBindingKey and GetBindingKey("CLICK QuesticusQuestItem:LeftButton")
+      local target
+      local m = P.Meta(id)
+      local open = m and P.OpenLines(id, m) or {}
+      for li, l in ipairs(m and m.lines or {}) do
+        if open[li] and (l.kind == "kill" or l.kind == "use") and l.name then target = l.name break end
+      end
+      out[#out + 1] = c(T.HEX.gold, "  Use ") .. itemText(item) .. (target and (" on " .. c(white, target)) or "") ..
+        c(dim, key and (" (quest item button or " .. key .. ")") or " (the quest item button)")
+    end
     if e and e.objectives and #e.objectives > 0 then
       for _, o in ipairs(e.objectives) do
         local txt = o.text or ""
-        out[#out + 1] = o.finished and c(dim, "  - " .. txt) or ("  - " .. txt)
+        out[#out + 1] = o.finished and c(dim, "  - " .. txt) or ("  - " .. txt .. sourceHint(id, txt))
       end
     else
       local m = P.Meta(id)
