@@ -1068,6 +1068,7 @@ local function bestAction(st, cands)
       and not (P.dset and not P.dset[id] and stage ~= "ready")   -- dungeon mode: other quests only get handed in
       and not (stage ~= "ready" and P.ZoneOff(id))                 -- zones you turned off: hand-ins only
       and not (stage ~= "ready" and P.EscortOff(id))               -- escorts turned off: hand-ins only
+      and not (stage == "ready" and QS.RepBlock(id, (QS:Info(id) or {}).enders))  -- hand-in NPC hostile to you
       and questMeta(id)
     if m then
       -- dungeon mode: every quest of the dungeon is wanted, so only the walking decides the order

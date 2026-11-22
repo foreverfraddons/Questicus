@@ -20,6 +20,7 @@ Q.Changelog = {
       "The options window is tidied into sections (General, Questing, Map & minimap, Tracker & alerts, Dungeons, Highlights, Advanced), each a short page with plainer wording; closing the highlight settings takes you back to it.",
     },
     fixed = {
+      "The route no longer sends you to quest givers who won't talk to you: quests that need reputation you don't have, quests from a faction you're unfriendly or hostile with (like Timbermaw before you've earned them), and quests whose NPCs you've seen are hostile to you are left out until that changes.",
       "Collect-from-object quests (like Harvesting Windstones) no longer get sent to the back of the route because a creature you had just killed was taken for where the items come from; abandoning and retaking a quest is planned fresh; the guide's \"Done:\" line now reads \"Last step:\" so it isn't mistaken for the quest being finished.",
       "Quest XP, gold and reward items now always come from the game itself (your quest log, the quest windows, what you really got) instead of the database whenever the game has shown them; differences are saved so the shared database gets corrected.",
       "Routes skip quests other players found their quest giver doesn't offer yet.",

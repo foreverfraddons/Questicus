@@ -357,6 +357,71 @@ local function anyOf(list, done)
   return not takeable          -- none of them is for you: not your requirement
 end
 
+-- ------------------------------------------------------------------ reputation / hostile quest NPCs
+-- your standing with a faction: 1 hated .. 4 neutral .. 8 exalted (and the raw value), nil = not known
+function QS.Standing(faction)
+  if not faction then return end
+  if C_Reputation and C_Reputation.GetFactionDataByID then
+    local ok, d = pcall(C_Reputation.GetFactionDataByID, faction)
+    if ok and type(d) == "table" and d.reaction and not Q.Secret(d.reaction) then return d.reaction, d.currentStanding end
+  end
+  if GetFactionInfoByID then
+    local ok, name, _, standing, _, _, value = pcall(GetFactionInfoByID, faction)
+    if ok and name and standing and not Q.Secret(standing) then return standing, value end
+  end
+end
+-- quest NPCs seen hostile / unfriendly to this character (UnitReaction <= 3): they won't talk to you,
+-- and their camp attacks you. Cleared when seen friendly again (your reputation went up)
+function QS.NoteReaction(unit)
+  if not (UnitExists and UnitExists(unit)) or (UnitIsPlayer and UnitIsPlayer(unit)) then return end
+  local k = Q.UnitKey(unit)
+  local npc = k and tonumber(k:match("^c(%d+)$"))
+  if not npc or not UnitReaction then return end
+  local ok, r = pcall(UnitReaction, unit, "player")
+  if not ok or not r or Q.Secret(r) then return end
+  Q.char.hostile = type(Q.char.hostile) == "table" and Q.char.hostile or {}
+  local was = Q.char.hostile[npc]
+  if r <= 3 then Q.char.hostile[npc] = time() elseif was then Q.char.hostile[npc] = nil end
+  if (r <= 3) ~= (was ~= nil) then
+    Q.Throttle("hostile-replan", 1, function() Q:Send("QC_QUESTS_CHANGED") end)
+  end
+end
+for _, ev in ipairs({ "PLAYER_TARGET_CHANGED", "UPDATE_MOUSEOVER_UNIT" }) do
+  Q:On(ev, function() pcall(QS.NoteReaction, ev == "PLAYER_TARGET_CHANGED" and "target" or "mouseover") end)
+end
+Q:On("NAME_PLATE_UNIT_ADDED", function(unit) if type(unit) == "string" and not Q.Secret(unit) then pcall(QS.NoteReaction, unit) end end)
+
+-- why you can't deal with this quest's NPCs, or nil: keys = info.givers / info.enders
+function QS.RepBlock(id, keys)
+  local info = QS:Info(id)
+  if not info then return end
+  local x = info.x or {}
+  -- the reputation the quest needs (ForeverDB x[19] = {faction, minimum value})
+  local need = x[19]
+  if type(need) == "table" and need[1] then
+    local reaction, value = QS.Standing(need[1])
+    if value and need[2] and value < need[2] then return "needs more reputation" end
+    if not reaction and (need[2] or 0) > 0 then return "needs reputation you don't have yet" end
+  end
+  -- the faction the quest gives reputation with is the quest NPCs' own: hostile / unfriendly with it,
+  -- they won't talk to you (Timbermaw, Bloodsail, Wildhammer ... before you've earned them)
+  local rep = x[15]
+  if type(rep) == "table" and rep[1] and (rep[2] or 0) > 0 then
+    local reaction = QS.Standing(rep[1])
+    if reaction and reaction <= 3 then return "hostile with its faction" end
+  end
+  -- its NPCs were seen hostile to you
+  local h = Q.char and Q.char.hostile
+  if h and keys and #keys > 0 then
+    local all = true
+    for _, k in ipairs(keys) do
+      local npc = tonumber(tostring(k):match("^c:?(%d+)$"))
+      if not (npc and h[npc]) then all = false break end
+    end
+    if all then return "its NPC is hostile to you" end
+  end
+end
+
 function QS:Available(id, st)
   local info = QS:Info(id)
   if not info then return false end
@@ -365,6 +430,7 @@ function QS:Available(id, st)
   local level = st and st.level or Q.player.level
   if done[id] or log[id] then return false end
   if level < info.min then return false end
+  if QS.RepBlock(id, info.givers) then return false end
   -- the quest giver didn't offer it when you stood there: not available yet (cleared on level up /
   -- turn-ins, which can unlock it). Only for the live state, not for planning ahead.
   if not st and Q.char.blocked and Q.char.blocked[id] then return false end
