@@ -19,6 +19,7 @@ Gear.lua
 Planner.lua
 Survey.lua
 Guide.lua
+Spots.lua
 Nav.lua
 Arrow.lua
 Pins.lua

@@ -122,9 +122,18 @@ function GD:Target(index)
   -- only objectives that aren't finished: the arrow moves on to the next one by itself
   -- remember which quest / objective the chosen spot belongs to (the arrow names that one)
   local pts, of = {}, {}
-  for _, e in ipairs(P.StepPoints(s)) do pts[#pts + 1] = e.p; of[e.p] = e end
+  local entries = P.StepPoints(s)
+  for _, e in ipairs(entries) do pts[#pts + 1] = e.p; of[e.p] = e end
   if #pts == 0 then return s.point, s end
-  local best = D.Nearest(here or s.point, pts)
+  local best
+  -- the arrow's step: closest open spot leaning toward the next step, spots just used / found empty
+  -- left alone until they respawn (Spots.lua)
+  if Q.Spots and (index == nil or index == GD.focus) then
+    Q.Spots.entries = entries
+    local pick = Q.Spots.Choose(entries, here, index or GD.focus)
+    best = pick and pick.p
+  end
+  best = best or D.Nearest(here or s.point, pts)
   local e = best and of[best]
   GD.targetOf = e and { id = e.id, li = e.li, key = best.key } or nil
   return best or s.point, s, GD.targetOf

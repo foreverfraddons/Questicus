@@ -51,10 +51,13 @@ function W:Follow()
   local p, s = Q.Guide:Target()
   if not p then return end
   local key = stepKey(s)
-  if last and last.i == p.i then
+  -- the arrow moved off a spot that's on cooldown (used / empty): follow it, at most every 5 s
+  local cooled = last and Q.Spots and Q.Spots.OnCooldown(last) and GetTime() - (W.lastCooled or 0) > 5
+  if last and last.i == p.i and not cooled then
     local d = D.Dist(last, p)
     if d < 60 or (key == lastStep and d < 400) then return end
   end
+  if cooled then W.lastCooled = GetTime() end
   if W:Pin(p) then lastStep = key end
 end
 
