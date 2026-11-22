@@ -99,7 +99,8 @@ function A:Update()
   -- aim along the less obstructed path (Nav.lua), not straight through walls and water
   local wp = (Q.Nav and Q.Nav:Next(here, p)) or p
   local dx, dy = wp.x - here.x, wp.y - here.y
-  if d < 12 then
+  -- "here" only when you're really on it (the spot's own check starts there: Spots.lua)
+  if d < 5 then
     frame.arrow:Hide(); frame.here:Show()
     frame.dist:SetText("here")
     return

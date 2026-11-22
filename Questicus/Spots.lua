@@ -13,9 +13,13 @@ local S = Q.Secret
 local SP = {}
 Q.Spots = SP
 
-local ARRIVE = 25          -- yards: standing at the spot
+local ARRIVE = 25          -- yards: close to a spot (a cooled one seen back, calibration)
+local EXACT = 6            -- yards: standing on the map marker - look for what should be there
+local STUCK = 14           -- yards: can't get closer (in a rock, up a slope) and standing still
 local NEAR = 60            -- yards: progress here counts for the spot
-local EMPTY_WAIT = 5       -- seconds at a spot with nothing there before it's called empty
+local UNDER = 28           -- yards: a mob this close to the marker is "under" it (they wander a bit)
+local SCAN_C = 2.5         -- seconds of looking for a creature at the marker before moving on
+local SCAN_O = 4           -- seconds for an object (give it time to come into view)
 local FALLBACK = 60        -- seconds: respawn time nobody has measured yet
 local LEAN = 0.35          -- how much the next step pulls the choice (0 = just the closest)
 local KEEP = 0.8           -- a new spot must be this much closer to take over (no flip-flopping)
@@ -147,28 +151,47 @@ local function snapshot(id)
 end
 
 -- the mob / object of the spot is there (a nameplate of that npc; the object in front of you)
-local function present(src)
-  if not src then return nil end
-  local kind, id = src:sub(1, 1), tonumber(src:sub(2))
-  -- enemy nameplates off: mobs can't be seen this way, so nothing is concluded
-  if kind == "c" and GetCVarBool and not GetCVarBool("nameplateShowEnemies") then return nil end
-  if kind == "c" and C_NamePlate and C_NamePlate.GetNamePlates then
+-- how close a unit is: true / false within about yd yards, nil when the game won't say
+local function within(tok, yd)
+  if not CheckInteractDistance then return nil end
+  local ok, r = pcall(CheckInteractDistance, tok, yd <= 11 and 2 or 4)
+  if not ok or r == nil or S(r) then return nil end
+  return r and true or false
+end
+-- every unit Questicus can look at: nameplates (mobs, and objects with one), soft targets, target, mouse
+local function units()
+  local out = { "softenemy", "softinteract", "softfriend", "target", "mouseover" }
+  if C_NamePlate and C_NamePlate.GetNamePlates then
     for _, plate in ipairs(C_NamePlate.GetNamePlates() or {}) do
       local tok = plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
-      if tok and not S(tok) then
-        local k = Q.UnitKey(tok)
-        local dead = UnitIsDead and UnitIsDead(tok)
-        if k == src and not (dead and not S(dead)) then return true end
+      if type(tok) == "string" and not S(tok) then out[#out + 1] = tok end
+    end
+  end
+  return out
+end
+-- is the spot's mob / object there? true = seen (alive, within `near` yards when the game says how
+-- far), false = looked and it isn't, nil = can't tell (no source known)
+local function present(src, near)
+  if not src then return nil end
+  local kind = src:sub(1, 1)
+  near = near or UNDER
+  if kind == "o" and Q.Glow and Q.Glow.Find then pcall(Q.Glow.Find) end
+  for _, tok in ipairs(units()) do
+    local okE, ex = pcall(UnitExists, tok)
+    if okE and ex and not S(ex) and Q.UnitKey(tok) == src then
+      local dead = UnitIsDead and UnitIsDead(tok)
+      if not (dead and not S(dead)) then
+        if kind == "o" then return true end               -- objects show only up close / in front
+        local w = within(tok, near)
+        if w ~= false then return true end
       end
     end
-    return false
   end
-  if kind == "o" and Q.Glow and Q.Glow.Find then
-    local ok = pcall(Q.Glow.Find)
-    local unit = ok and Q.Glow.Unit and Q.Glow.Unit()
-    if unit and Q.UnitKey(unit) == src then return true end
-    return nil          -- objects only show when in front of you: not seeing it proves nothing
+  if kind == "o" and Q.Glow and Q.Glow.Unit then
+    local u = Q.Glow.Unit()
+    if u and Q.UnitKey(u) == src then return true end
   end
+  return false
 end
 SP.Present = present
 
@@ -193,6 +216,7 @@ local function notYet(src, secs)
 end
 
 local atSince, atKey
+local lastPos, lastPosAt, stillFor = nil, nil, 0
 local function tick()
   if not (Q.char and Q.char.surveyDone) or (Q.CollectOnly and Q.CollectOnly()) then return end
   local here = D:PlayerPos()
@@ -201,7 +225,7 @@ local function tick()
   -- spots on cooldown near you: back early (respawned) or still gone after their cooldown
   for k, c in pairs(cds()) do
     if c.i == here.i and c.x and D.Dist(here, c) <= ARRIVE and c.src then
-      local seen = present(c.src)
+      local seen = present(c.src, UNDER)
       if seen == true then
         if c.used then measured(c.src, now() - c.used) end
         cds()[k] = nil
@@ -211,19 +235,26 @@ local function tick()
       cds()[k] = nil
     end
   end
-  -- the spot the arrow is on
+  -- standing still? (a marker you can't quite reach still counts once you stop next to it)
+  if lastPos and D.Dist(here, lastPos) < 1.5 then stillFor = stillFor + (GetTime() - (lastPosAt or GetTime()))
+  else stillFor = 0 end
+  lastPos, lastPosAt = here, GetTime()
+  -- the spot the arrow is on: only once you're on its marker, look for what should be there
   local e = current
-  if not (e and e.p) or D.Dist(here, e.p) > ARRIVE then atSince, atKey = nil, nil return end
+  local d = e and e.p and D.Dist(here, e.p)
+  local onIt = d and (d <= EXACT or (d <= STUCK and stillFor >= 2))
+  if not onIt then atSince, atKey = nil, nil return end
   local k = SP.Key(e.p)
   if atKey ~= k then atSince, atKey = GetTime(), k end
   local src = source(e.p)
-  local seen = present(src)
+  local seen = present(src, UNDER)
   -- a spot used before, come back to after its cooldown, still empty: the respawn is longer
   local last = SP.lastUsed and SP.lastUsed[k]
   if seen == false and last then notYet(src, now() - last) end
   if seen == true then atSince = GetTime() return end    -- it's there: go get it
   if SP.calib and SP.calib.key == k then return end      -- waiting for it on purpose
-  if GetTime() - atSince >= EMPTY_WAIT then
+  local wait = (src and src:sub(1, 1) == "o") and SCAN_O or SCAN_C
+  if GetTime() - atSince >= wait then
     SP.Cool(e.p, "empty")
     atSince, atKey = nil, nil
     SP.Kick()
