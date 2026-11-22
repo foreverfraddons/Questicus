@@ -419,8 +419,25 @@ Q:On("QC_READY", function(ok)
   QS:BuildPool()
 end)
 Q:On("QUEST_LOG_UPDATE", function() Q.Throttle("log", 0.3, changed) end)
-Q:On("QUEST_ACCEPTED", function() Q.Throttle("log", 0.1, changed) end)
-Q:On("QUEST_REMOVED", function() Q.Throttle("log", 0.3, changed) end)
+-- a quest taken (again) or dropped: forget what was worked out about it while it was in the log in
+-- another state (its spots, "the game's waypoint" for a finished one ...), so abandoning and taking it
+-- again is planned from what the log says now
+local function fresh(id)
+  if type(id) ~= "number" or id < 1 then return end
+  if Q.Planner and Q.Planner.ForgetMeta then Q.Planner.ForgetMeta(id) end
+  if Q.char and Q.char.blocked then Q.char.blocked[id] = nil end
+end
+Q:On("QUEST_ACCEPTED", function(a, b)
+  local id = b or a
+  fresh(id)
+  if type(id) == "number" then QS.done[id] = nil end     -- (in your log: not handed in)
+  Q.Throttle("log", 0.1, changed)
+  Q.After(1.5, function() Q.Throttle("log", 0.1, changed) end)
+end)
+Q:On("QUEST_REMOVED", function(id)
+  fresh(id)
+  Q.Throttle("log", 0.3, changed)
+end)
 -- a quest the NPC didn't offer stays off the route until something could have unlocked it: a level
 -- up, or handing in a quest at that same NPC (the usual chain). Handing in anything anywhere used to
 -- bring them all back (Remote Contact / Betrayed kept reappearing).
