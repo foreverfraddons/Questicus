@@ -34,7 +34,7 @@ local DEFAULTS = {
   effect = "aura",
   size = 110,
   intensity = 100,
-  offsetY = -40,         -- the light, up / down from the object's nameplate
+  offsetY = -90,         -- the light, up / down from the object's nameplate (it floats above the object)
   follow = false,        -- fades with the nameplate (object behind scenery ...)
   name = false,          -- the object's name over it, written by Questicus (the game already shows one on the plate)
   icon = true,           -- and its interaction icon
@@ -74,6 +74,11 @@ function G.cfg()
   Q.db.glow = fill(type(Q.db.glow) == "table" and Q.db.glow or {}, DEFAULTS)
   local c = Q.db.glow
   if (c.v or 1) < 2 then c.v = 2; c.name = false end     -- (the first build wrote a second name over the game's)
+  if c.v < 3 then                                          -- (and sat too high over the object)
+    c.v = 3
+    if c.offsetY == -40 then c.offsetY = -90 end
+    for _, own in pairs(c.own) do if own.offsetY == -40 then own.offsetY = -90 end end
+  end
   return c
 end
 function G.cats()
@@ -749,7 +754,7 @@ host:SetScript("OnUpdate", function(_, el)
   if cur.on and plate and plate ~= lastPlate then lastPlate = plate end
   if not lastPlate then return end
   local size = G.Look(cat, "size") or 110
-  local off = G.Look(cat, "offsetY") or -40
+  local off = G.Look(cat, "offsetY") or -90
   light:ClearAllPoints()
   light:SetPoint("CENTER", lastPlate, "CENTER", 0, off)
   light:SetSize(size, size)
