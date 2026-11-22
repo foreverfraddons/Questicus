@@ -295,7 +295,7 @@ function GD:Menu(index, anchor)
   local items = menuItems(index)
   local s = (index == 0) and P.prevStep or P.steps[index]
   if not s then return items end
-  menu.title:SetText(index == 0 and ("Done: " .. GD.StepText(s, true)) or ("Step %d: %s"):format(index, GD.StepText(s, true)))
+  menu.title:SetText(index == 0 and ("Last step: " .. GD.StepText(s, true)) or ("Step %d: %s"):format(index, GD.StepText(s, true)))
   for i, it in ipairs(items) do
     local b = menu.buttons[i]
     if not b then
@@ -549,7 +549,7 @@ local function build()
   frame.prev:SetScript("OnEnter", function(self)
     if not P.prevStep then return end
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-    GameTooltip:AddLine("Done: " .. GD.StepText(P.prevStep), 1, 1, 1, true)
+    GameTooltip:AddLine("Last step: " .. GD.StepText(P.prevStep), 1, 1, 1, true)
     for _, n in ipairs(Q.Author and Q.Author:NotesFor(P.prevStep) or {}) do GameTooltip:AddLine("Note: " .. n, 0.88, 0.69, 0.29, true) end
     if Q.Author and Q.Author:IsAuthor() then GameTooltip:AddLine("Click: add a note to it", 0.6, 0.6, 0.6) end
     GameTooltip:Show()
@@ -696,7 +696,7 @@ function GD:Refresh()
   end
   if frame.prev then
     local ps = P.prevStep
-    frame.prev.text:SetText(ps and (Q.Color(T.HEX.good, "Done: ") .. GD.StepText(ps, true)) or "")
+    frame.prev.text:SetText(ps and (Q.Color(T.HEX.good, "Last step: ") .. GD.StepText(ps, true)) or "")
   end
   local dm = Q.char.dmode and D:Dungeon(Q.char.dmode)
   frame.title:SetText(Q.Color(T.HEX.accent, "Questicus") .. (dm and Q.Color(T.HEX.dim, " - " .. dm[1]) or ""))

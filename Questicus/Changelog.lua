@@ -17,7 +17,7 @@ Q.Changelog = {
       "The options window is tidied into sections (General, Questing, Map & minimap, Tracker & alerts, Dungeons, Highlights, Advanced), each a short page with plainer wording; closing the highlight settings takes you back to it.",
     },
     fixed = {
-      "Abandoning a quest and taking it again is picked up by the route straight away (it no longer keeps what it knew about the old copy).",
+      "Collect-from-object quests (like Harvesting Windstones) no longer get sent to the back of the route because a creature you had just killed was taken for where the items come from; abandoning and retaking a quest is planned fresh; the guide's \"Done:\" line now reads \"Last step:\" so it isn't mistaken for the quest being finished.",
       "Quest XP, gold and reward items now always come from the game itself (your quest log, the quest windows, what you really got) instead of the database whenever the game has shown them; differences are saved so the shared database gets corrected.",
       "Routes skip quests other players found their quest giver doesn't offer yet.",
       "Collection mode now turns every Questicus feature off - map and minimap icons, nameplate marks and tooltip lines, the quest tracker, pop-ups, the quest item button, the boss tracker and highlights - and back on when you leave it.",

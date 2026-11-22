@@ -431,7 +431,8 @@ function D:QuestSources(qid)
   local own = QuesticusCollect and QuesticusCollect.qsrc and QuesticusCollect.qsrc[qid]
   for k, n in pairs(own or {}) do
     k = k:gsub(":", "")
-    if n >= 1 and not seen[k] then seen[k] = true; out[#out + 1] = k end
+    -- (twice at least: one kill that happened to come before some progress isn't a source)
+    if n >= 2 and not seen[k] then seen[k] = true; out[#out + 1] = k end
   end
   return out
 end

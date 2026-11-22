@@ -77,8 +77,24 @@ function C:CheckProgress()
       Q:Send("QC_PROGRESS", id)
       local map, x, y = here()
       if map and addSpot(c.qsp, id, map, x, y) then C.recorded = (C.recorded or 0) + 1 end
-      -- a kill credit: the mob you just killed (your target) is where this objective lives
-      if UnitExists and UnitExists("target") and UnitIsDead and UnitIsDead("target") then
+      -- a kill credit: the mob you just killed (your target) is where this objective lives - unless
+      -- an object was just picked up (then the dead mob you still have targeted had nothing to do with
+      -- it: Harvesting Windstones got a bear as its "source")
+      local fromObject = false
+      for _, r in ipairs(recent) do
+        if now - r.t <= LOOT_WINDOW and r.key:sub(1, 1) == "o" then fromObject = true end
+      end
+      -- (objects picked up without a loot window: the one in front of you right now)
+      if not fromObject and Q.Glow and Q.Glow.Find and Q.Glow.Unit then
+        local ok = pcall(Q.Glow.Find)
+        local u = ok and Q.Glow.Unit()
+        local ok7 = u and C.KeyOfGUID(Q.UnitGUID(u))
+        if ok7 and ok7:sub(1, 1) == "o" then
+          fromObject = true
+          recent[#recent + 1] = { key = ok7, t = now }
+        end
+      end
+      if not fromObject and UnitExists and UnitExists("target") and UnitIsDead and UnitIsDead("target") then
         local tk = C.KeyOfGUID(Q.UnitGUID("target"))
         if tk then
           recent[#recent + 1] = { key = tk, t = now }
