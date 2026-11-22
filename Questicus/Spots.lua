@@ -100,6 +100,16 @@ function SP.Choose(entries, here, index)
       open[#open + 1] = e
     end
   end
+  -- calibrating a respawn: stay on that spot
+  if SP.calib then
+    for _, e in ipairs(entries) do
+      if SP.Key(e.p) == SP.calib.key then
+        if not current or current.p ~= e.p then SP.changed = true end
+        current = e
+        return e
+      end
+    end
+  end
   -- every spot is on cooldown: the one that's back first
   if #open == 0 then return soonest end
   local function score(e)
@@ -187,6 +197,7 @@ local function tick()
   if not (Q.char and Q.char.surveyDone) or (Q.CollectOnly and Q.CollectOnly()) then return end
   local here = D:PlayerPos()
   if not here then return end
+  if SP.calib and SP.CalibTick then SP.CalibTick(here) end
   -- spots on cooldown near you: back early (respawned) or still gone after their cooldown
   for k, c in pairs(cds()) do
     if c.i == here.i and c.x and D.Dist(here, c) <= ARRIVE and c.src then
@@ -211,6 +222,7 @@ local function tick()
   local last = SP.lastUsed and SP.lastUsed[k]
   if seen == false and last then notYet(src, now() - last) end
   if seen == true then atSince = GetTime() return end    -- it's there: go get it
+  if SP.calib and SP.calib.key == k then return end      -- waiting for it on purpose
   if GetTime() - atSince >= EMPTY_WAIT then
     SP.Cool(e.p, "empty")
     atSince, atKey = nil, nil
@@ -243,9 +255,14 @@ local function onProgress()
     end
   end
   if best and bd <= NEAR then
+    if SP.calib and SP.calib.key == SP.Key(best.p) then
+      SP.Calibrated("collected")
+      return
+    end
     SP.Cool(best.p, "used")
     SP.lastUsed = SP.lastUsed or {}
     SP.lastUsed[SP.Key(best.p)] = now()
+    SP.MaybeCalibrate(best.p)
     SP.Kick()
   end
 end
@@ -253,6 +270,126 @@ Q:On("QC_QUESTS_CHANGED", function() pcall(onProgress) end)
 Q:On("QUEST_ACCEPTED", function(a, b)
   local id = b or a
   if type(id) == "number" then counts[id] = snapshot(id) end
+end)
+
+-- ------------------------------------------------------------------ calibrating a quest object's respawn
+-- A quest object nobody has a respawn time for yet: once (ever, per object), ask to wait at it. The
+-- wait ends when it's back (seen in front of you) or collected again at that spot; that time is the
+-- respawn, saved for the database so nobody has to do it again.
+local function known(src)
+  local own = QuesticusCollect and QuesticusCollect.resp and QuesticusCollect.resp[src]
+  return (own and (own.n or 0) > 0) or (D.db and D.db.resp and D.db.resp[src]) and true or false
+end
+SP.Known = known
+local function asked()
+  Q.db.calibAsked = type(Q.db.calibAsked) == "table" and Q.db.calibAsked or {}
+  return Q.db.calibAsked
+end
+
+local pop
+local function fmt(secs)
+  secs = math.max(0, math.floor(secs))
+  return ("%d:%02d"):format(math.floor(secs / 60), secs % 60)
+end
+local function buildPop()
+  local T = Q.T
+  pop = T.Window("QuesticusCalibrate", 360, 178, "Help calibrate Questicus")
+  pop:SetFrameStrata("HIGH")
+  pop:ClearAllPoints(); pop:SetPoint("TOP", 0, -160)
+  pop.text = T.Text(pop, 12, T.c.text)
+  pop.text:SetPoint("TOPLEFT", 16, -36); pop.text:SetPoint("TOPRIGHT", -16, -36)
+  pop.text:SetJustifyH("LEFT")
+  pop.text:SetSpacing(2)
+  pop.timer = T.Text(pop, 13, T.c.gold)
+  pop.timer:SetPoint("BOTTOMLEFT", 16, 46)
+  pop.yes = T.Button(pop, "I'll wait here", 130, 24)
+  pop.yes:SetPoint("BOTTOMLEFT", 16, 14)
+  pop.no = T.Button(pop, "Not now", 100, 24)
+  pop.no:SetPoint("BOTTOMRIGHT", -16, 14)
+  pop.yes:SetScript("OnClick", function()
+    if SP.calib then
+      SP.calib.waiting = true
+      pop.yes:Hide()
+      pop.no.label:SetText("Stop")
+    end
+  end)
+  pop.no:SetScript("OnClick", function() SP.StopCalibrate(true) end)
+  pop.close:SetScript("OnClick", function() SP.StopCalibrate(true) end)
+  pop:SetScript("OnUpdate", function()
+    local c = SP.calib
+    if not c then pop:Hide() return end
+    pop.timer:SetText(c.waiting and ("Waiting: " .. fmt(now() - c.t0)) or "")
+  end)
+end
+
+function SP.MaybeCalibrate(p)
+  local src = source(p)
+  if not src or src:sub(1, 1) ~= "o" or SP.calib then return end          -- quest objects only
+  if not rec() or known(src) or asked()[src] then return end              -- once ever, per object
+  if Q.CollectOnly and Q.CollectOnly() then return end
+  asked()[src] = time()
+  SP.calib = { p = p, key = SP.Key(p), src = src, t0 = now() }
+  if not pop then buildPop() end
+  local name = (D.Name and D:Name(src)) or "This object"
+  pop.text:SetText(("|cffe0b04a%s|r's respawn timer isn't in the database yet.\n\nPlease stand here and wait for it to respawn to calibrate Questicus to this quest. Keep facing the spot - Questicus sees it come back and saves the time.\n\nThis only happens once, ever, and you're helping everyone else never have to do it."):format(name))
+  pop:SetHeight(math.max(178, (pop.text:GetStringHeight() or 100) + 110))
+  pop.yes:Show(); pop.no.label:SetText("Not now")
+  pop:Show()
+  SP.changed = true
+end
+
+function SP.StopCalibrate(byPlayer)
+  if not SP.calib then return end
+  SP.calib = nil
+  if pop then pop:Hide() end
+  if byPlayer then Q:Print("calibration stopped - the respawn time is still measured whenever it's seen back") end
+  SP.changed = true
+end
+
+function SP.Calibrated(how)
+  local c = SP.calib
+  if not c then return end
+  local secs = now() - c.t0
+  measured(c.src, secs)
+  SP.calib = nil
+  if pop then pop:Hide() end
+  local name = (D.Name and D:Name(c.src)) or "it"
+  Q:Print(("%s respawns in %s - saved for everyone. Thank you!"):format(name, fmt(secs)))
+  -- (the spot was just collected again: it's on cooldown for the time measured)
+  if how == "collected" then SP.Cool(c.p, "used", secs) end
+  SP.changed = true
+end
+
+-- watching the calibrated spot: back in front of you, picked up again, or you left
+local function calibTick(here)
+  local c = SP.calib
+  if not c then return end
+  local d = D.Dist(here, c.p)
+  if d > 150 then
+    SP.calib = nil
+    if pop then pop:Hide() end
+    Q:Print("calibration stopped - you left the spot")
+    SP.changed = true
+    return
+  end
+  if d <= ARRIVE + 10 and now() - c.t0 >= 5 and present(c.src) == true then SP.Calibrated("seen") end
+end
+SP.CalibTick = calibTick
+-- picked up again (the quest may be finished by now, so no quest progress): the loot window's object
+Q:On("LOOT_OPENED", function()
+  local c = SP.calib
+  if not c or not GetNumLootItems then return end
+  for slot = 1, GetNumLootItems() or 0 do
+    local ok, guid = pcall(GetLootSourceInfo, slot)
+    if ok and type(guid) == "string" and not S(guid) then
+      local kind, id = Q.ParseGUID(guid)
+      if kind == "GameObject" and "o" .. tostring(id) == c.src then
+        local here = D:PlayerPos()
+        if here and D.Dist(here, c.p) <= NEAR then SP.Calibrated("collected") end
+        return
+      end
+    end
+  end
 end)
 
 -- the arrow / map / waypoint pick a new spot
