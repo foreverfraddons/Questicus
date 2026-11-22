@@ -49,24 +49,49 @@ local function penalty(qlvl, plvl)
   if diff >= 10 then return 0.1 elseif diff > 5 then return 1 - 0.2 * (diff - 5) end
   return 1
 end
-function QS.Rewards(id) return D.db and D.db.qrw and D.db.qrw[id] end
+-- Rewards: what WoW Forever itself says always wins (Record.lua: the quest log right now, the quest
+-- windows and turn-ins recorded on this account, everyone's recordings in ForeverDB's qinfo). ForeverDB's
+-- base table (qrw, classic dumps) only fills what the game hasn't shown yet.
+local rewCache, rewVer = {}, -1
+function QS.Rewards(id)
+  local R = Q.Record
+  local base = D.db and D.db.qrw and D.db.qrw[id]
+  if not R then return base end
+  if rewVer ~= R.ver then wipe(rewCache); rewVer = R.ver end
+  local hit = rewCache[id]
+  if hit ~= nil then return hit or nil end
+  local ch, rw = R.GameItems(id)
+  local money = R.GameMoney(id)
+  local full = R.GameXP(id, 0)              -- level 0: never live, the full value (no grey penalty)
+  local r = base
+  if ch or rw or money or full then
+    r = { money or (base and base[1]) or 0, full or (base and base[2]) or 0, ch or (base and base[3]),
+      rw or (base and base[4]) }
+    if r[3] and #r[3] == 0 then r[3] = nil end
+    if r[4] and #r[4] == 0 then r[4] = nil end
+  end
+  rewCache[id] = r or false
+  return r
+end
+-- XP for a player of level plvl. Returns xp, known (real data, not the estimate), fromGame
 function QS.RewardXP(id, plvl)
+  local R = Q.Record
+  local g = R and R.GameXP(id, plvl)
+  if g then return g, true, true end
   local q = D:Quest(id)
-  local r = QS.Rewards(id)
-  if r and r[2] and r[2] > 0 then return math.floor(r[2] * penalty(q and q[2], plvl)), true end
-  -- no data: what someone really got for it (your own turn-ins, any character)
+  local base = D.db and D.db.qrw and D.db.qrw[id]
+  if base and base[2] and base[2] > 0 then return math.floor(base[2] * penalty(q and q[2], plvl)), true end
+  -- what someone really got for it at another level (your own turn-ins, any character)
   local rec = Q.Learn and Q.Learn:RecordedXP(id, plvl)
   if rec then return rec, true, true end
-  -- what the quest window said (ForeverDB qinfo, or this account's own recording)
-  local qi = (D.db and D.db.qinfo and D.db.qinfo[id]) or (QuesticusCollect and QuesticusCollect.qinfo and QuesticusCollect.qinfo[id])
-  if qi and qi.xp and qi.xp > 0 then return qi.xp, true, true end
   return math.floor(QS.QuestXP(q and q[2] or plvl, plvl)), false
 end
 function QS.RewardMoney(id)
-  local r = QS.Rewards(id)
-  if r and r[1] then return r[1] end
-  local qi = (D.db and D.db.qinfo and D.db.qinfo[id]) or (QuesticusCollect and QuesticusCollect.qinfo and QuesticusCollect.qinfo[id])
-  return qi and qi.m or 0
+  local R = Q.Record
+  local g = R and R.GameMoney(id)
+  if g then return g end
+  local base = D.db and D.db.qrw and D.db.qrw[id]
+  return base and base[1] or 0
 end
 
 -- highest level that is grey (no XP to speak of) for a player of level plvl

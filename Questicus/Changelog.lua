@@ -16,7 +16,8 @@ Q.Changelog = {
       "The options window is tidied into sections (General, Questing, Map & minimap, Tracker & alerts, Dungeons, Highlights, Advanced), each a short page with plainer wording; closing the highlight settings takes you back to it.",
     },
     fixed = {
-      "Routes skip quests other players found their quest giver doesn't offer yet, and quest rewards fill in from what the quest window showed when the database has none.",
+      "Quest XP, gold and reward items now always come from the game itself (your quest log, the quest windows, what you really got) instead of the database whenever the game has shown them; differences are saved so the shared database gets corrected.",
+      "Routes skip quests other players found their quest giver doesn't offer yet.",
       "Collection mode now turns every Questicus feature off - map and minimap icons, nameplate marks and tooltip lines, the quest tracker, pop-ups, the quest item button, the boss tracker and highlights - and back on when you leave it.",
     },
   },

@@ -28,7 +28,7 @@ local R = {}
 Q.Record = R
 
 local SPOT_NEAR, SPOT_MAX = 15, 40
-local KEYS = { "gold", "skinl", "fishl", "gathl", "taxi", "trn", "qinfo", "qoff", "qmiss", "qrep", "area", "enc", "rare",
+local KEYS = { "qdiff", "gold", "skinl", "fishl", "gathl", "taxi", "trn", "qinfo", "qoff", "qmiss", "qrep", "area", "enc", "rare",
   "oskill", "itemx", "ctype", "loot", "vend", "npc", "obj", "sp", "item", "recentR" }
 
 local function on() return Q.db and Q.db.collect ~= false end
@@ -338,16 +338,187 @@ end)
 
 -- ------------------------------------------------------------------ quests: details, offers, missing ones, item starts, reputation
 local function lvl() return UnitLevel and clean(UnitLevel("player")) or 0 end
+-- ------------------------------------------------------------------ quest rewards: the game's numbers are the right ones
+-- Everything recorded here is from WoW Forever itself, so it always wins over ForeverDB's base data
+-- (old classic dumps). qinfo[quest]:
+--   xl = { [player level] = XP the game showed }, xb = full XP (seen at a level with no grey penalty),
+--   m = money, ch = choice items, rw = items you always get, lv = the quest's level in game.
+-- qdiff[quest] = what the game showed vs what ForeverDB said, when they differ (for the database fixes).
+R.ver = 0                                   -- bumped on every change (Quests.lua's reward cache)
+local function penalty(qlvl, plvl)
+  local diff = plvl - (qlvl or plvl)
+  if diff >= 10 then return 0.1 elseif diff > 5 then return 1 - 0.2 * (diff - 5) end
+  return 1
+end
+local function maxLevel()
+  return (GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion()) or (GetMaxPlayerLevel and GetMaxPlayerLevel()) or 60
+end
+local function dbBase(qid)                  -- ForeverDB's base rewards (qrw: money, full XP, choices, fixed)
+  return D.db and D.db.qrw and D.db.qrw[qid]
+end
+local function questLevel(qid, e)
+  if e and e.lv then return e.lv end
+  local f = D.db and D.db.qinfo and D.db.qinfo[qid]
+  if f and f.lv then return f.lv end
+  local q = D:Quest(qid)
+  return q and q[2]
+end
+local function sameList(a, b)
+  a, b = a or {}, b or {}
+  if #a ~= #b then return false end
+  local set = {}
+  for _, v in ipairs(a) do set[v] = true end
+  for _, v in ipairs(b) do if not set[v] then return false end end
+  return true
+end
+
+-- save what the game said about a quest's rewards; xp / money / items may be nil (not known here)
+function R.SaveReward(qid, xp, money, choices, fixed, qlvl)
+  if not on() or not qid or qid == 0 then return end
+  local c = db()
+  c.qdiff = type(c.qdiff) == "table" and c.qdiff or {}
+  local e = c.qinfo[qid] or {}
+  local l = lvl()
+  local changed = false
+  if qlvl and qlvl > 0 and e.lv ~= qlvl then e.lv = qlvl; changed = true end
+  local ql = questLevel(qid, e)
+  local base = dbBase(qid)
+  local diff = c.qdiff[qid] or {}
+  if xp and l > 0 and l < maxLevel() then                -- at the level cap quests give no XP: says nothing
+    e.xl = e.xl or {}
+    if e.xl[l] ~= xp then e.xl[l] = xp; changed = true end
+    e.xp = xp
+    if penalty(ql, l) == 1 and e.xb ~= xp then e.xb = xp; changed = true end
+    local full = e.xb or (penalty(ql, l) > 0.1 and math.floor(xp / penalty(ql, l) + 0.5)) or nil
+    if base and base[2] and full and math.abs(base[2] - full) > math.max(5, full * 0.05) then
+      diff.xp = { full, base[2], l }
+    end
+  end
+  if money then
+    if e.m ~= money then e.m = money; changed = true end
+    if base and (base[1] or 0) ~= money then diff.m = { money, base[1] or 0 } end
+    if not base and money > 0 then diff.m = { money, 0 } end
+  end
+  if choices then
+    if not sameList(e.ch, choices) then e.ch = choices; changed = true end
+    if base and not sameList(base[3], choices) then diff.ch = { choices, base[3] or {} } end
+  end
+  if fixed then
+    if not sameList(e.rw, fixed) then e.rw = fixed; changed = true end
+    if base and not sameList(base[4], fixed) then diff.rw = { fixed, base[4] or {} } end
+  end
+  c.qinfo[qid] = e
+  if next(diff) then diff.t = time(); c.qdiff[qid] = diff end
+  if changed then R.ver = R.ver + 1 end
+end
+
+-- the reward items in the quest window that's open (nil if any hasn't loaded yet: never save half a list)
+local function windowItems(kind, count)
+  local list = {}
+  for i = 1, count or 0 do
+    local link = clean(GetQuestItemLink and GetQuestItemLink(kind, i))
+    local id = type(link) == "string" and tonumber(link:match("item:(%d+)"))
+    if not id then return nil end
+    noteItem(link)
+    list[#list + 1] = id
+  end
+  return list
+end
+local function fromWindow()
+  local qid = clean(GetQuestID and GetQuestID())
+  if not qid or qid == 0 then return end
+  local xp = clean(GetRewardXP and GetRewardXP())
+  local mo = clean(GetRewardMoney and GetRewardMoney())
+  local ch = windowItems("choice", clean(GetNumQuestChoices and GetNumQuestChoices()) or 0)
+  local rw = windowItems("reward", clean(GetNumQuestRewards and GetNumQuestRewards()) or 0)
+  R.SaveReward(qid, xp, mo, ch, rw)
+  return qid
+end
+Q:On("QUEST_COMPLETE", function() if on() then pcall(fromWindow) end end)
+
+-- the quest log: every quest in it, at your level (XP and money; the level the game gives it)
+local function logIndex(qid)
+  return C_QuestLog and C_QuestLog.GetLogIndexForQuestID and C_QuestLog.GetLogIndexForQuestID(qid)
+end
+function R.LogXP(qid)
+  if not (GetQuestLogRewardXP and logIndex(qid)) then return end
+  local ok, xp = pcall(GetQuestLogRewardXP, qid)
+  xp = ok and clean(xp)
+  return type(xp) == "number" and xp or nil
+end
+function R.LogMoney(qid)
+  if not (GetQuestLogRewardMoney and logIndex(qid)) then return end
+  local ok, m = pcall(GetQuestLogRewardMoney, qid)
+  m = ok and clean(m)
+  return type(m) == "number" and m or nil
+end
+local function scanLog()
+  if not on() or not (C_QuestLog and C_QuestLog.GetNumQuestLogEntries) then return end
+  for i = 1, C_QuestLog.GetNumQuestLogEntries() do
+    local info = C_QuestLog.GetInfo(i)
+    local qid = info and not info.isHeader and clean(info.questID)
+    if qid and qid > 0 then
+      R.SaveReward(qid, R.LogXP(qid), R.LogMoney(qid), nil, nil, clean(info.level))
+    end
+  end
+end
+R.ScanLog = scanLog
+Q:On("QUEST_LOG_UPDATE", function() Q.Throttle("rec-log", 2, function() pcall(scanLog) end) end)
+Q:On("PLAYER_LEVEL_UP", function() Q.After(2, function() pcall(scanLog) end) end)
+
+-- what the game says a quest gives a player of level plvl: live from the quest log, else recorded
+-- in game (this account, then everyone's through ForeverDB's qinfo). nil = the game never said.
+function R.GameXP(qid, plvl)
+  if plvl == lvl() then
+    local live = R.LogXP(qid)
+    if live and (live > 0 or plvl >= maxLevel()) then return live end
+  end
+  local own = QuesticusCollect and QuesticusCollect.qinfo and QuesticusCollect.qinfo[qid]
+  if own and own.xl and own.xl[plvl] then return own.xl[plvl] end
+  local a = QuesticusCollect and QuesticusCollect.qact and QuesticusCollect.qact[qid]
+  if a and a.lv == plvl and a.xp and a.xp > 0 then return a.xp end
+  local ql = questLevel(qid, own)
+  local full = own and own.xb
+  local shared = D.db and D.db.qinfo and D.db.qinfo[qid]
+  if not full and shared then full = shared.xb end
+  if not full and own and own.xl then          -- seen at a grey level only: work back from it
+    for l, x in pairs(own.xl) do
+      local p = penalty(ql, l)
+      if p > 0.1 then full = math.floor(x / p + 0.5) break end
+    end
+  end
+  if not full and a and a.xp and a.xp > 0 and a.lv and penalty(ql, a.lv) > 0.1 then
+    full = math.floor(a.xp / penalty(ql, a.lv) + 0.5)
+  end
+  if full then return math.floor(full * penalty(ql, plvl)) end
+end
+function R.GameMoney(qid)
+  local live = R.LogMoney(qid)
+  if live then return live end
+  local own = QuesticusCollect and QuesticusCollect.qinfo and QuesticusCollect.qinfo[qid]
+  if own and own.m then return own.m end
+  local a = QuesticusCollect and QuesticusCollect.qact and QuesticusCollect.qact[qid]
+  if a and a.money and (not a.lv or a.lv < maxLevel()) then return a.money end
+  local shared = D.db and D.db.qinfo and D.db.qinfo[qid]
+  if shared and shared.m then return shared.m end
+end
+-- reward items the game showed (choices, fixed); nil when never seen
+function R.GameItems(qid)
+  local own = QuesticusCollect and QuesticusCollect.qinfo and QuesticusCollect.qinfo[qid]
+  local shared = D.db and D.db.qinfo and D.db.qinfo[qid]
+  local ch = (own and own.ch) or (shared and shared.ch)
+  local rw = (own and own.rw) or (shared and shared.rw)
+  return ch, rw
+end
+
 Q:On("QUEST_DETAIL", function()
   if not on() then return end
   pcall(function()
-    local qid = clean(GetQuestID and GetQuestID())
-    if not qid or qid == 0 then return end
+    local qid = fromWindow()
+    if not qid then return end
     local e = db().qinfo[qid] or {}
     local o = clean(GetObjectiveText and GetObjectiveText())
     if o and o ~= "" then e.o = o end
-    local xp = clean(GetRewardXP and GetRewardXP()); if xp and xp > 0 then e.xp = xp end
-    local mo = clean(GetRewardMoney and GetRewardMoney()); if mo and mo > 0 then e.m = mo end
     local g = clean(GetSuggestedGroupNum and GetSuggestedGroupNum()); if g and g > 0 then e.grp = g end
     local l = lvl()
     if l > 0 then e.minlv = e.minlv and math.min(e.minlv, l) or l end
@@ -404,7 +575,14 @@ end)
 
 -- reputation for a quest: the faction lines right after handing it in
 local lastTurnIn, lastTurnInAt
-Q:On("QUEST_TURNED_IN", function(qid) lastTurnIn, lastTurnInAt = qid, GetTime() end)
+Q:On("QUEST_TURNED_IN", function(qid, xp, money)
+  lastTurnIn, lastTurnInAt = qid, GetTime()
+  -- the money really received (not the XP: a level-up from this very quest makes the level wrong;
+  -- the reward window just before has the XP at the right level)
+  if on() and qid and not S(qid) and lvl() < maxLevel() then
+    pcall(R.SaveReward, qid, nil, clean(money))
+  end
+end)
 local REP = FACTION_STANDING_INCREASED and FACTION_STANDING_INCREASED:gsub("%%s", "(.+)"):gsub("%%d", "(%%d+)")
 Q:On("CHAT_MSG_COMBAT_FACTION_CHANGE", function(msg)
   if not (on() and REP and lastTurnIn and GetTime() - (lastTurnInAt or 0) < 3) or S(msg) then return end

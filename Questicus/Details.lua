@@ -256,7 +256,7 @@ local function lines(s)
     add(" ")
     add(c(gold, "Rewards"))
     local xp, real, rec = QS.RewardXP(id, Q.player.level)
-    add(("  XP: %s%s"):format(xp, rec and c(dim, " (from a real turn-in)") or (real and "" or c(dim, " (estimate - no data)"))))
+    add(("  XP: %s%s"):format(xp, rec and c(dim, " (what the game says)") or (real and "" or c(dim, " (estimate - no data)"))))
     add("  Gold: " .. DT.Money(QS.RewardMoney(id)))
     local r = QS.Rewards(id)
     if r and r[3] then
