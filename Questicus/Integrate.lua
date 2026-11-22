@@ -312,6 +312,7 @@ Q:Command("questlogdebug", "save the world map quest log's search bar layout (fo
       if not (f.IsForbidden and f:IsForbidden()) and f.IsVisible and f:IsVisible() and f.GetLeft then
         local k = f:GetEffectiveScale() or 1
         local L, R, T, B = f:GetLeft(), f:GetRight(), f:GetTop(), f:GetBottom()
+        if Q.Secret(k) or Q.Secret(L) or Q.Secret(R) or Q.Secret(T) or Q.Secret(B) then L = nil end
         if L and R and T and B and L * k <= px and R * k >= px and B * k <= py and T * k >= py then
           list[#list + 1] = ("%s strata=%s lvl=%s"):format(name(f), tostring(f:GetFrameStrata()), tostring(f:GetFrameLevel()))
         end

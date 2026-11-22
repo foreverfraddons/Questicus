@@ -9,6 +9,7 @@ Q.Changelog = {
   { v = "next",
     fixed = {
       "Opening the world map no longer redraws the quest areas when nothing has changed.",
+      "Fixed an error (\"secret number value\") with the world map open while another addon's frames were in combat.",
       "The What's new window keeps its text inside the window, waits until you've answered the setup questions, and on a first install shows only the latest version's notes.",
     },
     added = {

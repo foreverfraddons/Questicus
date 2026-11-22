@@ -529,11 +529,14 @@ local function hasWaypointArt(f)
     end
   end
 end
+local S = Q.Secret
 local function screenCenter(f)
   local x, y = f:GetCenter()
-  if not x then return end
-  local k = f:GetEffectiveScale() or 1
-  return x * k, y * k, (f:GetWidth() or 0) * k
+  local k, w = f:GetEffectiveScale(), f:GetWidth()
+  -- (another addon's protected frame in combat gives secret values: left alone)
+  if not x or S(x) or S(y) or S(k) or S(w) then return end
+  k = k or 1
+  return x * k, y * k, (w or 0) * k
 end
 function PN:UncoverStep()
   local ic = PN.leg and PN.leg.icon
@@ -542,12 +545,21 @@ function PN:UncoverStep()
     local ix, iy, iw = screenCenter(ic)
     if ix then
       local near = math.max(10, iw * 0.6)
-      local f = EnumerateFrames()
-      local n = 0
-      while f do
-        n = n + 1
-        if n > 60000 then break end
-        if f ~= ic and not (f.IsForbidden and f:IsForbidden()) and f.IsVisible and f:IsVisible() then
+      -- only the map's own frames (the markers are all on it), not every frame in the game
+      local list, n = {}, 0
+      local function walk(p, depth)
+        if depth > 7 or n > 6000 then return end
+        for _, c in ipairs({ p:GetChildren() }) do
+          if not (c.IsForbidden and c:IsForbidden()) then
+            n = n + 1
+            list[#list + 1] = c
+            if c ~= PN.overlay then walk(c, depth + 1) end
+          end
+        end
+      end
+      walk(WorldMapFrame, 0)
+      for _, f in ipairs(list) do
+        if f ~= ic and f.IsVisible and f:IsVisible() then
           local x, y, w = screenCenter(f)
           if x and w < 80 and math.abs(x - ix) < near and math.abs(y - iy) < near and f:GetParent() ~= PN.overlay
             and f.GetRegions and hasWaypointArt(f) then
@@ -559,7 +571,6 @@ function PN:UncoverStep()
             end
           end
         end
-        f = EnumerateFrames(f)
       end
     end
   end
