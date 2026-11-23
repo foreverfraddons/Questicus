@@ -94,7 +94,7 @@ local function onMap(pt, mapID)
   end
 end
 
-PN.OnMap, PN.CanvasScale = onMap, function(sc) return canvasScale(sc) end
+PN.OnMap = onMap
 
 -- ------------------------------------------------------------------ rares (collectibles layer)
 local rareDrops
@@ -125,6 +125,7 @@ local function canvasScale(sc)
   if type(k) == "number" and k > 0 then return k end
   return sc and sc.GetCanvasScale and sc:GetCanvasScale() or 1
 end
+PN.CanvasScale = canvasScale
 local available, availableFor = nil, nil
 
 local function availableQuests()

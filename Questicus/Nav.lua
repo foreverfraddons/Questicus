@@ -314,13 +314,13 @@ function N.SetFixed(key, inst, nodes)
   QuesticusCollect.fpath[key] = { i = inst, n = n, t = time and time() or 0 }
   N:Forget()
   N.fixedVer = (N.fixedVer or 0) + 1
-  if Q.Pins and Q.Pins.RefreshWorld then Q.Pins:RefreshWorld(true) end
+  if Q.Pins and Q.Pins.RefreshWorld then pcall(Q.Pins.RefreshWorld, Q.Pins, true) end
 end
 function N.ClearFixed(key)
   if QuesticusCollect and QuesticusCollect.fpath then QuesticusCollect.fpath[key] = nil end
   N:Forget()
   N.fixedVer = (N.fixedVer or 0) + 1
-  if Q.Pins and Q.Pins.RefreshWorld then Q.Pins:RefreshWorld(true) end
+  if Q.Pins and Q.Pins.RefreshWorld then pcall(Q.Pins.RefreshWorld, Q.Pins, true) end
 end
 -- the fixed path that leads to `to`: the focused step's own when `to` is near its end, else any path
 -- ending within 60 yd of `to` on that continent
