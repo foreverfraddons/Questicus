@@ -12,7 +12,7 @@ Q.Changelog = {
       "Mob respawn times are learned while you play and used right away: a spot you killed at that still has no nameplate in view (not back yet), or is found back later, tightens its respawn time; the arrow re-times every skipped spot of that mob at once, and the route counts the wait for respawns when a quest needs more kills than there are spawns. Everything is saved for ForeverDB.",
     },
     fixed = {
-      "The arrow no longer points away from the quest mobs in front of you: when a mob for the current objectives is in view (nameplate, target or soft target, not tagged by someone else) it points at that mob's nearest spot, and says \"<mob> - right here\" once it's within about 28 yards.",
+      "The arrow no longer points away from the quest mobs in front of you: while a mob for the current objectives is in view (nameplate, target or soft target, not tagged by someone else) the arrow turns into its skull and says \"<mob> in view\" (\"right here\" when it's close) instead of pointing at a spawn marker that may be a different one. Within sight it also aims straight at the target instead of along a detour.",
       "The arrow no longer runs you round every kill spot to find them empty: with enemy nameplates on, spawns within nameplate range whose mob isn't up (no live nameplate, or tagged by someone else) are skipped from a distance until they respawn, and open again as soon as the mob shows up. Without nameplates you get a one-time tip to turn them on.",
     },
   },

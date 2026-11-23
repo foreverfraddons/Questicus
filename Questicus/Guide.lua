@@ -231,6 +231,10 @@ function GD:TargetNow(index, s)
             if not bd or d < bd then pick, bd = e, d end
           end
         end
+        -- no known spawn of it anywhere near where you can see it (beyond nameplate range): the mob is
+        -- standing somewhere the database doesn't know - pointing at a far marker would lead you away
+        local range = Q.Spots.PlateRange and Q.Spots.PlateRange() or 40
+        if not bd or bd > range + 10 then GD.inView.far = true end
       end
       pick = pick or Q.Spots.Choose(entries, here, index or GD.focus)
       best = pick and pick.p

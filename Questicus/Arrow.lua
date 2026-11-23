@@ -39,6 +39,11 @@ local function build()
   frame.here:SetSize(40, 40)
   frame.here:SetPoint("CENTER")
   frame.here:Hide()
+  frame.skull = frame:CreateTexture(nil, "ARTWORK")
+  frame.skull:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_8")
+  frame.skull:SetSize(36, 36)
+  frame.skull:SetPoint("CENTER")
+  frame.skull:Hide()
   frame.dist = T.Text(frame, 13, T.c.text, "OUTLINE")
   frame.dist:SetPoint("TOP", frame, "BOTTOM", 0, -2)
   frame.dist:SetJustifyH("CENTER")
@@ -63,7 +68,7 @@ local function build()
     if Q.OnTaxi() then
       if not frame.inFlight then
         frame.inFlight = true
-        frame.arrow:Hide(); frame.here:Hide()
+        frame.arrow:Hide(); frame.here:Hide(); frame.skull:Hide()
         frame.dist:SetText("in flight")
       end
       return
@@ -101,20 +106,25 @@ function A:Update()
   frame:Show()
   frame.label:SetText(shortText(s))
   if p.i ~= here.i then
-    frame.arrow:Hide(); frame.here:Hide()
+    frame.arrow:Hide(); frame.here:Hide(); frame.skull:Hide()
     frame.dist:SetText("other continent")
     return
   end
   local d = D.Dist(here, p)
   -- the step's mob is right in front of you: no direction to a marker, just say so
   local v = s and s.type == "complete" and Q.Guide.inView
-  if v and v.close then
-    frame.arrow:Hide(); frame.here:Show()
-    frame.dist:SetText((D:Name(v.src) or "target") .. " - right here")
+  if v then
+    -- in view (its nameplate carries the skull): no direction - the game won't tell an addon where a
+    -- mob stands, and the nearest spawn marker is often not the one it's on, so an arrow would lead away
+    frame.arrow:Hide(); frame.here:Hide(); frame.skull:Show()
+    frame.dist:SetText((D:Name(v.src) or "target") .. (v.close and " - right here" or " in view - go for the skull"))
     return
   end
+  frame.skull:Hide()
   -- aim along the less obstructed path (Nav.lua), not straight through walls and water
-  local wp = (Q.Nav and Q.Nav:Next(here, p)) or p
+  -- (close by - within sight - straight at it: a detour along ground walked before would point you
+  -- away from a target you can see)
+  local wp = (d > 80 and Q.Nav and Q.Nav:Next(here, p)) or p
   local dx, dy = wp.x - here.x, wp.y - here.y
   -- "here" only when you're really on it (the spot's own check starts there: Spots.lua)
   if d < 5 then

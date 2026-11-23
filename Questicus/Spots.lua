@@ -265,7 +265,9 @@ function SP.Visible(entries)
         local dead = UnitIsDead and UnitIsDead(tok)
         local taken = UnitIsTapDenied and UnitIsTapDenied(tok)
         if not (dead and not S(dead)) and not (taken and not S(taken)) then
-          local close = within(tok, 28) == true
+          -- (the game may not say how far an enemy is in combat: your soft target / target in front of
+          -- you is close enough)
+          local close = within(tok, 28) == true or tok == "softenemy" or (tok == "target" and within(tok, 28) ~= false)
           if close and not bestClose then best, bestClose = k, true
           elseif not best then best = k end
         end
