@@ -1,20 +1,38 @@
--- Questicus helpers at quest NPCs: turn in every finished quest, accept every quest that fits
--- your survey answers, take the best reward, and keep going until the NPC has nothing left.
+-- Questicus helpers at quest NPCs: turn in every finished quest, accept the quests on your route, take the best reward, and keep going until the NPC has nothing left.
 -- Hold Shift while talking to an NPC to do it yourself.
 local Q = Questicus
 local QS, G = Q.Quests, Q.Gear
 
 local function paused() return (IsShiftKeyDown and IsShiftKeyDown()) or (Q.CollectOnly and Q.CollectOnly()) end
 
--- any quest Questicus would route for this character (the survey decides), not only the next steps
+-- only quests the route has you pick up: an "accept" step for it anywhere in the planned route (60 steps),
+-- or one you added yourself. (It used to take any quest the survey allows, so NPCs handed you quests
+-- the route had left out - too far, too slow, grey, another zone - and they sat in your log.)
+local function onRoute(id)
+  local P = Q.Planner
+  local steps = P and P.steps
+  if not steps then return nil end                     -- no route worked out yet
+  for _, s in ipairs(steps) do
+    if s.type == "accept" then
+      for _, q in ipairs(s.quests or {}) do if q == id then return true end end
+    end
+  end
+  return false
+end
+Q.AutoOnRoute = onRoute
+
 local function wanted(id)
   if not id or id == 0 then return false end
   if Q.char.skipped[id] then return false end
   if QS:Info(id) == nil then return false end
+  if Q.char.forced and Q.char.forced[id] then return true end   -- you added it yourself
   -- left out by your settings (dungeon quests off, elites with solo only, escort / PvP off ...)
   local P = Q.Planner
   if P and P.OptedOut and P.OptedOut(id) then return false end
-  return true
+  if P and P.Excluded and P.Excluded(id) then return false end
+  local r = onRoute(id)
+  if r == nil then return true end                      -- (before the first route: the survey decides)
+  return r
 end
 
 local function after(fn) Q.After(0.05, function() if not paused() then fn() end end) end
