@@ -183,6 +183,7 @@ Q:On("QC_QUESTS_CHANGED", function() GD.tver = GD.tver + 1 end)
 Q:On("QC_PLAN_UPDATED", function() GD.tver = GD.tver + 1 end)
 function GD:Target(index)
   local idx = index or GD.focus
+  if idx == GD.focus and Q.Nav and Q.Nav.StepKey then Q.Nav.focusKey = Q.Nav.StepKey(P.steps and P.steps[idx]) end
   local s = P.steps and P.steps[idx]
   if not s then return end
   if s.type ~= "complete" then return s.point, s end

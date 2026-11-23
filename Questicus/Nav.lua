@@ -134,6 +134,8 @@ end
 -- note a place you walked (called by Collect.lua every couple of seconds)
 function N:Walked(pos)
   if not pos then return end
+  -- along a path set by hand: nothing recorded (it's settled)
+  if N.NearFixed(pos) then return end
   pcall(noteCrossing, pos)
   local cx, cy = cellOf(pos.x, pos.y)
   local k = keyOf(cx, cy)
@@ -284,11 +286,115 @@ function N:Forget() wipe(cache); cacheN = 0; wipe(zcell) end
 local function airborne()
   return (Q.OnTaxi and Q.OnTaxi()) or (IsFlying and IsFlying()) or false
 end
+
+-- ------------------------------------------------------------------ fixed paths (set by hand)
+-- A route step's walk drawn by hand on the map (the author's dev tools): used as it is from then on -
+-- no path search, no learning or trail recording along it. [stepKey] = { i = continent, n = {x, y, ...},
+-- t = time }. This account's own (QuesticusCollect.fpath, sent to ForeverDB with the recordings) win
+-- over ForeverDB's (D.db.fpath, everyone's).
+function N.StepKey(s)
+  if not s then return nil end
+  if s.type == "buy" then return "buy:" .. tostring(s.npc or s.title or "") end
+  local q = s.quests and s.quests[1]
+  return q and (s.type .. ":" .. q) or nil
+end
+function N.FixedOf(key)
+  if not key then return nil end
+  local own = QuesticusCollect and QuesticusCollect.fpath and QuesticusCollect.fpath[key]
+  if type(own) == "table" and own.n then return own end
+  local db = D.db and D.db.fpath and D.db.fpath[key]
+  if type(db) == "table" and db.n then return db end
+end
+function N.SetFixed(key, inst, nodes)
+  if not (key and inst and nodes) then return end
+  QuesticusCollect = QuesticusCollect or {}
+  QuesticusCollect.fpath = QuesticusCollect.fpath or {}
+  local n = {}
+  for _, p in ipairs(nodes) do n[#n + 1] = math.floor(p.x * 10 + 0.5) / 10; n[#n + 1] = math.floor(p.y * 10 + 0.5) / 10 end
+  QuesticusCollect.fpath[key] = { i = inst, n = n, t = time and time() or 0 }
+  N:Forget()
+  N.fixedVer = (N.fixedVer or 0) + 1
+  if Q.Pins and Q.Pins.RefreshWorld then Q.Pins:RefreshWorld(true) end
+end
+function N.ClearFixed(key)
+  if QuesticusCollect and QuesticusCollect.fpath then QuesticusCollect.fpath[key] = nil end
+  N:Forget()
+  N.fixedVer = (N.fixedVer or 0) + 1
+  if Q.Pins and Q.Pins.RefreshWorld then Q.Pins:RefreshWorld(true) end
+end
+-- the fixed path that leads to `to`: the focused step's own when `to` is near its end, else any path
+-- ending within 60 yd of `to` on that continent
+local FIX_END = 60
+local function fixedFor(to)
+  local function ends(f, r)
+    local n = f.n
+    return f.i == to.i and #n >= 2 and (n[#n - 1] - to.x) ^ 2 + (n[#n] - to.y) ^ 2 <= r * r
+  end
+  local key = N.focusKey
+  local f = N.FixedOf(key)
+  if f and ends(f, 300) then return f end
+  for _, src in ipairs({ QuesticusCollect and QuesticusCollect.fpath, D.db and D.db.fpath }) do
+    for _, g in pairs(src or {}) do
+      if type(g) == "table" and g.n and ends(g, FIX_END) then return g end
+    end
+  end
+end
+N.FixedFor = fixedFor
+-- the rest of a fixed path from where you are: from the node you're nearest (the one after it once
+-- you're at it), then the target itself when it isn't the path's last node
+local function fixedRoute(f, here, to)
+  local n = f.n
+  local best, bd
+  for j = 1, #n - 1, 2 do
+    local d = (n[j] - here.x) ^ 2 + (n[j + 1] - here.y) ^ 2
+    if not bd or d < bd then best, bd = j, d end
+  end
+  -- (between two nodes: heading on to the next one, not back to the one behind you)
+  if best and best + 2 <= #n - 1 then
+    local ax, ay, bx, by = n[best], n[best + 1], n[best + 2], n[best + 3]
+    local seg = (bx - ax) ^ 2 + (by - ay) ^ 2
+    local t = seg > 0 and ((here.x - ax) * (bx - ax) + (here.y - ay) * (by - ay)) / seg or 0
+    if t > 0 or bd < 25 * 25 then best = best + 2 end
+  end
+  local out = {}
+  for j = best or 1, #n - 1, 2 do out[#out + 1] = { i = f.i, x = n[j], y = n[j + 1], fixed = true } end
+  local last = out[#out]
+  if not last or D.Dist(last, to) > 10 then out[#out + 1] = to end
+  return out
+end
+N.FixedRoute = fixedRoute
+-- near a fixed path (its walk isn't learned or recorded any more)?
+function N.NearFixed(pos, r)
+  r = r or 30
+  for _, src in ipairs({ QuesticusCollect and QuesticusCollect.fpath, D.db and D.db.fpath }) do
+    for _, f in pairs(src or {}) do
+      local n = type(f) == "table" and f.n
+      if n and f.i == pos.i then
+        for j = 1, #n - 3, 2 do
+          local ax, ay, bx, by = n[j], n[j + 1], n[j + 2], n[j + 3]
+          local seg = (bx - ax) ^ 2 + (by - ay) ^ 2
+          local t = seg > 0 and math.max(0, math.min(1, ((pos.x - ax) * (bx - ax) + (pos.y - ay) * (by - ay)) / seg)) or 0
+          local px, py = ax + (bx - ax) * t, ay + (by - ay) * t
+          if (pos.x - px) ^ 2 + (pos.y - py) ^ 2 <= r * r then return true end
+        end
+      end
+    end
+  end
+  return false
+end
+
 function N:Route(here, to)
   if not here or not to then return nil end
   -- in the air (flight path, flying mount) the ground's walls don't matter: straight at the target, no
   -- search (moving that fast made a new search every half second: the stutters while flying)
   if airborne() then return { to } end
+  -- a path set by hand for this walk: that, as it is
+  local f = here.i == to.i and fixedFor(to)
+  if f then
+    local p = fixedRoute(f, here, to)
+    while #p > 1 and D.Dist(here, p[1]) < 15 do table.remove(p, 1) end
+    return p
+  end
   local key = (to.i or 0) * 1e8 + math.floor(to.x / 10) * 1e4 + math.floor(to.y / 10)
   local now = GetTime and GetTime() or 0
   local e = cache[key]

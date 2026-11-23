@@ -94,6 +94,8 @@ local function onMap(pt, mapID)
   end
 end
 
+PN.OnMap, PN.CanvasScale = onMap, function(sc) return canvasScale(sc) end
+
 -- ------------------------------------------------------------------ rares (collectibles layer)
 local rareDrops
 local function rares()

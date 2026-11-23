@@ -58,6 +58,8 @@ local function start(target)
   if not (here and target and target.i == here.i) then leg = nil; return end
   local straight = D.Dist(here, target)
   if straight < MIN_LEG then leg = nil; return end
+  -- a walk with a path set by hand isn't learned from: that path stays as it is
+  if Q.Nav and Q.Nav.FixedFor and Q.Nav.FixedFor(target) then leg = nil; return end
   local line = { { i = here.i, x = here.x, y = here.y } }
   local path = Q.Nav and Q.Nav:Route(here, target) or { target }
   for _, p in ipairs(path or {}) do line[#line + 1] = { i = p.i, x = p.x, y = p.y } end
