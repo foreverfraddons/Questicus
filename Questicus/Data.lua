@@ -275,6 +275,56 @@ function D:RemoveSpot(key, p)
   if Q.Pins and Q.Pins.RefreshWorld then Q.Pins:RefreshWorld(true) end
   return true
 end
+-- ------------------------------------------------------------------ spawns the database doesn't have
+-- A quest mob seen standing (out of combat) more than NEW_SPAWN yards from every spawn ForeverDB knows:
+-- that's a spawn point too. Saved in QuesticusCollect.nspawn (ForeverDB adds it to spw for everyone)
+-- and used at once by the map, the arrow and the route.
+local NEW_SPAWN = 30
+-- is p within r yards of a spawn already known (every spawn in the database, not just the first few)?
+function D:KnownSpawnNear(key, p, r)
+  r = r or NEW_SPAWN
+  local r2 = r * r
+  for _, g in ipairs(DB.spw and DB.spw[key] or {}) do
+    if g[1] == p.i then
+      for j = 2, #g - 1, 2 do
+        if (g[j] - p.x) ^ 2 + (g[j + 1] - p.y) ^ 2 <= r2 then return true end
+      end
+    end
+  end
+  local spm = DB.spm and DB.spm[key]
+  if spm then
+    for map, pts in pairs(spm) do
+      for j = 1, #pts - 1, 2 do
+        local inst, x, y = D:WorldPos(map, pts[j] / 1000, pts[j + 1] / 1000)
+        if inst == p.i and (x - p.x) ^ 2 + (y - p.y) ^ 2 <= r2 then return true end
+      end
+    end
+  end
+  local own = QuesticusCollect and QuesticusCollect.nspawn and QuesticusCollect.nspawn[key]
+  for _, q in ipairs(type(own) == "table" and own or {}) do
+    if q.i == p.i and (q.x - p.x) ^ 2 + (q.y - p.y) ^ 2 <= r2 then return true end
+  end
+  return false
+end
+function D:AddSpawn(key, p)
+  if not (key and p and p.i) or not QuesticusCollect or (Q.db and Q.db.collect == false) then return end
+  if D:KnownSpawnNear(key, p) then return end
+  QuesticusCollect.nspawn = type(QuesticusCollect.nspawn) == "table" and QuesticusCollect.nspawn or {}
+  local list = QuesticusCollect.nspawn[key] or {}
+  QuesticusCollect.nspawn[key] = list
+  if #list >= 40 then return end
+  local m, mx, my = D:MapPos(p)
+  list[#list + 1] = { i = p.i, x = math.floor(p.x + 0.5), y = math.floor(p.y + 0.5), t = time and time() or 0,
+    m = m, mx = mx and math.floor(mx * 1000 + 0.5), my = my and math.floor(my * 1000 + 0.5) }
+  pointCache[key] = nil
+  Q:Print(("found a new spawn point of %s - added to your map and routes, and to ForeverDB with your recordings"):format(D:Name(key)))
+  Q.Throttle("newspawn", 3, function()
+    if Q.Planner then Q.Planner:Reset(); Q.Planner:Replan(1) end
+    if Q.Pins and Q.Pins.RefreshWorld then Q.Pins:RefreshWorld(true) end
+  end)
+  return true
+end
+
 Q:Command("spots", "spots you removed with Ctrl-click (/qc spots undo puts the last one back, /qc spots reset all)", function(arg)
   local r = QuesticusCollect and QuesticusCollect.removed or {}
   if arg == "undo" then
@@ -316,6 +366,12 @@ function D:Points(key)
         end
       end
     end
+  end
+  -- spawns players found that the database didn't have (Spots.lua; ForeverDB merges them into spw)
+  local own = QuesticusCollect and QuesticusCollect.nspawn and QuesticusCollect.nspawn[key]
+  for _, p in ipairs(type(own) == "table" and own or {}) do
+    if #c >= MAX_POINTS then break end
+    if p.i and p.x then c[#c + 1] = { i = p.i, x = p.x, y = p.y, found = true } end
   end
   for _, area in ipairs(DB.ind and DB.ind[key] or {}) do inDungeon[area] = true end
   local spm = DB.spm and DB.spm[key]

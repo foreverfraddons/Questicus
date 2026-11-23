@@ -8,6 +8,7 @@ local Q = Questicus
 Q.Changelog = {
   { v = "next",
     added = {
+      "New spawn points: a quest mob standing next to you (out of combat) more than 30 yards from every spawn the database knows is added as a new spawn point - on your map, in the arrow's spots and in the route right away, and in ForeverDB for everyone with your recordings.",
       "Mob respawn times are learned while you play and used right away: a spot you killed at that still has no nameplate in view (not back yet), or is found back later, tightens its respawn time; the arrow re-times every skipped spot of that mob at once, and the route counts the wait for respawns when a quest needs more kills than there are spawns. Everything is saved for ForeverDB.",
     },
     fixed = {

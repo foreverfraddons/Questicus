@@ -318,6 +318,45 @@ local function farScan(here)
 end
 SP.FarScan = farScan
 
+-- ------------------------------------------------------------------ new spawn points
+-- A mob of a quest in your log standing next to you (about 10 yd, out of combat - not chasing you):
+-- where you stand is its spawn. More than 30 yd from every known spawn -> a new one (Data.lua D:AddSpawn).
+local questMobs, questMobsVer
+local function mobsOfLog()
+  if questMobs and questMobsVer == (Q.Guide and Q.Guide.tver) then return questMobs end
+  questMobs, questMobsVer = {}, Q.Guide and Q.Guide.tver
+  for id in pairs(QS.log or {}) do
+    local m = P.Meta and P.Meta(id)
+    for _, l in ipairs(m and m.lines or {}) do
+      if l.kind == "kill" and l.key then questMobs[l.key] = true end
+      for _, k in ipairs(l.srcs or {}) do questMobs[k] = true end
+      if l.mob and l.from then questMobs[l.from] = true end
+    end
+  end
+  return questMobs
+end
+local spawnTried = {}
+local function spawnScan(here)
+  local mobs = mobsOfLog()
+  if not next(mobs) then return end
+  local t = GetTime()
+  for _, tok in ipairs(units()) do
+    local okE, ex = pcall(UnitExists, tok)
+    if okE and ex and not S(ex) then
+      local k = Q.UnitKey(tok)
+      if k and mobs[k] and t - (spawnTried[k] or 0) >= 5 then
+        local dead = UnitIsDead and UnitIsDead(tok)
+        local fighting = UnitAffectingCombat and UnitAffectingCombat(tok)
+        if not (dead and not S(dead)) and not (fighting and not S(fighting)) and within(tok, 10) == true then
+          spawnTried[k] = t
+          D:AddSpawn(k, here)
+        end
+      end
+    end
+  end
+end
+SP.SpawnScan = spawnScan
+
 -- a respawn measured: the spot was used at t0 and its mob / object is back
 -- ------------------------------------------------------------------ objects that don't respawn on a timer
 -- Some quest objects only appear when you do something (use an item on a mob and kill it: Broodling
@@ -450,6 +489,7 @@ local function tick()
     if cds()[k] and t >= c.untl then cds()[k] = nil end
   end
   pcall(farScan, here)
+  pcall(spawnScan, here)
   -- standing still? (a marker you can't quite reach still counts once you stop next to it)
   if lastPos and D.Dist(here, lastPos) < 1.5 then stillFor = stillFor + (GetTime() - (lastPosAt or GetTime()))
   else stillFor = 0 end
