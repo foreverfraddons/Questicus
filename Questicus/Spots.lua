@@ -50,7 +50,8 @@ end
 SP.Source = source
 
 -- respawn seconds for a creature / object: measured here > measured by everyone (ForeverDB) > 1 minute
-function SP.Respawn(src)
+-- the respawn from real timings only (yours, everyone's), nil when there are none
+local function timed(src)
   local own = src and QuesticusCollect and QuesticusCollect.resp and QuesticusCollect.resp[src]
   local shared = src and D.db and D.db.resp and D.db.resp[src]
   local t
@@ -60,13 +61,26 @@ function SP.Respawn(src)
   elseif shared then
     t = shared
   end
-  -- "it wasn't back yet after this long": never wait less than that again; "it was back by then": at most
+  return t, own
+end
+local LO_TRUST = 2.5      -- "not back after X" far beyond the timed respawn: it came back elsewhere (mobs
+                          -- share spawn points), not later - don't let that stretch the cooldowns
+local LO_MAX = 900        -- seconds: "not back yet" with nothing timed stops counting past this
+function SP.Respawn(src)
+  local t, own = timed(src)
+  -- "it wasn't back yet after this long": wait at least that; "it was back by then": at most that
   local lo, hi = own and own.lo, own and own.hi
+  if t and lo and lo > t * LO_TRUST then lo = nil end
   if not t and lo and hi and hi > lo then t = (lo + hi) / 2 end
   if not t and hi then t = math.min(FALLBACK, hi) end
   if not t then t = lo and math.max(FALLBACK, lo * 1.25) or FALLBACK end
-  if lo and t < lo then t = lo * 1.1 end
+  if lo and t < lo then t = lo * 1.05 end
   return math.max(10, math.min(t, 3600))
+end
+-- how long "not back yet" may keep counting for this mob before it means "came back somewhere else"
+local function loLimit(src)
+  local t = timed(src)
+  return t and t * LO_TRUST or LO_MAX
 end
 
 function SP.OnCooldown(p)
@@ -336,9 +350,10 @@ local function retime(src)
   end
 end
 SP.Retime = retime
+local MIN_RESP = 20       -- seconds: "back" sooner than this is another one of them wandering past
 local function measured(src, secs)
   local r = rec()
-  if not (r and src) or secs < 5 or secs > 3600 then return end
+  if not (r and src) or secs < MIN_RESP or secs > 3600 then return end
   if SP.IsSummoned(src) then return end
   local e = r[src] or { n = 0, s = 0 }
   -- (seen back after this long: it can't be more than this; keep the shortest few)
@@ -351,7 +366,7 @@ end
 -- not back yet this long after it was used: the respawn is longer than that
 local function notYet(src, secs)
   local r = rec()
-  if not (r and src) or secs < 5 then return end
+  if not (r and src) or secs < 5 or secs > loLimit(src) then return end
   if SP.IsSummoned(src) then return end
   local e = r[src] or { n = 0, s = 0 }
   if not e.lo or secs > e.lo + 2 then
@@ -363,7 +378,7 @@ end
 -- found back this long after it was used (you weren't watching before): the respawn is at most that
 local function backBy(src, secs)
   local r = rec()
-  if not (r and src) or secs < 5 or secs > 3600 then return end
+  if not (r and src) or secs < MIN_RESP or secs > 3600 then return end
   if SP.IsSummoned(src) then return end
   local e = r[src] or { n = 0, s = 0 }
   if not e.hi or secs < e.hi then
@@ -616,6 +631,22 @@ f:SetScript("OnUpdate", function(_, el)
   acc = 0
   pcall(tick)
   if SP.changed then SP.changed = false; SP.Kick() end
+end)
+
+-- recordings from before these checks: timings shorter than MIN_RESP (another mob wandering past) and
+-- "not back yet" stretched far past the timed respawn are dropped once
+Q:On("QC_READY", function()
+  local r = QuesticusCollect and QuesticusCollect.resp
+  if type(r) ~= "table" then return end
+  for src, e in pairs(r) do
+    if type(e) == "table" then
+      if (e.n or 0) > 0 and (e.s or 0) / e.n < MIN_RESP then e.n, e.s, e.min = 0, 0, nil end
+      if e.hi and e.hi < MIN_RESP then e.hi = nil end
+      local t = timed(src)
+      if e.lo and ((t and e.lo > t * LO_TRUST) or (not t and e.lo > LO_MAX)) then e.lo = nil end
+    end
+  end
+  for _, c in pairs(cds()) do if c.src then c.untl = math.min(c.untl, (c.used or c.t or now()) + SP.Respawn(c.src)) end end
 end)
 
 Q:Command("respawn", "objective spots on cooldown and respawn times (/qc respawn reset)", function(arg)
