@@ -1612,10 +1612,19 @@ function P.NeedChain(id, set, depth)
   for _, pre in ipairs(x[4] or {}) do P.NeedChain(pre, set, depth + 1) end
   local any = x[3] or ((not x[3] and not x[4]) and QS.prevOf and QS.prevOf[id]) or nil
   if any then
-    local ok
-    for _, pre in ipairs(any) do if QS.done[pre] or QS.log[pre] then ok = true; break end end
-    if not ok then
-      for _, pre in ipairs(any) do if QS:Info(pre) then P.NeedChain(pre, set, depth + 1); break end end
+    -- one of them done: nothing earlier to do. One in your log: it's part of the chain still to finish
+    -- (it used to count as done here, so dungeon mode dropped the quest you were on - Larion and Muigin
+    -- for the Sunken Temple - and sent you elsewhere). Else the first one the data knows.
+    local done, inLog
+    for _, pre in ipairs(any) do
+      if QS.done[pre] then done = true; break end
+      if QS.log[pre] then inLog = inLog or pre end
+    end
+    if not done then
+      if inLog then P.NeedChain(inLog, set, depth + 1)
+      else
+        for _, pre in ipairs(any) do if QS:Info(pre) then P.NeedChain(pre, set, depth + 1); break end end
+      end
     end
   end
   return set
@@ -1633,10 +1642,19 @@ function P.DungeonTargets(area)
     for _, pre in ipairs(x[4] or {}) do need(pre, depth + 1) end
     local any = x[3] or ((not x[3] and not x[4]) and QS.prevOf and QS.prevOf[id]) or nil
     if any then
-      local ok
-      for _, pre in ipairs(any) do if QS.done[pre] or QS.log[pre] then ok = true; break end end
-      if not ok then
-        for _, pre in ipairs(any) do if QS:Info(pre) then need(pre, depth + 1); break end end
+      -- one of them done: nothing earlier to do. One in your log: it's part of the chain still to finish
+      -- (it used to count as done here, so dungeon mode dropped the quest you were on - Larion and Muigin
+      -- for the Sunken Temple - and sent you elsewhere). Else the first one the data knows.
+      local done, inLog
+      for _, pre in ipairs(any) do
+        if QS.done[pre] then done = true; break end
+        if QS.log[pre] then inLog = inLog or pre end
+      end
+      if not done then
+        if inLog then need(inLog, depth + 1)
+        else
+          for _, pre in ipairs(any) do if QS:Info(pre) then need(pre, depth + 1); break end end
+        end
       end
     end
   end

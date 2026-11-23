@@ -18,6 +18,7 @@ Q.Changelog = {
       "The arrow and the route learn your way around much sooner: a wall, gate, cliff or mountain range you had to walk round is remembered (one long detour is enough), walks through caves and dungeons on the way are kept instead of dropped, ground you've walked yourself is preferred, and a chat line tells you when it learned something (/qc paths shows the last walk).",
     },
     fixed = {
+      "Dungeon mode now finishes the chain quest you already have before sending you elsewhere: a step of the chain in your log (e.g. Larion and Muigin in Un'Goro for the Sunken Temple) was treated as already done and left off the route.",
       "Dungeon mode no longer fills the route with endless \"Do <quest>\" steps for a finished quest of another zone in your log (e.g. It's a Secret to Everybody in Temple of Atal'Hakkar mode). A quest whose objectives have no known place now gets one step at most.",
       "Auto accept only takes the quests your route has you pick up (or ones you added yourself). It used to accept any quest your settings allowed, so NPCs handed you quests the route had left out.",
       "The \"Help calibrate Questicus\" respawn pop-up no longer shows for objects that only appear when you use an item on a mob or kill it (like Broodling Essence) - those have no respawn timer.",
