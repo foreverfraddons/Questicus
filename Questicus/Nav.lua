@@ -128,7 +128,10 @@ local function noteCrossing(pos)
   for j = 1, #list - 1, 2 do
     if (list[j] - mx) ^ 2 + (list[j + 1] - my) ^ 2 < 40 * 40 then return end   -- (known already)
   end
-  if #list < CROSS_KEEP * 2 then list[#list + 1] = mx; list[#list + 1] = my end
+  if #list < CROSS_KEEP * 2 then
+    list[#list + 1] = mx; list[#list + 1] = my
+    if D.CrossingsChanged then D:CrossingsChanged() end
+  end
 end
 
 -- note a place you walked (called by Collect.lua every couple of seconds)

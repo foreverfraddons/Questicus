@@ -213,9 +213,16 @@ local function placeOf(pt)
   return best, bd
 end
 local walkMemo = {}
+local walkDistPlaces
 function D.WalkDist(a, b)
   local s = D.Dist(a, b)
   if not (a and b) or a.i ~= b.i or s < 150 then return s end
+  -- through the zone crossings when the two are in different zones (mountains between zones)
+  local zw = D.ZoneWalk and D.ZoneWalk(a, b)
+  local w0 = walkDistPlaces(a, b, s)
+  return zw and zw > w0 and zw or w0
+end
+function walkDistPlaces(a, b, s)
   local pa, da = placeOf(a)
   local pb, db = placeOf(b)
   if not (pa and pb) or pa == pb then return s end
@@ -661,7 +668,15 @@ local function polyList(kind, inst)
   l = {}
   polys[key] = l
   local src = kind == "z" and DB and DB.zbord or (_G.ForeverDBFull and _G.ForeverDBFull.abord)
-  for id, e in pairs(src or {}) do
+  -- zone outlines redrawn by hand (the author's dev tools: QuesticusCollect.zbord, sent to ForeverDB) win
+  local over = kind == "z" and QuesticusCollect and type(QuesticusCollect.zbord) == "table" and QuesticusCollect.zbord
+  local merged = src or {}
+  if over and next(over) then
+    merged = {}
+    for id, e in pairs(src or {}) do merged[id] = e end
+    for id, e in pairs(over) do if type(e) == "table" and e.w then merged[tonumber(id) or id] = e end end
+  end
+  for id, e in pairs(merged) do
     if e.c == inst and e.w then
       local minx, maxx = math.huge, -math.huge
       for _, loop in ipairs(e.w) do
@@ -720,8 +735,17 @@ local function gridRow(s, o, c)
   end
   return out
 end
+-- outlines redrawn by hand on this continent: the chunk grid (agrid) doesn't know them, use the outlines
+local function edited(inst)
+  if DB and DB.zbordEd and DB.zbordEd[inst] then return true end
+  for _, e in pairs(QuesticusCollect and type(QuesticusCollect.zbord) == "table" and QuesticusCollect.zbord or {}) do
+    if type(e) == "table" and e.c == inst then return true end
+  end
+  return false
+end
 local function rowOf(kind, inst, x)
   local g = kind == "z" and _G.ForeverDBFull and _G.ForeverDBFull.agrid and _G.ForeverDBFull.agrid[inst]
+  if g and edited(inst) then g = nil end
   local o, c = (g and g.o) or GO, (g and g.c) or GC
   local r = math.floor((o - x) / c)
   local key = kind .. inst
@@ -764,17 +788,119 @@ function D:SubZoneAt(i, x, y)
   local z = lookup("a", i, x, y)
   return z ~= 0 and z or nil
 end
-function D:ForgetBorders() wipe(rows); rowsN = 0; wipe(polys); wipe(hasZones) end
+function D:ForgetBorders() wipe(rows); rowsN = 0; wipe(polys); wipe(hasZones); if D.ForgetWalk then D.ForgetWalk() end end
 
 -- zone border crossings: where people really walked from one zone into the next (Nav.lua records yours,
--- QuesticusCollect.zcross; ForeverDB zcross has everyone's). [continent][lowZone .. "-" .. highZone] = { x, y, ... }
+-- QuesticusCollect.zcross; ForeverDB zcross has everyone's; the author's dev tools add and remove them:
+-- QuesticusCollect.zcrossDel). [continent][lowZone .. "-" .. highZone] = { x, y, ... }
 local function pairKey(a, b) if a > b then a, b = b, a end return a .. "-" .. b end
 D.ZonePair = pairKey
-function D:Crossings(i, za, zb)
+local DEL_NEAR = 40
+local function deleted(i, k, x, y)
+  local del = QuesticusCollect and type(QuesticusCollect.zcrossDel) == "table" and QuesticusCollect.zcrossDel[i]
+  local l = del and del[k]
+  for j = 1, #(l or {}) - 1, 2 do
+    if (l[j] - x) ^ 2 + (l[j + 1] - y) ^ 2 <= DEL_NEAR * DEL_NEAR then return true end
+  end
+  local dbd = DB and DB.zcrossDel and DB.zcrossDel[i] and DB.zcrossDel[i][k]
+  for j = 1, #(dbd or {}) - 1, 2 do
+    if (dbd[j] - x) ^ 2 + (dbd[j + 1] - y) ^ 2 <= DEL_NEAR * DEL_NEAR then return true end
+  end
+  return false
+end
+-- every crossing of a continent: { x, y, a, b, own } (yours first, then ForeverDB's not near one of
+-- yours, minus deleted ones). Rebuilt when D.crossVer changes.
+local crossCache = {}
+D.crossVer = 0
+function D:CrossList(i)
+  local c = crossCache[i]
+  if c and c.v == D.crossVer then return c end
+  c = { v = D.crossVer }
+  crossCache[i] = c
+  local function add(t, own)
+    for k, l in pairs(t or {}) do
+      local za, zb = tostring(k):match("^(%d+)%-(%d+)$")
+      za, zb = tonumber(za), tonumber(zb)
+      if za and type(l) == "table" then
+        for j = 1, #l - 1, 2 do
+          local x, y = l[j], l[j + 1]
+          if not deleted(i, k, x, y) then
+            local dup
+            for _, q in ipairs(c) do
+              if q.a == za and q.b == zb and (q.x - x) ^ 2 + (q.y - y) ^ 2 < 900 then dup = true; break end
+            end
+            if not dup then c[#c + 1] = { x = x, y = y, a = za, b = zb, own = own } end
+          end
+        end
+      end
+    end
+  end
+  add(QuesticusCollect and QuesticusCollect.zcross and QuesticusCollect.zcross[i], true)
+  add(DB and DB.zcross and DB.zcross[i], false)
+  c.dist = {}                        -- [from node] = { [node] = walking yards through crossings }
+  return c
+end
+-- the author's dev tools: add / remove a crossing, save / drop a zone's outline (all sent to ForeverDB)
+function D:AddCrossing(i, za, zb, x, y)
+  QuesticusCollect.zcross = QuesticusCollect.zcross or {}
+  local ci = QuesticusCollect.zcross[i] or {}
+  QuesticusCollect.zcross[i] = ci
   local k = pairKey(za, zb)
-  local own = QuesticusCollect and QuesticusCollect.zcross and QuesticusCollect.zcross[i]
-  local db = DB and DB.zcross and DB.zcross[i]
-  return own and own[k], db and db[k]
+  local l = ci[k] or {}
+  ci[k] = l
+  l[#l + 1] = math.floor(x + 0.5); l[#l + 1] = math.floor(y + 0.5)
+  -- (a crossing put back where one was removed: not removed any more)
+  local del = type(QuesticusCollect.zcrossDel) == "table" and QuesticusCollect.zcrossDel[i] and QuesticusCollect.zcrossDel[i][k]
+  if del then
+    for j = #del - 1, 1, -2 do
+      if (del[j] - x) ^ 2 + (del[j + 1] - y) ^ 2 <= DEL_NEAR * DEL_NEAR then table.remove(del, j + 1); table.remove(del, j) end
+    end
+  end
+  D:CrossingsChanged()
+end
+function D:RemoveCrossing(i, za, zb, x, y)
+  local k = pairKey(za, zb)
+  local own = QuesticusCollect.zcross and QuesticusCollect.zcross[i] and QuesticusCollect.zcross[i][k]
+  if own then
+    for j = #own - 1, 1, -2 do
+      if (own[j] - x) ^ 2 + (own[j + 1] - y) ^ 2 <= 25 then table.remove(own, j + 1); table.remove(own, j) end
+    end
+  end
+  QuesticusCollect.zcrossDel = type(QuesticusCollect.zcrossDel) == "table" and QuesticusCollect.zcrossDel or {}
+  local di = QuesticusCollect.zcrossDel[i] or {}
+  QuesticusCollect.zcrossDel[i] = di
+  local l = di[k] or {}
+  di[k] = l
+  l[#l + 1] = math.floor(x + 0.5); l[#l + 1] = math.floor(y + 0.5)
+  D:CrossingsChanged()
+end
+function D:SetZoneOutline(zone, inst, loops)
+  QuesticusCollect.zbord = type(QuesticusCollect.zbord) == "table" and QuesticusCollect.zbord or {}
+  if loops then QuesticusCollect.zbord[zone] = { c = inst, w = loops, t = time and time() or 0 }
+  else QuesticusCollect.zbord[zone] = nil end
+  D:ForgetBorders()
+  D:CrossingsChanged()
+  if Q.Nav then Q.Nav:Forget() end
+end
+-- a zone's outline as the database has it (or yours)
+function D:ZoneOutline(zone)
+  local o = QuesticusCollect and type(QuesticusCollect.zbord) == "table" and QuesticusCollect.zbord[zone]
+  if type(o) == "table" and o.w then return o end
+  return DB and DB.zbord and DB.zbord[zone]
+end
+function D:CrossingsChanged()
+  D.crossVer = D.crossVer + 1
+  wipe(crossCache)
+  D.ForgetWalk()
+  if D.ForgetBorderMemo then D.ForgetBorderMemo() end
+end
+-- the crossings between two zones as a flat { x, y, ... } list (and nil: kept for older callers)
+function D:Crossings(i, za, zb)
+  local out = {}
+  for _, q in ipairs(D:CrossList(i)) do
+    if (q.a == za and q.b == zb) or (q.a == zb and q.b == za) then out[#out + 1] = q.x; out[#out + 1] = q.y end
+  end
+  return out, nil
 end
 local function bestCrossing(list, ax, ay, bx, by, best, bd)
   for j = 1, #(list or {}) - 1, 2 do
@@ -785,12 +911,82 @@ local function bestCrossing(list, ax, ay, bx, by, best, bd)
   return best, bd
 end
 
+-- ------------------------------------------------------------------ walking between zones
+-- The crossings make a network: from one crossing you can walk to any other crossing of the zones it
+-- joins. A walk from a to b in another zone goes a -> crossings -> b; the shortest one (Dijkstra) is the
+-- real distance when the zones only meet through mountains - not the straight line over them.
+-- nil when the network doesn't reach (not enough crossings known yet).
+local function inZone(q, z) return q.a == z or q.b == z end
+local function fromNode(c, s)
+  local d = c.dist[s]
+  if d then return d end
+  d = {}
+  c.dist[s] = d
+  local n = #c
+  local done = {}
+  d[s] = 0
+  for _ = 1, n do
+    local u, ud
+    for k = 1, n do
+      if not done[k] and d[k] and (not ud or d[k] < ud) then u, ud = k, d[k] end
+    end
+    if not u then break end
+    done[u] = true
+    local qu = c[u]
+    for k = 1, n do
+      if not done[k] then
+        local qk = c[k]
+        if inZone(qk, qu.a) or inZone(qk, qu.b) then
+          local nd = ud + math.sqrt((qu.x - qk.x) ^ 2 + (qu.y - qk.y) ^ 2)
+          if not d[k] or nd < d[k] then d[k] = nd end
+        end
+      end
+    end
+  end
+  return d
+end
+local walkMemo2, walkN = {}, 0
+function D.ForgetWalk() wipe(walkMemo2); walkN = 0 end
+-- walking yards from a to b through the crossings, and the first crossing on the way (nil: unknown)
+function D.ZoneWalk(a, b)
+  if not (a and b) or a.i ~= b.i or not D:HasBorders(a.i) then return nil end
+  local za, zb = D:ZoneAt(a.i, a.x, a.y), D:ZoneAt(b.i, b.x, b.y)
+  if not za or za == 0 or not zb or zb == 0 or za == zb then return nil end
+  local f = math.floor
+  local key = (((a.i * 1000 + f(a.x / 50) + 500) * 1000 + f(a.y / 50) + 500) * 1000 + f(b.x / 50) + 500) * 1000 + f(b.y / 50) + 500
+  local m = walkMemo2[key]
+  if m ~= nil then if m then return m[1], m[2] end return nil end
+  local c = D:CrossList(a.i)
+  local best, first
+  for s = 1, #c do
+    local qs = c[s]
+    if inZone(qs, za) then
+      local ds = math.sqrt((a.x - qs.x) ^ 2 + (a.y - qs.y) ^ 2)
+      if not best or ds < best then
+        local d = fromNode(c, s)
+        for t = 1, #c do
+          local qt = c[t]
+          if d[t] and inZone(qt, zb) then
+            local total = ds + d[t] + math.sqrt((b.x - qt.x) ^ 2 + (b.y - qt.y) ^ 2)
+            if not best or total < best then best, first = total, qs end
+          end
+        end
+      end
+    end
+  end
+  if walkN >= 5000 then wipe(walkMemo2); walkN = 0 end
+  walkMemo2[key] = best and { best, { i = a.i, x = first.x, y = first.y } } or false
+  walkN = walkN + 1
+  if best then return best, { i = a.i, x = first.x, y = first.y } end
+end
+
 -- the straight line from a to b against the zone borders: how many borders it crosses, how much of it
--- runs through no zone (sea), and the extra yards a walk round them is likely to need (through a known
--- crossing where there is one, else a typical detour). Remembered (points to 50 yards).
+-- runs through no zone (sea), and the extra yards a walk round them is likely to need (through the
+-- crossings network where it reaches, else a typical detour per border). Remembered (points to 50 yards).
 local BORDER_EXTRA = 140        -- yards: going round to a border's pass nobody recorded yet
 local VOID_EXTRA = 0.7          -- a stretch over open sea / off the map costs this much more again
 local memo, memoN = {}, 0
+D.ForgetBorderMemo = function() wipe(memo); memoN = 0 end
 function D.BorderExtra(a, b)
   if not (a and b) or a.i ~= b.i or not D:HasBorders(a.i) then return 0, 0, 0 end
   local s = D.Dist(a, b)
@@ -811,9 +1007,8 @@ function D.BorderExtra(a, b)
     elseif z ~= lastZone then
       if lastZone then
         borders = borders + 1
-        local own, db = D:Crossings(a.i, lastZone, z)
+        local own = D:Crossings(a.i, lastZone, z)
         local j, bd = bestCrossing(own, lastX, lastY, x, y)
-        j, bd = bestCrossing(db, lastX, lastY, x, y, j, bd)
         local straight = math.sqrt((x - lastX) ^ 2 + (y - lastY) ^ 2)
         extra = extra + (bd and math.min(BORDER_EXTRA * 3, bd - straight) or BORDER_EXTRA)
       end
@@ -821,21 +1016,21 @@ function D.BorderExtra(a, b)
     end
     if z ~= 0 then lastX, lastY = x, y end
   end
-  extra = math.min(s, extra + void * VOID_EXTRA)
+  extra = extra + void * VOID_EXTRA
+  -- the crossings network knows the real way round (it may go through a third zone)
+  local zw = borders > 0 and D.ZoneWalk(a, b)
+  if zw then extra = math.max(extra, zw - s) end
+  extra = math.min(s * 3, extra)
   if memoN >= 5000 then wipe(memo); memoN = 0 end
   memo[key] = { extra, borders, void }
   memoN = memoN + 1
   return extra, borders, void
 end
 
--- a far target in another zone: the known crossing to walk through first (nil: none known / not worth it)
+-- a far target in another zone: the crossing to walk through first (nil: none known / not worth it)
 function D:BorderVia(from, to)
   if not (from and to) or from.i ~= to.i or not D:HasBorders(from.i) then return nil end
-  local za, zb = D:ZoneAt(from.i, from.x, from.y), D:ZoneAt(to.i, to.x, to.y)
-  if not za or za == 0 or not zb or zb == 0 or za == zb then return nil end
-  local own, db = D:Crossings(from.i, za, zb)
-  local j, bd = bestCrossing(own, from.x, from.y, to.x, to.y)
-  j, bd = bestCrossing(db, from.x, from.y, to.x, to.y, j, bd)
-  if not bd or bd > D.Dist(from, to) * 1.6 then return nil end
-  return { i = from.i, x = D._cx, y = D._cy }
+  local zw, first = D.ZoneWalk(from, to)
+  if not zw or zw > D.Dist(from, to) * 3 then return nil end
+  return first
 end
