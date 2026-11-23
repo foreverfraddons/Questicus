@@ -885,6 +885,13 @@ local function groupsOf(id, m, open)
   for _, g in ipairs(out) do table.sort(g.lines) end
   return out
 end
+-- both points in the same zone (ForeverDB's zone borders): dungeon mode finishes the chain quest of the
+-- zone you're in before it sends you off
+local function sameZone(a, b)
+  if not (a and b) or a.i ~= b.i or not D.ZoneAt then return false end
+  local za = D:ZoneAt(a.i, a.x, a.y)
+  return za and za ~= 0 and za == D:ZoneAt(b.i, b.x, b.y) or false
+end
 local function nearestIn(pos, m, lines)
   local best, bd
   for _, li in ipairs(lines) do
@@ -1159,7 +1166,8 @@ local function bestAction(st, cands)
           offer({ type = "complete", id = id, point = target, bundle = bundle, parts = parts, t = t, back = back,
             together = together, inArea = here,
             partial = #g.lines < (function() local n = 0 for _ in pairs(open) do n = n + 1 end return n end)() },
-            value / (t + back + tail) * (here and 3 or 1) * ((P.dset and m.dungeon and dPending > 0) and 0.01 or 1))
+            value / (t + back + tail) * (here and 3 or 1) * ((P.dset and m.dungeon and dPending > 0) and 0.01 or 1)
+              * ((P.dset and P.dset[id] and not m.dungeon and sameZone(st.pos, target)) and 1.6 or 1))
         end
       end
     end
@@ -1189,7 +1197,10 @@ local function bestAction(st, cands)
       end
       if overlap then score = score * 1.4 end
       -- walking away from objectives that are waiting right here means coming back for them
-      local back = (not here and not overlap) and detour(pending, st.pos, p, lv) or 0
+      -- (counted even when its objectives overlap others waiting somewhere: an overlap far away - the
+      -- dungeon's quests at the Sunken Temple - made a quest across the sea look "on the way" and the
+      -- route left the chain quest you were standing next to)
+      local back = (not here) and detour(pending, st.pos, p, lv) or 0
       if back > 0 then score = score * t / (t + back) end
       if here then score = score * 4 end       -- same NPC / hub: take it now
       if t * speed(lv) < 200 then score = score * 1.6 end   -- right on the way: pick it up
