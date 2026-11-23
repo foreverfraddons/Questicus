@@ -994,7 +994,7 @@ Q:On("ZONE_CHANGED", function() wipe(exploreCache) end)
 function P.CheckExplore(here)
   local s = P.steps and P.steps[1]
   if not (s and s.type == "explore" and s.area and here) then return end
-  if D.Dist(here, s.area.point) < 35 then
+  if D.Dist(here, s.area.point) < 20 then
     Q.char.explored = Q.char.explored or {}
     Q.char.explored[s.area.key] = true
     wipe(exploreCache)

@@ -16,6 +16,7 @@ Q.Spots = SP
 local ARRIVE = 25          -- yards: close to a spot (a cooled one seen back, calibration)
 local EXACT = 6            -- yards: standing on the map marker - look for what should be there
 local STUCK = 14           -- yards: can't get closer (in a rock, up a slope) and standing still
+local EXACT_O, STUCK_O = 4, 9   -- the same for objects (they don't move: the marker is where it is)
 local NEAR = 60            -- yards: progress here counts for the spot
 local UNDER = 28           -- yards: a mob this close to the marker is "under" it (they wander a bit)
 local SCAN_C = 2.5         -- seconds of looking for a creature at the marker before moving on
@@ -499,7 +500,10 @@ local function tick()
   -- the spot the arrow is on: only once you're on its marker, look for what should be there
   local e = current
   local d = e and e.p and D.Dist(here, e.p)
-  local onIt = d and (d <= EXACT or (d <= STUCK and stillFor >= 2))
+  -- (objects sit still: you must really be on the marker; mobs wander, so near it is enough)
+  local s0 = e and e.p and source(e.p)
+  local isObj = s0 ~= nil and s0:sub(1, 1) == "o"
+  local onIt = d and (d <= (isObj and EXACT_O or EXACT) or (d <= (isObj and STUCK_O or STUCK) and stillFor >= (isObj and 3 or 2)))
   if not onIt then atSince, atKey = nil, nil return end
   local k = SP.Key(e.p)
   if atKey ~= k then atSince, atKey = GetTime(), k end

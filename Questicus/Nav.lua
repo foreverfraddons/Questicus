@@ -179,7 +179,120 @@ end
 -- spots where the line failed before (Paths.lua): cost more, and a straight line through them isn't clear
 local curInst
 local function avoidCost(k) return (Q.Paths and curInst) and Q.Paths.Avoid(curInst, k) or 1 end
+-- ------------------------------------------------------------------ walls (drawn by hand)
+-- Lines nobody can walk through (a cliff edge, a fence, a canyon wall), drawn with the author's dev
+-- tools: QuesticusCollect.walls[continent][id] = { n = { x, y, ... }, t } (or { del = true } once removed),
+-- and ForeverDB's walls (everyone's). The path search never steps across one; a straight line that
+-- crosses one goes round its nearer end.
+local wallSegs, wallVer = {}, 0          -- [continent] = { buckets [bx..":"..by] = { {ax, ay, bx, by}, ... } }
+local WB = 200
+function N.WallsChanged() wallVer = wallVer + 1; wipe(wallSegs); N:Forget() end
+local function wallList(i)
+  local out = {}
+  local function add(t, own)
+    for id, wl in pairs(type(t) == "table" and t or {}) do
+      if type(wl) == "table" and wl.n and not wl.del and #wl.n >= 4 then
+        if own or not (out[id]) then out[id] = wl end
+      end
+    end
+  end
+  add(D.db and D.db.walls and D.db.walls[i], false)
+  local own = QuesticusCollect and type(QuesticusCollect.walls) == "table" and QuesticusCollect.walls[i]
+  add(own, true)
+  -- (removed by you: gone even if ForeverDB still has it)
+  for id, wl in pairs(type(own) == "table" and own or {}) do if type(wl) == "table" and wl.del then out[id] = nil end end
+  return out
+end
+N.WallList = wallList
+-- the author's dev tools: save / remove a wall (sent to ForeverDB with the recordings)
+function N.SetWall(i, id, pts)
+  QuesticusCollect.walls = type(QuesticusCollect.walls) == "table" and QuesticusCollect.walls or {}
+  local ci = QuesticusCollect.walls[i] or {}
+  QuesticusCollect.walls[i] = ci
+  if pts and #pts >= 2 then
+    local n = {}
+    for _, p in ipairs(pts) do n[#n + 1] = math.floor(p[1] + 0.5); n[#n + 1] = math.floor(p[2] + 0.5) end
+    ci[id] = { n = n, t = time and time() or 0 }
+  else
+    ci[id] = { del = true, t = time and time() or 0 }
+  end
+  N.WallsChanged()
+  if Q.Planner then Q.Planner:Replan(1) end
+end
+local function segsOf(i)
+  local s = wallSegs[i]
+  if s then return s end
+  s = {}
+  wallSegs[i] = s
+  for _, wl in pairs(wallList(i)) do
+    local n = wl.n
+    for j = 1, #n - 3, 2 do
+      local seg = { n[j], n[j + 1], n[j + 2], n[j + 3] }
+      local x0, x1 = math.floor(math.min(seg[1], seg[3]) / WB), math.floor(math.max(seg[1], seg[3]) / WB)
+      local y0, y1 = math.floor(math.min(seg[2], seg[4]) / WB), math.floor(math.max(seg[2], seg[4]) / WB)
+      for bx = x0, x1 do
+        for by = y0, y1 do
+          local k = bx .. ":" .. by
+          s[k] = s[k] or {}
+          table.insert(s[k], seg)
+        end
+      end
+    end
+  end
+  return s
+end
+local function cross(ax, ay, bx, by, cx, cy, dx, dy)
+  local function o(px, py, qx, qy, rx, ry) return (qx - px) * (ry - py) - (qy - py) * (rx - px) end
+  local d1, d2 = o(cx, cy, dx, dy, ax, ay), o(cx, cy, dx, dy, bx, by)
+  local d3, d4 = o(ax, ay, bx, by, cx, cy), o(ax, ay, bx, by, dx, dy)
+  return ((d1 > 0) ~= (d2 > 0)) and ((d3 > 0) ~= (d4 > 0))
+end
+-- does the line a-b go through a wall? (returns the wall segment)
+local function hitsWall(i, ax, ay, bx, by)
+  local s = segsOf(i)
+  if not next(s) then return nil end
+  local x0, x1 = math.floor(math.min(ax, bx) / WB), math.floor(math.max(ax, bx) / WB)
+  local y0, y1 = math.floor(math.min(ay, by) / WB), math.floor(math.max(ay, by) / WB)
+  if (x1 - x0 + 1) * (y1 - y0 + 1) > 400 then
+    for _, list in pairs(s) do
+      for _, g in ipairs(list) do if cross(ax, ay, bx, by, g[1], g[2], g[3], g[4]) then return g end end
+    end
+    return nil
+  end
+  for bxx = x0, x1 do
+    for byy = y0, y1 do
+      for _, g in ipairs(s[bxx .. ":" .. byy] or {}) do
+        if cross(ax, ay, bx, by, g[1], g[2], g[3], g[4]) then return g end
+      end
+    end
+  end
+end
+N.HitsWall = hitsWall
+-- round a wall: the end of the whole wall line nearer the way (a little past it)
+local function roundWall(i, from, to)
+  local best, bd
+  for _, wl in pairs(wallList(i)) do
+    local n = wl.n
+    local hit
+    for j = 1, #n - 3, 2 do
+      if cross(from.x, from.y, to.x, to.y, n[j], n[j + 1], n[j + 2], n[j + 3]) then hit = true; break end
+    end
+    if hit then
+      for _, e in ipairs({ { n[1], n[2], n[3], n[4] }, { n[#n - 1], n[#n], n[#n - 3], n[#n - 2] } }) do
+        local ex, ey, px, py = e[1], e[2], e[3], e[4]
+        local dx, dy = ex - px, ey - py
+        local len = math.sqrt(dx * dx + dy * dy)
+        if len > 0 then ex, ey = ex + dx / len * 15, ey + dy / len * 15 end
+        local d = math.sqrt((from.x - ex) ^ 2 + (from.y - ey) ^ 2) + math.sqrt((to.x - ex) ^ 2 + (to.y - ey) ^ 2)
+        if not bd or d < bd then best, bd = { i = i, x = ex, y = ey }, d end
+      end
+    end
+  end
+  return best
+end
+
 local function lineClear(w, ax, ay, bx, by)
+  if curInst and hitsWall(curInst, ax, ay, bx, by) then return false end
   local dx, dy = bx - ax, by - ay
   local steps = math.max(1, math.floor(math.sqrt(dx * dx + dy * dy) / (CELL * 0.5)))
   for s = 1, steps - 1 do
@@ -200,13 +313,19 @@ function N:Path(from, to)
   local dist = D.Dist(from, to)
   -- (further than this a search covers thousands of cells - 50 ms and more - for a way that will be
   -- worked out again long before you get there: a straight line until you're closer)
+  local walled = hitsWall(from.i, from.x, from.y, to.x, to.y)
+  local hasWalls = next(segsOf(from.i)) ~= nil
   if dist > FAR then
     -- far, into another zone: through the border's pass people walked (the path is worked out from there)
     local via = D.BorderVia and D:BorderVia(from, to)
     if via and D.Dist(from, via) > 60 then return { via, to } end
+    -- a wall in the way: round its nearer end
+    local r = walled and roundWall(from.i, from, to)
+    if r then return { r, to } end
     return { to }
   end
-  if not w or dist < CELL * 2 or lineClear(w, from.x, from.y, to.x, to.y) then return { to } end
+  if not walled and (not w or dist < CELL * 2 or lineClear(w, from.x, from.y, to.x, to.y)) then return { to } end
+  w = w or {}
   local zones = D:HasBorders(from.i)
   local zgoal = zones and D:ZoneAt(from.i, to.x, to.y)
   local zstart = zones and D:ZoneAt(from.i, from.x, from.y)
@@ -233,6 +352,10 @@ function N:Path(from, to)
           if nx >= minx and nx <= maxx and ny >= miny and ny <= maxy then
             local nk = keyOf(nx, ny)
             local step = (dx ~= 0 and dy ~= 0) and 1.414 or 1
+            -- (never through a wall drawn by hand)
+            if hasWalls and hitsWall(from.i, (cx + 0.5) * CELL, (cy + 0.5) * CELL, (nx + 0.5) * CELL, (ny + 0.5) * CELL) then
+              step = math.huge
+            end
             if not w[nk] then
               step = step * UNKNOWN_COST
               if zones then
@@ -247,7 +370,7 @@ function N:Path(from, to)
             elseif tr and tr[nk] then step = step * WALKED_COST end
             step = step * avoidCost(nk)
             local ng = g[cur] + step
-            if not g[nk] or ng < g[nk] then
+            if step < math.huge and (not g[nk] or ng < g[nk]) then
               g[nk], came[nk], cxOf[nk], cyOf[nk] = ng, cur, nx, ny
               local hx, hy = gx - nx, gy - ny
               heapPush(open, nk, ng + math.sqrt(hx * hx + hy * hy))
@@ -285,7 +408,7 @@ end
 -- most of Questicus' lag while guiding). A target is keyed to 10 yards; the path's last point is
 -- always the exact target. Recomputed when the target changes, after 8 s, or when you leave the path
 local cache, cacheN = {}, 0
-function N:Forget() wipe(cache); cacheN = 0; wipe(zcell) end
+function N:Forget() wipe(cache); cacheN = 0; wipe(zcell); wipe(wallSegs) end
 local function airborne()
   return (Q.OnTaxi and Q.OnTaxi()) or (IsFlying and IsFlying()) or false
 end
@@ -395,7 +518,8 @@ function N:Route(here, to)
   local f = here.i == to.i and fixedFor(to)
   if f then
     local p = fixedRoute(f, here, to)
-    while #p > 1 and D.Dist(here, p[1]) < 15 do table.remove(p, 1) end
+    local reach = N.precise and 8 or 15
+    while #p > 1 and D.Dist(here, p[1]) < reach do table.remove(p, 1) end
     return p
   end
   local key = (to.i or 0) * 1e8 + math.floor(to.x / 10) * 1e4 + math.floor(to.y / 10)
@@ -417,8 +541,10 @@ function N:Route(here, to)
     p = e.path
   end
   if p and #p > 0 then p[#p] = to end            -- (exactly the target, not the one 10 yards off)
-  -- drop waypoints you reached
-  while p and #p > 1 and D.Dist(here, p[1]) < 25 do table.remove(p, 1) end
+  -- drop waypoints you reached (walking to a person / object / place: only once you're really at the
+  -- corner, so the arrow doesn't turn early; mobs wander, so those keep the looser radius)
+  local reach = N.precise and 8 or 25
+  while p and #p > 1 and D.Dist(here, p[1]) < reach do table.remove(p, 1) end
   return p
 end
 

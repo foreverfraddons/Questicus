@@ -183,7 +183,12 @@ Q:On("QC_QUESTS_CHANGED", function() GD.tver = GD.tver + 1 end)
 Q:On("QC_PLAN_UPDATED", function() GD.tver = GD.tver + 1 end)
 function GD:Target(index)
   local idx = index or GD.focus
-  if idx == GD.focus and Q.Nav and Q.Nav.StepKey then Q.Nav.focusKey = Q.Nav.StepKey(P.steps and P.steps[idx]) end
+  if idx == GD.focus and Q.Nav and Q.Nav.StepKey then
+    local st = P.steps and P.steps[idx]
+    Q.Nav.focusKey = Q.Nav.StepKey(st)
+    -- walking to a person, a flight master, a place or an object: exact; mobs: as before (they wander)
+    Q.Nav.precise = st and st.type ~= "complete" or false
+  end
   local s = P.steps and P.steps[idx]
   if not s then return end
   if s.type ~= "complete" then return s.point, s end
@@ -239,6 +244,8 @@ function GD:TargetNow(index, s)
       end
       pick = pick or Q.Spots.Choose(entries, here, index or GD.focus)
       best = pick and pick.p
+      local src = best and Q.Spots.Source(best)
+      if Q.Nav and (index or GD.focus) == GD.focus then Q.Nav.precise = src ~= nil and src:sub(1, 1) == "o" end
       c = GD.spotPick or {}
       GD.spotPick = c
       c.s, c.t, c.p = s, now, best
