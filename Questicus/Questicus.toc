@@ -49,6 +49,7 @@ Minimap.lua
 Integrate.lua
 Changelog.lua
 News.lua
+Relay.lua
 Glow.lua
 GlowMenu.lua
 
