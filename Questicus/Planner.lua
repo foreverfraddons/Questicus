@@ -1084,7 +1084,10 @@ local function bestAction(st, cands)
         local pe = D.Nearest(st.pos, m.enders)
         offTrack = not (pe and st.pos and pe.i == st.pos.i and D.Dist(st.pos, pe) <= 250)
       end
-      if stage == "ready" and not offTrack then
+      if stage == "ready" and offTrack then
+        -- (finished, its hand-in off the dungeon's way: nothing to do for it now. It used to fall through
+        -- to "objectives with no known place" and fill the route with "Do <quest>" steps that never ended)
+      elseif stage == "ready" then
         local p = D.Nearest(st.pos, m.enders)
         local t = travel(st.pos, p, lv) + 6
         local back = detour(pending, st.pos, p, lv)
@@ -1101,6 +1104,8 @@ local function bestAction(st, cands)
         if same then back = math.max(back, travel(p, same.centre, lv) * 0.9) end
         offer({ type = "turnin", id = id, point = p, t = t, back = back, sameEnder = same and same.id },
           v * 1.15 / (t + back))
+      elseif st.udone and st.udone[id] then
+        -- (already planned once below: one "Do" step for it is enough)
       elseif not m.obj or not st.open[id] or not next(groups[id] or {}) then
         -- objectives the databases have no place for: never "turn in" before they are done.
         -- Point at the game's own quest waypoint when it has one, else stay put.
@@ -1256,6 +1261,7 @@ local function apply(st, a)
       local id, m = part.id, questMeta(part.id)
       local open = st.open[id]
       local k = 0
+      if a.unknown then st.udone = st.udone or {}; st.udone[id] = true end
       if a.unknown or not open then
         k = m.kills
         st.open[id] = {}
