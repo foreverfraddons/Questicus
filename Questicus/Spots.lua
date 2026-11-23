@@ -247,6 +247,33 @@ local function inView()
   return seenNow
 end
 SP.InView = inView
+-- a mob for one of these spots that you can see right now (nameplate, target, soft target, mouseover):
+-- returns its source and whether it's close (within ~28 yd when the game says), else nil
+function SP.Visible(entries)
+  local want
+  for _, e in ipairs(entries or {}) do
+    local src = source(e.p)
+    if src and src:sub(1, 1) == "c" then want = want or {}; want[src] = true end
+  end
+  if not want then return nil end
+  local best, bestClose
+  for _, tok in ipairs(units()) do
+    local okE, ex = pcall(UnitExists, tok)
+    if okE and ex and not S(ex) then
+      local k = Q.UnitKey(tok)
+      if k and want[k] then
+        local dead = UnitIsDead and UnitIsDead(tok)
+        local taken = UnitIsTapDenied and UnitIsTapDenied(tok)
+        if not (dead and not S(dead)) and not (taken and not S(taken)) then
+          local close = within(tok, 28) == true
+          if close and not bestClose then best, bestClose = k, true
+          elseif not best then best = k end
+        end
+      end
+    end
+  end
+  return best, bestClose
+end
 local unseen = {}        -- [spot key] = GetTime() since its mob hasn't been in view while you were close
 local GONE_AFTER = 1.5   -- seconds in range with no live nameplate of its mob
 local tipShown

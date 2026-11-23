@@ -106,6 +106,13 @@ function A:Update()
     return
   end
   local d = D.Dist(here, p)
+  -- the step's mob is right in front of you: no direction to a marker, just say so
+  local v = s and s.type == "complete" and Q.Guide.inView
+  if v and v.close then
+    frame.arrow:Hide(); frame.here:Show()
+    frame.dist:SetText((D:Name(v.src) or "target") .. " - right here")
+    return
+  end
   -- aim along the less obstructed path (Nav.lua), not straight through walls and water
   local wp = (Q.Nav and Q.Nav:Next(here, p)) or p
   local dx, dy = wp.x - here.x, wp.y - here.y

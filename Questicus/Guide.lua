@@ -218,7 +218,21 @@ function GD:TargetNow(index, s)
       best = c.p
     else
       Q.Spots.entries = entries
-      local pick = Q.Spots.Choose(entries, here, index or GD.focus)
+      -- a mob for this step in view: don't point at a marker somewhere else - the spot of that mob
+      -- nearest to you (the arrow says it's right there when it's close)
+      local vis, close = Q.Spots.Visible and Q.Spots.Visible(entries)
+      GD.inView = vis and { src = vis, close = close } or nil
+      local pick
+      if vis and here then
+        local bd
+        for _, e in ipairs(entries) do
+          if Q.Spots.Source(e.p) == vis and e.p.i == here.i then
+            local d = D.Dist(here, e.p)
+            if not bd or d < bd then pick, bd = e, d end
+          end
+        end
+      end
+      pick = pick or Q.Spots.Choose(entries, here, index or GD.focus)
       best = pick and pick.p
       c = GD.spotPick or {}
       GD.spotPick = c
