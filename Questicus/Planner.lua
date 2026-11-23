@@ -111,7 +111,23 @@ function P.LineTime(m, l, lv, frac)
     if m.elite then ttk = ttk * 3 end
     local gap = L and L:Gap() or 14
     local kills = l.kind == "kill" and n or (n / math.max(0.12, l.chance or 0.35))
-    t = math.min(1200, kills * (ttk + gap))
+    t = kills * (ttk + gap)
+    -- more kills than there are spawns: waiting for respawns (the respawn time measured live, Spots.lua)
+    local key = l.kind == "kill" and l.key or (l.srcs and l.srcs[1]) or l.from
+    if key and Q.Spots and Q.Spots.Respawn then
+      if l.spawnN == nil then
+        local c = 0
+        for _, k in ipairs(l.kind == "kill" and { l.key } or (l.srcs or { key })) do c = c + #(D:Points(k) or {}) end
+        l.spawnN = c
+      end
+      local sn = l.spawnN
+      if sn > 0 and kills > sn then
+        local rounds = math.ceil(kills / sn) - 1
+        local wait = Q.Spots.Respawn(key) - sn * (ttk + gap)
+        if wait > 0 then t = t + rounds * wait end
+      end
+    end
+    t = math.min(1200, t)
   elseif l.kind == "loot" then
     t = math.min(600, n * 20)              -- objects / containers
   elseif l.kind == "buy" then t = 15

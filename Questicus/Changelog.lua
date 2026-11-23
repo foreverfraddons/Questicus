@@ -7,6 +7,9 @@
 local Q = Questicus
 Q.Changelog = {
   { v = "next",
+    added = {
+      "Mob respawn times are learned while you play and used right away: a spot you killed at that still has no nameplate in view (not back yet), or is found back later, tightens its respawn time; the arrow re-times every skipped spot of that mob at once, and the route counts the wait for respawns when a quest needs more kills than there are spawns. Everything is saved for ForeverDB.",
+    },
     fixed = {
       "The arrow no longer runs you round every kill spot to find them empty: with enemy nameplates on, spawns within nameplate range whose mob isn't up (no live nameplate, or tagged by someone else) are skipped from a distance until they respawn, and open again as soon as the mob shows up. Without nameplates you get a one-time tip to turn them on.",
     },

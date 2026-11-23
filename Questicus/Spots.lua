@@ -25,6 +25,7 @@ local LEAN = 0.35          -- how much the next step pulls the choice (0 = just 
 local KEEP = 0.8           -- a new spot must be this much closer to take over (no flip-flopping)
 
 local function now() return time() end
+local lastResp = {}        -- [src] = the respawn time last used for its cooldowns
 local function cds()
   if not Q.char then return {} end
   Q.char.spotcd = type(Q.char.spotcd) == "table" and Q.char.spotcd or {}
@@ -59,8 +60,10 @@ function SP.Respawn(src)
   elseif shared then
     t = shared
   end
-  -- "it wasn't back yet after this long": never wait less than that again
-  local lo = own and own.lo
+  -- "it wasn't back yet after this long": never wait less than that again; "it was back by then": at most
+  local lo, hi = own and own.lo, own and own.hi
+  if not t and lo and hi and hi > lo then t = (lo + hi) / 2 end
+  if not t and hi then t = math.min(FALLBACK, hi) end
   if not t then t = lo and math.max(FALLBACK, lo * 1.25) or FALLBACK end
   if lo and t < lo then t = lo * 1.1 end
   return math.max(10, math.min(t, 3600))
@@ -78,6 +81,7 @@ function SP.Cool(p, why, secs)
   if not k then return end
   local src = source(p)
   secs = secs or SP.Respawn(src)
+  if src and lastResp[src] == nil then lastResp[src] = SP.Respawn(src) end
   cds()[k] = { untl = now() + secs, t = now(), why = why, src = src, i = p.i, x = p.x, y = p.y }
   if why == "used" then cds()[k].used = now() end
   SP.dirty = true
@@ -313,6 +317,25 @@ local function noteSummoned(src)
 end
 SP.NoteSummoned = noteSummoned
 
+-- the respawn time changed: every cooldown of that mob / object is re-timed at once, so the arrow (and
+-- which spots it skips) follows what was just learned
+local function retime(src)
+  if not src then return end
+  local secs = SP.Respawn(src)
+  -- a big change (a quarter or more): the route's time for quests with that mob is worked out again
+  local was = lastResp[src]
+  lastResp[src] = secs
+  if was and math.abs(secs - was) >= was * 0.25 and P and P.Replan then
+    Q.Throttle("respreplan", 20, function() P:Replan(5) end)
+  end
+  for _, c in pairs(cds()) do
+    if c.src == src then
+      local untl = (c.used or c.t or now()) + secs
+      if untl ~= c.untl then c.untl = untl; SP.changed = true end
+    end
+  end
+end
+SP.Retime = retime
 local function measured(src, secs)
   local r = rec()
   if not (r and src) or secs < 5 or secs > 3600 then return end
@@ -323,6 +346,7 @@ local function measured(src, secs)
   e.min = e.min and math.min(e.min, secs) or secs
   r[src] = e
   Q:Debug(("respawn measured for %s: %ds (avg %ds over %d)"):format(src, secs, math.floor(e.s / e.n), e.n))
+  retime(src)
 end
 -- not back yet this long after it was used: the respawn is longer than that
 local function notYet(src, secs)
@@ -330,9 +354,25 @@ local function notYet(src, secs)
   if not (r and src) or secs < 5 then return end
   if SP.IsSummoned(src) then return end
   local e = r[src] or { n = 0, s = 0 }
-  if not e.lo or secs > e.lo then e.lo = secs end
-  r[src] = e
+  if not e.lo or secs > e.lo + 2 then
+    e.lo = secs
+    r[src] = e
+    retime(src)
+  end
 end
+-- found back this long after it was used (you weren't watching before): the respawn is at most that
+local function backBy(src, secs)
+  local r = rec()
+  if not (r and src) or secs < 5 or secs > 3600 then return end
+  if SP.IsSummoned(src) then return end
+  local e = r[src] or { n = 0, s = 0 }
+  if not e.hi or secs < e.hi then
+    e.hi = secs
+    r[src] = e
+    retime(src)
+  end
+end
+SP.Measured, SP.NotYet, SP.BackBy = measured, notYet, backBy
 
 local atSince, atKey
 local lastPos, lastPosAt, stillFor = nil, nil, 0
@@ -342,17 +382,30 @@ local function tick()
   if not here then return end
   if SP.calib and SP.CalibTick then SP.CalibTick(here) end
   -- spots on cooldown near you: back early (respawned) or still gone after their cooldown
+  -- (with enemy nameplates on, a mob's spot within nameplate range shows whether it's back from afar:
+  -- no live nameplate of it = not back yet, the respawn is longer than the time since you killed it)
+  local plates = platesOn()
+  local view = plates and inView() or nil
+  local range = plateRange()
+  local t = now()
   for k, c in pairs(cds()) do
-    if c.i == here.i and c.x and D.Dist(here, c) <= ARRIVE and c.src then
+    local d = c.i == here.i and c.x and D.Dist(here, c)
+    if d and d <= ARRIVE and c.src then
       local seen = present(c.src, UNDER)
       if seen == true then
-        if c.used then measured(c.src, now() - c.used) end
+        if c.used then measured(c.src, t - c.used) end
         cds()[k] = nil
         SP.dirty = true
+      elseif c.used and seen == false and t - (c.ny or 0) >= 5 then
+        c.ny = t
+        notYet(c.src, t - c.used)
       end
-    elseif now() >= c.untl then
-      cds()[k] = nil
+    elseif d and c.used and c.src and view and d <= range and c.src:sub(1, 1) == "c"
+        and not view[c.src] and t - (c.ny or 0) >= 5 then
+      c.ny = t
+      notYet(c.src, t - c.used)
     end
+    if cds()[k] and t >= c.untl then cds()[k] = nil end
   end
   pcall(farScan, here)
   -- standing still? (a marker you can't quite reach still counts once you stop next to it)
@@ -371,7 +424,10 @@ local function tick()
   -- a spot used before, come back to after its cooldown, still empty: the respawn is longer
   local last = SP.lastUsed and SP.lastUsed[k]
   if seen == false and last then notYet(src, now() - last) end
-  if seen == true then atSince = GetTime() return end    -- it's there: go get it
+  if seen == true then
+    if last then backBy(src, now() - last); SP.lastUsed[k] = nil end
+    atSince = GetTime() return                           -- it's there: go get it
+  end
   if SP.calib and SP.calib.key == k then return end      -- waiting for it on purpose
   local wait = (src and src:sub(1, 1) == "o") and SCAN_O or SCAN_C
   if GetTime() - atSince >= wait then
