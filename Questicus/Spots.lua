@@ -195,6 +195,84 @@ local function present(src, near)
 end
 SP.Present = present
 
+-- ------------------------------------------------------------------ seeing spawns from a distance
+-- With enemy nameplates on, every mob within nameplate range has one. A spot that close whose mob has
+-- no live nameplate anywhere around you is empty: no need to walk onto every marker to find out.
+-- (Nameplates show through walls and hills too.) Not for objects - they only show up close.
+local function plateRange()
+  local d = GetCVar and tonumber(GetCVar("nameplateMaxDistance") or "")
+  d = d or 41
+  return math.max(15, math.min(d, 60) - 5)
+end
+local function platesOn()
+  if not GetCVarBool then return false end
+  local ok, on = pcall(GetCVarBool, "nameplateShowEnemies")
+  return ok and on and not S(on) and true or false
+end
+SP.PlatesOn, SP.PlateRange = platesOn, plateRange
+-- live mobs in view, by source ("c123" = n); mobs someone else tagged don't count
+local seenNow = {}
+local function inView()
+  wipe(seenNow)
+  if not (C_NamePlate and C_NamePlate.GetNamePlates) then return seenNow end
+  for _, plate in ipairs(C_NamePlate.GetNamePlates() or {}) do
+    local tok = plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
+    if type(tok) == "string" and not S(tok) then
+      local k = Q.UnitKey(tok)
+      if k then
+        local dead = UnitIsDead and UnitIsDead(tok)
+        local taken = UnitIsTapDenied and UnitIsTapDenied(tok)
+        if not (dead and not S(dead)) and not (taken and not S(taken)) then seenNow[k] = (seenNow[k] or 0) + 1 end
+      end
+    end
+  end
+  return seenNow
+end
+SP.InView = inView
+local unseen = {}        -- [spot key] = GetTime() since its mob hasn't been in view while you were close
+local GONE_AFTER = 1.5   -- seconds in range with no live nameplate of its mob
+local tipShown
+local function farScan(here)
+  local entries = SP.entries
+  if not entries or #entries == 0 then return end
+  if not platesOn() then
+    if not tipShown and current and source(current.p) and source(current.p):sub(1, 1) == "c" then
+      tipShown = true
+      Q:Print("tip: turn on enemy nameplates (default key V) - Questicus then sees from a distance which spawns are up and skips the empty ones.")
+    end
+    return
+  end
+  local r = plateRange()
+  local view = inView()
+  local t = GetTime()
+  for _, e in ipairs(entries) do
+    local src = source(e.p)
+    if src and src:sub(1, 1) == "c" and e.p.i == here.i then
+      local k = SP.Key(e.p)
+      local d = D.Dist(here, e.p)
+      if d <= r and not (view[src]) then
+        if not SP.OnCooldown(e.p) then
+          unseen[k] = unseen[k] or t
+          if t - unseen[k] >= GONE_AFTER and not (SP.calib and SP.calib.key == k) then
+            SP.Cool(e.p, "gone")
+            unseen[k] = nil
+            SP.changed = true
+          end
+        end
+      else
+        unseen[k] = nil
+        -- its mob is in view again: spots near you skipped from a distance are worth a look (not ones you
+        -- stood on and found empty - that would send you round in circles)
+        if d <= r and view[src] then
+          local c = cds()[k]
+          if c and c.why == "gone" then cds()[k] = nil; SP.changed = true end
+        end
+      end
+    end
+  end
+end
+SP.FarScan = farScan
+
 -- a respawn measured: the spot was used at t0 and its mob / object is back
 -- ------------------------------------------------------------------ objects that don't respawn on a timer
 -- Some quest objects only appear when you do something (use an item on a mob and kill it: Broodling
@@ -276,6 +354,7 @@ local function tick()
       cds()[k] = nil
     end
   end
+  pcall(farScan, here)
   -- standing still? (a marker you can't quite reach still counts once you stop next to it)
   if lastPos and D.Dist(here, lastPos) < 1.5 then stillFor = stillFor + (GetTime() - (lastPosAt or GetTime()))
   else stillFor = 0 end

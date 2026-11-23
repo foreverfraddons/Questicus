@@ -6,7 +6,11 @@
 -- update goes out once "next" holds 10 lines (release.yml, MIN_CHANGES).
 local Q = Questicus
 Q.Changelog = {
-  { v = "next" },
+  { v = "next",
+    fixed = {
+      "The arrow no longer runs you round every kill spot to find them empty: with enemy nameplates on, spawns within nameplate range whose mob isn't up (no live nameplate, or tagged by someone else) are skipped from a distance until they respawn, and open again as soon as the mob shows up. Without nameplates you get a one-time tip to turn them on.",
+    },
+  },
   { v = "0.9.025",
     added = {
       "Options > Stat weights: set how much each stat is worth to you, per role. Gear upgrades and quest reward picks use your numbers (scroll over a number to nudge it; Back to defaults undoes it).",
