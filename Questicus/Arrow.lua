@@ -135,6 +135,15 @@ function A:Update()
   if not p or not here or not Q.db.arrow.shown or (Q.CollectOnly and Q.CollectOnly()) then frame:Hide(); return end
   frame:Show()
   frame.label:SetText(body and "Your corpse" or shortText(s))
+  -- on a flight: where to and how long is left - no arrow (the bird does the flying)
+  if Q.OnTaxi and Q.OnTaxi() then
+    local to, left = Q.Flight and Q.Flight.InFlight and Q.Flight:InFlight()
+    frame.arrow:Hide(); frame.skull:Hide(); frame.here:Hide()
+    frame.label:SetText("In flight" .. (to and (" to " .. (to.name:match("^(.-),") or to.name)) or ""))
+    frame.dist:SetText(left and (left >= 60 and ("about %dm %02ds left"):format(math.floor(left / 60), math.floor(left % 60))
+      or ("about %ds left"):format(math.floor(left))) or ("then: " .. shortText(s)))
+    return
+  end
   if p.i ~= here.i then
     frame.arrow:Hide(); frame.here:Hide(); frame.skull:Hide()
     frame.dist:SetText(body and "corpse is in another zone or instance" or "other continent")

@@ -282,6 +282,16 @@ end
 -- ------------------------------------------------------------------ in game
 local flyingTo
 function F:FlyingTo() return flyingTo end
+-- the flight you're on: where to, and about how long is left (nil when it isn't known)
+function F:InFlight()
+  if not flyingTo then return nil end
+  local left
+  if F.takeoff and F.takeoff.to == flyingTo and F.takeoff.from then
+    local secs = F:FlyTime(F.takeoff.from, flyingTo)
+    if secs then left = math.max(0, secs - (GetTime() - F.takeoff.t)) end
+  end
+  return flyingTo, left
+end
 
 -- Timing your flights: from the flight master you take off at to the one you land at, measured once
 -- per route and kept in QuesticusCollect.ftime["from>to"] = { s = seconds, at = when } (sent with your
@@ -300,10 +310,12 @@ local function noteTakeoff(dest)
   local here = D:PlayerPos()
   local from = here and nearestNode(here, 80)
   if from and from.id ~= dest.id then takeoff = { from = from, to = dest, t = GetTime() } end
+  F.takeoff = takeoff
 end
 local function noteLanding()
   local f = takeoff
   takeoff = nil
+  F.takeoff = nil
   if not f or not QuesticusCollect or (Q.db and Q.db.collect == false) then return end
   local here = D:PlayerPos()
   local at = here and nearestNode(here, 150)
