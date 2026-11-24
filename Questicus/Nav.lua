@@ -282,7 +282,7 @@ N.HitsWall = hitsWall
 -- you and the target, the walls drawn into it, every square's distance to the nearest wall worked out,
 -- and a search that pays extra for squares close to a wall - so in a corridor the way runs down the
 -- middle instead of bouncing from one wall's corner to the other's.
-local FG_MAX = 240              -- squares a side at most (the square size grows past that)
+local FG_MAX = 150              -- squares a side at most (the square size grows past that)
 local FG_NEAR = 5               -- squares: closer than this to a wall costs extra
 function N.WallGrid(from, to)
   local i = from.i
@@ -298,6 +298,9 @@ function N.WallGrid(from, to)
     if any then break end
   end
   if not any then return nil end
+  local co, isMain = coroutine.running()
+  local sliced = co and not isMain
+  local function pause() if sliced then coroutine.yield() end end
   local c = math.max(5, math.max(x1 - x0, y1 - y0) / FG_MAX)
   local W, H = math.floor((x1 - x0) / c) + 1, math.floor((y1 - y0) / c) + 1
   local function idx(cx, cy) return cy * W + cx end
@@ -319,11 +322,13 @@ function N.WallGrid(from, to)
     end
   end
   if not next(block) then return nil end
+  pause()
   -- distance (in squares) to the nearest wall square, up to FG_NEAR
   local near, q, head = {}, {}, 1
   for k in pairs(block) do near[k] = 0; q[#q + 1] = k end
   while head <= #q do
     local k = q[head]; head = head + 1
+    if head % 3000 == 0 then pause() end
     local d = near[k]
     if d < FG_NEAR then
       local cx, cy = k % W, math.floor(k / W)
@@ -345,10 +350,17 @@ function N.WallGrid(from, to)
   local g, came, open = { [start] = 0 }, {}, {}
   heapPush(open, start, 0)
   local found, expanded = false, 0
-  while #open > 0 and expanded < 40000 do
+  pause()
+  local t0 = sliced and debugprofilestop and debugprofilestop()
+  while #open > 0 and expanded < 9000 do
     local cur = heapPop(open)
     if cur == goal then found = true; break end
     expanded = expanded + 1
+    -- (worked out in the background: a few ms a frame, never a stutter)
+    if sliced and expanded % 200 == 0 and (not t0 or debugprofilestop() - t0 > 3) then
+      coroutine.yield()
+      t0 = debugprofilestop and debugprofilestop()
+    end
     local cx, cy = cur % W, math.floor(cur / W)
     local gc = g[cur]
     for dx = -1, 1 do
@@ -406,6 +418,45 @@ function N.WallGrid(from, to)
   return out
 end
 
+-- the fine wall search, in the background: the answer for this target when there's one worked out from
+-- near here; else one is started (a few ms a frame) and the route is looked at again when it's done
+local wgDone, wgJob, wgQueue = {}, nil, {}
+local function wgKey(to) return (to.i or 0) .. ":" .. math.floor(to.x / 10) .. ":" .. math.floor(to.y / 10) end
+function N.WallGridFor(from, to)
+  local k = wgKey(to)
+  local d = wgDone[k]
+  if d and d.from.i == from.i and (d.from.x - from.x) ^ 2 + (d.from.y - from.y) ^ 2 < 40 * 40 then
+    return d.path or nil
+  end
+  -- (tests and anything outside the game: right away)
+  if not (CreateFrame and debugprofilestop and N.wgFrame) then return N.WallGrid(from, to) end
+  if not (wgJob and wgJob.k == k) then
+    wgQueue[k] = { k = k, from = { i = from.i, x = from.x, y = from.y }, to = to }
+  end
+  return nil
+end
+if CreateFrame then
+  N.wgFrame = CreateFrame("Frame")
+  N.wgFrame:SetScript("OnUpdate", function()
+    if not wgJob then
+      local k, j = next(wgQueue)
+      if not k then return end
+      wgQueue[k] = nil
+      j.co = coroutine.create(function() return N.WallGrid(j.from, j.to) end)
+      wgJob = j
+    end
+    local ok, res = coroutine.resume(wgJob.co)
+    if not ok or coroutine.status(wgJob.co) == "dead" then
+      local n = 0
+      for _ in pairs(wgDone) do n = n + 1 end
+      if n > 30 then wipe(wgDone) end
+      wgDone[wgJob.k] = { from = wgJob.from, path = ok and res or false }
+      wgJob = nil
+      -- (the route looks again, now with it)
+      if N.ForgetRoutes then N.ForgetRoutes() end
+    end
+  end)
+end
 -- the shortest way round hand-drawn walls: points just past each wall's ends and off both sides of its
 -- bends, joined where nothing's in the way (a visibility graph), searched from you to the target.
 -- Only walls near the way count (at most 160 points).
@@ -650,7 +701,9 @@ function N:Path(from, to, oneLeg)
   -- between them, past their ends) - the grid's 20-yard squares can't see a narrow opening, so its way
   -- can go far round or (corners joined up) over a wall
   if hasWalls then
-    local vis = (N.WallGrid and N.WallGrid(from, to)) or (N.WallWay and N.WallWay(from, to))
+    -- (WallWay's visibility graph is far too slow with many walls - seconds - so only the grid; in
+    -- the game it's worked out in the background and used once it's there)
+    local vis = N.WallGridFor and N.WallGridFor(from, to)
     local ok, a = pcall(grid)
     a = ok and a or nil
     if vis then
@@ -679,7 +732,8 @@ end
 -- most of Questicus' lag while guiding). A target is keyed to 10 yards; the path's last point is
 -- always the exact target. Recomputed when the target changes, after 8 s, or when you leave the path
 local cache, cacheN = {}, 0
-function N:Forget() wipe(cache); cacheN = 0; wipe(zcell); wipe(wallSegs) end
+function N:Forget() wipe(cache); cacheN = 0; wipe(zcell); wipe(wallSegs); wipe(wgDone) end
+function N.ForgetRoutes() wipe(cache); cacheN = 0 end
 local function airborne()
   return (Q.OnTaxi and Q.OnTaxi()) or (IsFlying and IsFlying()) or false
 end
@@ -807,7 +861,11 @@ function N:Route(here, to)
       e = {}; cache[key] = e; cacheN = cacheN + 1
     end
     e.at, e.from = now, { i = here.i, x = here.x, y = here.y }
+    local t0 = debugprofilestop and debugprofilestop()
     local ok, res = pcall(N.Path, N, here, to)
+    -- (a slow search - walls, a long way - is kept longer before it's worked out again)
+    local took = t0 and (debugprofilestop() - t0) or 0
+    if took > 15 then e.at = now + math.min(30, took / 2) end
     e.path = ok and res or { to }
     p = e.path
   end
