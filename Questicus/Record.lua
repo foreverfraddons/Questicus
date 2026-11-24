@@ -17,6 +17,9 @@
 --   oskill  [object]= { profession, level }                                skill an herb / vein / chest needs
 --   itemx   [item] = { name, quality, ilvl, reqLevel, class, subclass, equipLoc, sell, stack }  items ForeverDB doesn't have
 --   ctype   [npc]  = { creature type, family }
+--   qtext   [quest]= { d = details, o = objectives, p = progress, c = completion, t }   the quest's dialog, as the
+--                   game shows it ($N / $C / $R for your name / class / race, like the game's own texts)
+--   qgreet  ["c123" / "o123"] = { x = text, t }                            the greeting above an NPC's quest list
 -- Also, when Command Center isn't there to do it: loot, vendors, npc names / levels, object names,
 -- item names, spots (its CommandCenterCollect layout, so the build merges both the same way).
 -- Never: anything about other players, chat, or your settings. Off with Options > Advanced >
@@ -29,7 +32,7 @@ Q.Record = R
 
 local SPOT_NEAR, SPOT_MAX = 15, 40
 local KEYS = { "qdiff", "vendx", "vdiff", "gold", "skinl", "fishl", "gathl", "taxi", "trn", "qinfo", "qoff", "qmiss", "qrep", "area", "enc", "rare",
-  "oskill", "itemx", "ctype", "loot", "vend", "npc", "obj", "sp", "item", "recentR" }
+  "oskill", "itemx", "ctype", "loot", "vend", "npc", "obj", "sp", "item", "recentR", "qtext", "qgreet" }
 
 local function on() return Q.db and Q.db.collect ~= false end
 local function db()
@@ -465,6 +468,63 @@ local function fromWindow()
 end
 Q:On("QUEST_COMPLETE", function() if on() then pcall(fromWindow) end end)
 
+-- ------------------------------------------------------------------ quest dialog
+-- Every text a quest window shows (offer, objectives, "have you got them?", turn-in) and the greeting above an
+-- NPC's quest list, so ForeverDB has WoW Forever's own words (also for quests no other database has).
+-- Your name, class and race go back to the game's $N / $C / $R, so nothing about you is kept.
+local function plain(s)
+  return (s:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1"))
+end
+local function generic(text)
+  text = clean(text)
+  if type(text) ~= "string" or text == "" then return nil end
+  local function swap(word, tag)
+    word = clean(word)
+    if type(word) == "string" and #word > 1 then
+      text = text:gsub(plain(word), tag):gsub(plain(word:upper()), tag:upper()):gsub(plain(word:lower()), tag:lower())
+    end
+  end
+  swap(UnitName and UnitName("player"), "$N")
+  swap(UnitClass and UnitClass("player"), "$C")
+  swap(UnitRace and UnitRace("player"), "$R")
+  return text
+end
+local function saveText(field, text)
+  local qid = clean(GetQuestID and GetQuestID())
+  text = generic(text)
+  if not qid or qid == 0 or not text then return end
+  local c = db()
+  local e = c.qtext[qid] or {}
+  if e[field] ~= text then
+    e[field], e.t = text, time()
+    c.qtext[qid] = e
+  end
+end
+local function saveGreeting(text)
+  text = generic(text)
+  local kind, id = kindId(UnitGUID and UnitGUID("npc"))
+  if not text or not id or (kind ~= "c" and kind ~= "o") then return end
+  local c = db()
+  local key = kind .. id
+  if not (c.qgreet[key] and c.qgreet[key].x == text) then c.qgreet[key] = { x = text, t = time() } end
+end
+Q:On("QUEST_DETAIL", function()
+  if not on() then return end
+  pcall(function()
+    saveText("d", GetQuestText and GetQuestText())
+    saveText("o", GetObjectiveText and GetObjectiveText())
+  end)
+end)
+Q:On("QUEST_PROGRESS", function()
+  if on() then pcall(saveText, "p", GetProgressText and GetProgressText()) end
+end)
+Q:On("QUEST_COMPLETE", function()
+  if on() then pcall(saveText, "c", GetRewardText and GetRewardText()) end
+end)
+Q:On("QUEST_GREETING", function()
+  if on() then pcall(saveGreeting, GetGreetingText and GetGreetingText()) end
+end)
+
 -- the quest log: every quest in it, at your level (XP and money; the level the game gives it)
 local function logIndex(qid)
   return C_QuestLog and C_QuestLog.GetLogIndexForQuestID and C_QuestLog.GetLogIndexForQuestID(qid)
@@ -598,6 +658,9 @@ Q:On("GOSSIP_SHOW", function()
     noteUnit("npc"); noteSpot("c:" .. id)
     if C_GossipInfo and C_GossipInfo.GetAvailableQuests then
       offered(id, C_GossipInfo.GetAvailableQuests() or {})
+      -- an NPC with quests: its gossip text is the greeting above them
+      local av, ac = C_GossipInfo.GetAvailableQuests() or {}, C_GossipInfo.GetActiveQuests and C_GossipInfo.GetActiveQuests() or {}
+      if (#av > 0 or #ac > 0) and C_GossipInfo.GetText then saveGreeting(C_GossipInfo.GetText()) end
     end
   end)
 end)
