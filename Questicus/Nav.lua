@@ -313,6 +313,18 @@ function N:Path(from, to)
   local dist = D.Dist(from, to)
   -- (further than this a search covers thousands of cells - 50 ms and more - for a way that will be
   -- worked out again long before you get there: a straight line until you're closer)
+  -- into another zone: only through the crossings between zones (no straight line over a zone line)
+  if D.ZoneWalkPath then
+    local cp = D.ZoneWalkPath(from, to)
+    if cp then
+      local out = {}
+      for _, q in ipairs(cp) do
+        if D.Dist(from, q) > 12 or #out > 0 then out[#out + 1] = q end
+      end
+      out[#out + 1] = to
+      return out
+    end
+  end
   local walled = hitsWall(from.i, from.x, from.y, to.x, to.y)
   local hasWalls = next(segsOf(from.i)) ~= nil
   if dist > FAR then

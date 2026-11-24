@@ -838,6 +838,7 @@ function D:CrossList(i)
   add(QuesticusCollect and QuesticusCollect.zcross and QuesticusCollect.zcross[i], true)
   add(DB and DB.zcross and DB.zcross[i], false)
   c.dist = {}                        -- [from node] = { [node] = walking yards through crossings }
+  c.prev = {}                        -- [from node] = { [node] = the node before it on that walk }
   return c
 end
 -- the author's dev tools: add / remove a crossing, save / drop a zone's outline (all sent to ForeverDB)
@@ -919,9 +920,12 @@ end
 local function inZone(q, z) return q.a == z or q.b == z end
 local function fromNode(c, s)
   local d = c.dist[s]
-  if d then return d end
+  if d then return d, c.prev[s] end
   d = {}
   c.dist[s] = d
+  local pv = {}
+  c.prev = c.prev or {}
+  c.prev[s] = pv
   local n = #c
   local done = {}
   d[s] = 0
@@ -938,12 +942,12 @@ local function fromNode(c, s)
         local qk = c[k]
         if inZone(qk, qu.a) or inZone(qk, qu.b) then
           local nd = ud + math.sqrt((qu.x - qk.x) ^ 2 + (qu.y - qk.y) ^ 2)
-          if not d[k] or nd < d[k] then d[k] = nd end
+          if not d[k] or nd < d[k] then d[k] = nd; pv[k] = u end
         end
       end
     end
   end
-  return d
+  return d, pv
 end
 local walkMemo2, walkN = {}, 0
 function D.ForgetWalk() wipe(walkMemo2); walkN = 0 end
@@ -955,9 +959,9 @@ function D.ZoneWalk(a, b)
   local f = math.floor
   local key = (((a.i * 1000 + f(a.x / 50) + 500) * 1000 + f(a.y / 50) + 500) * 1000 + f(b.x / 50) + 500) * 1000 + f(b.y / 50) + 500
   local m = walkMemo2[key]
-  if m ~= nil then if m then return m[1], m[2] end return nil end
+  if m ~= nil then if m then return m[1], m[2], m[3] end return nil end
   local c = D:CrossList(a.i)
-  local best, first
+  local best, first, bs, bt
   for s = 1, #c do
     local qs = c[s]
     if inZone(qs, za) then
@@ -968,16 +972,35 @@ function D.ZoneWalk(a, b)
           local qt = c[t]
           if d[t] and inZone(qt, zb) then
             local total = ds + d[t] + math.sqrt((b.x - qt.x) ^ 2 + (b.y - qt.y) ^ 2)
-            if not best or total < best then best, first = total, qs end
+            if not best or total < best then best, first, bs, bt = total, qs, s, t end
           end
         end
       end
     end
   end
+  local path
+  if best then
+    -- the crossings on the way, in order
+    local _, pv = fromNode(c, bs)
+    local rev, k = {}, bt
+    while k do
+      rev[#rev + 1] = { i = a.i, x = c[k].x, y = c[k].y }
+      if k == bs then break end
+      k = pv[k]
+    end
+    path = {}
+    for j = #rev, 1, -1 do path[#path + 1] = rev[j] end
+  end
   if walkN >= 5000 then wipe(walkMemo2); walkN = 0 end
-  walkMemo2[key] = best and { best, { i = a.i, x = first.x, y = first.y } } or false
+  walkMemo2[key] = best and { best, path[1], path } or false
   walkN = walkN + 1
-  if best then return best, { i = a.i, x = first.x, y = first.y } end
+  if best then return best, path[1], path end
+end
+-- the crossings to walk through from a to b (in order), nil when they're in one zone / unknown
+function D.ZoneWalkPath(a, b)
+  local key
+  local w, first, path = D.ZoneWalk(a, b)
+  return w and path or nil
 end
 
 -- the straight line from a to b against the zone borders: how many borders it crosses, how much of it

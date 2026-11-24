@@ -332,7 +332,7 @@ function PN:RefreshWorld(force)
   -- the current step and the next two: colour coded icons, objective areas and the route line
   local shown = PN.RouteSteps()
   local prev = D:PlayerPos()
-  local px, py
+  local px, py, prevPt
   if prev then px, py = onMap(prev, mapID) end
   local li = 0
   for k, e in ipairs(shown) do
@@ -400,7 +400,16 @@ function PN:RefreshWorld(force)
       -- line from the step before (the line from you to the step you're on: PN:DrawLeg)
       if k > 1 and px and not (Q.OnTaxi() or (IsFlying and IsFlying())) then   -- no route lines while flying
         local legs = { { x, y } }
-        if k == 1 and prev and Q.Nav then
+        -- (a leg into another zone goes through the crossings between zones, not over the zone line)
+        local zp = prevPt and D.ZoneWalkPath and D.ZoneWalkPath(prevPt, pt)
+        if zp then
+          legs = {}
+          for _, wpt in ipairs(zp) do
+            local wx, wy = onMap(wpt, mapID)
+            if wx then legs[#legs + 1] = { wx, wy } end
+          end
+          legs[#legs + 1] = { x, y }
+        elseif k == 1 and prev and Q.Nav then
           -- the first leg follows the less obstructed path (Nav.lua)
           local path = Q.Nav:Route(prev, pt)
           if path and #path > 1 then
@@ -438,9 +447,9 @@ function PN:RefreshWorld(force)
       if note then table.insert(b.tip, 2, note) end
       b.step = e.index
       place(b, x, y)
-      px, py = x, y
+      px, py, prevPt = x, y, pt
     else
-      px, py = nil, nil            -- next leg starts on another map: no line across
+      px, py, prevPt = nil, nil, nil            -- next leg starts on another map: no line across
     end
   end
   for i = li + 1, #PN.lines do PN.lines[i].bg:Hide(); PN.lines[i].fg:Hide() end
