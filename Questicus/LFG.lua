@@ -93,144 +93,187 @@ end
 
 -- ------------------------------------------------------------------ listing
 local ROLES = { tank = "Tank", healer = "Healer", dps = "Damage" }
-local function setRole(role)
-  local t, h, d = role == "tank", role == "healer", role == "dps"
-  if C_LFGListRoles and C_LFGListRoles.SetRoles then pcall(C_LFGListRoles.SetRoles, { tank = t, healer = h, dps = d }) end
-  if C_LFGList and C_LFGList.SetRoles then pcall(C_LFGList.SetRoles, { tank = t, healer = h, dps = d }) end
-  if SetLFGRoles then pcall(SetLFGRoles, false, t, h, d) end
-end
--- the group finder window is a load-on-demand part of the game's UI: load it, then show its listing tab
-local function loadUI()
-  local load = (C_AddOns and C_AddOns.LoadAddOn) or LoadAddOn
-  if not load then return end
-  for _, n in ipairs({ "Blizzard_GroupFinder_VanillaStyle", "Blizzard_GroupFinder", "Blizzard_LookingForGroupUI" }) do pcall(load, n) end
-end
-local function finderShown()
-  for _, f in ipairs({ LFGParentFrame, PVEFrame, LFGListingFrame }) do if f and f:IsShown() then return true end end
-end
-local function openFinder()
-  loadUI()
-  if finderShown() then return true end
-  if ShowLFGParentFrame then pcall(ShowLFGParentFrame, 1) end
-  if not finderShown() and LFGParentFrame and ShowUIPanel then pcall(ShowUIPanel, LFGParentFrame) end
-  if not finderShown() and PVEFrame_ShowFrame then pcall(PVEFrame_ShowFrame, "GroupFinderFrame", LFGListPVEStub) end
-  if not finderShown() and ToggleLFGParentFrame then pcall(ToggleLFGParentFrame, 1) end
-  if not finderShown() and LFGMicroButton and LFGMicroButton.Click then pcall(LFGMicroButton.Click, LFGMicroButton) end
-  return finderShown()
-end
-LF.Open = openFinder
--- what happened the last time (for "/qc lfg why"): the call used, its result, a blocked action
+local ROLEKEY = { tank = "Tank", healer = "Healer", dps = "DPS" }
+
+-- ------------------------------------------------------------------ listing, through the game's own buttons
+-- The game only creates a listing from its own code: C_LFGList.CreateListing called by an addon does
+-- nothing (tried 2026-11-24), and if addon code opens the group finder or touches its form, the
+-- game's own buttons stop working there too (ForeverDungeonJournal found searches hang until /reload).
+-- So Questicus never calls into the window. The role buttons are secure buttons that run a macro of
+-- /clicks; each /click hits a small hidden secure button of ours that, just before it fires, is pointed
+-- at the game's button for the next step (eye button, Listing tab, the category, the dungeon's tick
+-- box, your role's tick box, List). The game's code does all the work, as if you'd clicked each one.
 LF.diag = {}
-local watch = CreateFrame("Frame")
-watch:SetScript("OnEvent", function(_, ev, who, fn)
-  if LF.diag.pending then LF.diag.blocked = ("%s %s %s"):format(ev, tostring(who), tostring(fn)) end
-end)
-watch:RegisterEvent("ADDON_ACTION_BLOCKED")
-watch:RegisterEvent("ADDON_ACTION_FORBIDDEN")
+local want = {}
+local function LFm() return LFGListingFrame end
+local function microBtn() return _G.LFGMicroButton or _G.LFDMicroButton end
+local function finderShown() return LFGParentFrame and LFGParentFrame:IsShown() end
 local function listed() return C_LFGList.HasActiveEntryInfo and C_LFGList.HasActiveEntryInfo() end
--- the game's own listing screen (Questicus doesn't fill it in: the game blocks its List button if an
--- addon touched the form, so you tick the dungeon yourself)
-local function openCreate(act)
-  if not openFinder() then Q:Print("Couldn't open the group finder - open it from the micro menu (the eye button).") end
+-- the dungeon's row (or its group's row) in the listing's scroll list, if it's on screen
+local function rowFor(pred)
+  local L = LFm()
+  local sb = L and L.ActivityView and L.ActivityView.ScrollBox
+  if not (sb and sb.EnumerateFrames and L.ActivityView:IsShown()) then return end
+  for _, f in sb:EnumerateFrames() do
+    local node = f.GetElementData and f:GetElementData()
+    local d = node and node.GetData and node:GetData()
+    if d and pred(d, node) then return f, node end
+  end
 end
-LF.OpenCreate = openCreate
--- (called from a click: the game only lets a listing be made right after you click something, and
--- only once per click - so one call, in the form this client's group finder takes)
-function LF:List(act, role, dname)
-  setRole(role)
-  local ps, gps = styleValues()
-  local form, ok, res
-  loadUI()
-  local vanilla = C_LFGList.GetPremadeGroupFinderStyle and Enum and Enum.PremadeGroupFinderStyle and
-    C_LFGList.GetPremadeGroupFinderStyle() == Enum.PremadeGroupFinderStyle.Vanilla
-  if vanilla or (LFGListingFrame and not LFGListFrame) then
-    form = "vanilla"      -- the classic group finder: activities and new-player-friendly only (no playstyle)
-    ok, res = pcall(C_LFGList.CreateListing, { activityIDs = { act.id }, newPlayerFriendly = false })
-  elseif Enum and Enum.LFGEntryPlaystyle then
-    form = "table"        -- current: one table with everything
-    ok, res = pcall(C_LFGList.CreateListing, {
-      activityIDs = { act.id }, playstyle = ps, generalPlaystyle = gps,
-      isAutoAccept = false, isPrivateGroup = false, newPlayerFriendly = false,
-    })
-  else
-    form = "args"         -- older: activity, item level, honor level, auto accept, private
-    ok, res = pcall(C_LFGList.CreateListing, act.id, 0, 0, false, false)
-  end
-  LF.diag = { style = C_LFGList.GetPremadeGroupFinderStyle and tostring(C_LFGList.GetPremadeGroupFinderStyle()), form = form, ok = ok, res = tostring(res), act = act.id, name = act.name, pending = true, t = time and time() }
-  Q.db.lfgDiag = LF.diag
-  if not ok then
-    Q:Print(("Couldn't list you for %s - the group finder is open: tick it and press List."):format(dname or act.name))
-    openCreate(act)
-    LF.diag.pending = nil
-    return
-  end
-  Q:Print(("Listing you for %s as %s..."):format(act.name, ROLES[role] or role))
-  -- the listing turns up a moment later; if it doesn't, say so and open the game's own screen
-  C_Timer.After(2, function()
-    LF.diag.pending = nil
-    if listed() then
-      LF.diag.listed = true
-      Q:Print(("Listed for %s as %s%s. Players can now find you in the group finder."):format(act.name, ROLES[role] or role,
-        (ps or gps) and (" - " .. cfg().playstyle) or ""))
+local STEPS = {
+  { "Open", function()          -- the group finder (the game's own eye / micro button)
+      if finderShown() then return nil, "already open" end
+      return microBtn(), "eye button"
+    end },
+  { "Tab", function()           -- its listing tab
+      local L = LFm()
+      if L and L:IsShown() then return nil, "on the listing tab" end
+      return _G.LFGParentFrameTab1, "listing tab"
+    end },
+  { "Cat", function()           -- the dungeons category
+      local L = LFm()
+      if not (L and L.CategoryView) then return nil, "no listing window" end
+      if L.GetCategorySelection and L:GetCategorySelection() == want.cat and L.ActivityView:IsShown() then return nil, "category picked" end
+      for _, b in ipairs(L.CategoryView.CategoryButtons or {}) do
+        if b.categoryID == want.cat then return b, "category " .. tostring(want.cat) end
+      end
+      return nil, "category " .. tostring(want.cat) .. " not found"
+    end },
+  { "Exp", function()           -- the dungeon's group, if folded
+      local gid = want.group
+      if not gid or gid == 0 then return nil, "no group" end
+      local f, node = rowFor(function(d) return d.activityGroupID == gid and d.activityID == nil end)
+      if f and node.IsCollapsed and node:IsCollapsed() then return f.ExpandOrCollapseButton, "unfold group" end
+      return nil, f and "group open" or "group row not shown"
+    end },
+  { "Act", function()           -- tick the dungeon
+      local f = rowFor(function(d) return d.activityID == want.id end)
+      if not f then return nil, "dungeon row not on screen" end
+      if f.CheckButton:GetChecked() then return nil, "dungeon ticked" end
+      return f.CheckButton, "tick dungeon"
+    end },
+}
+for _, r in ipairs({ "tank", "healer", "dps" }) do
+  STEPS[#STEPS + 1] = { "R" .. r, function()   -- your role ticked, the others not
+    local L = LFm()
+    local rb = L and L.SoloRoleButtons and L.SoloRoleButtons:IsShown() and L.SoloRoleButtons[ROLEKEY[r]]
+    if not rb then return nil, "no role boxes (in a group?)" end
+    local cb = rb.CheckButton
+    local on = want.role == r
+    if not cb:IsEnabled() then return nil, r .. " not allowed" end
+    if (cb:GetChecked() and true or false) ~= on then return cb, (on and "tick " or "untick ") .. r end
+    return nil, r .. " ok"
+  end }
+end
+STEPS[#STEPS + 1] = { "Post", function()      -- List
+  local L = LFm()
+  local pb = L and L.PostButton
+  if not pb then return nil, "no List button" end
+  if not pb:IsEnabled() then return nil, "List button disabled" end
+  return pb, "List"
+end }
+
+local macro = {}
+for _, st in ipairs(STEPS) do
+  local name = "QuesticusLFGStep" .. st[1]
+  local b = CreateFrame("Button", name, UIParent, "SecureActionButtonTemplate")
+  b:SetAttribute("type", "qcnone")
+  b:SetScript("PreClick", function(self)
+    if InCombatLockdown and InCombatLockdown() then return end
+    local ok, target, why = pcall(st[2])
+    if not ok then target, why = nil, "error: " .. tostring(target) end
+    LF.diag.steps = LF.diag.steps or {}
+    LF.diag.steps[#LF.diag.steps + 1] = st[1] .. ": " .. tostring(why)
+    if target then
+      self:SetAttribute("type", "click")
+      self:SetAttribute("clickbutton", target)
     else
-      LF.diag.listed = false
-      Q:Print(("The game didn't take the listing%s - the group finder is open: tick %s and press List."):format(
-        LF.diag.blocked and " (it only lets its own buttons do that)" or "", act.name))
-      openCreate(act)
+      self:SetAttribute("type", "qcnone")
+      self:SetAttribute("clickbutton", nil)
+    end
+  end)
+  macro[#macro + 1] = "/click " .. name
+end
+LF.MACRO = table.concat(macro, "\n")
+
+local function report(dname)
+  C_Timer.After(1.5, function()
+    LF.diag.listed = listed() and true or false
+    Q.db.lfgDiag = LF.diag
+    if LF.diag.listed then
+      Q:Print(("Listed for %s as %s. Players can now find you in the group finder."):format(dname, ROLES[want.role] or want.role))
+    else
+      Q:Print(("Not listed yet for %s - press your role again (the first press opens the group finder). /qc lfg why shows each step."):format(dname))
     end
   end)
 end
 
--- the role prompt
+-- the role prompt: its three buttons are the secure ones (a real click is what lets the game list you)
 local pick
+local function roleButton(parent, role)
+  local b = CreateFrame("Button", "QuesticusLFGRole" .. role, parent, "SecureActionButtonTemplate")
+  b:SetSize(84, 24)
+  b.bg = T.RFill(b, T.c.bg2)
+  T.Border(b, T.c.line)
+  b.label = T.Text(b, 12, T.c.gold)
+  b.label:SetPoint("CENTER")
+  b.label:SetText(ROLES[role])
+  b:RegisterForClicks("AnyUp")
+  b:SetAttribute("type", "macro")
+  b:SetAttribute("macrotext", LF.MACRO)
+  b:SetScript("PreClick", function()
+    want.role = role
+    LF.cfg().lastRole = role
+    LF.diag = { name = want.name, act = want.id, cat = want.cat, role = role, t = time and time(), steps = {} }
+  end)
+  b:SetScript("PostClick", function() report(want.name or "the dungeon") end)
+  b:SetScript("OnEnter", function(s) T.SetBorderColor(s, T.c.accent[1], T.c.accent[2], T.c.accent[3], 1) end)
+  b:SetScript("OnLeave", function(s) local on = LF.cfg().role == role; T.SetBorderColor(s, on and 0.75 or T.c.line[1], on and 0.45 or T.c.line[2], on and 1 or T.c.line[3], 1) end)
+  return b
+end
 local function rolePrompt(act, dname)
+  if InCombatLockdown and InCombatLockdown() then Q:Print("Can't list you in combat - try again after the fight."); return end
   if not pick then
-    pick = T.Window("QuesticusLFGRole", 300, 120, "Find a group", nil)
+    pick = T.Window("QuesticusLFGRole", 300, 128, "Find a group", nil)
     pick:SetFrameStrata("DIALOG")
     pick.text = T.Text(pick, 12, T.c.text)
-    pick.text:SetPoint("TOPLEFT", 14, -34)
+    pick.text:SetPoint("TOPLEFT", 14, -32)
     pick.text:SetPoint("RIGHT", -14, 0)
     pick.text:SetJustifyH("LEFT")
     pick.btns = {}
     local x = 14
     for _, role in ipairs({ "tank", "healer", "dps" }) do
-      local b = T.Button(pick, ROLES[role], 84, 24)
+      local b = roleButton(pick, role)
       b:SetPoint("BOTTOMLEFT", x, 14)
       x = x + 92
-      b:SetScript("OnClick", function()
-        pick:Hide()
-        if pick.act then LF:List(pick.act, role, pick.dname) end
-      end)
       pick.btns[role] = b
     end
+    -- (secure buttons can't be hidden in combat: close the prompt as a fight starts)
+    pick:RegisterEvent("PLAYER_REGEN_DISABLED")
+    pick:SetScript("OnEvent", function(self) self:Hide() end)
   end
-  pick.act, pick.dname = act, dname
-  pick.text:SetText(("Your role for %s?"):format(Q.Color(T.HEX.gold, dname or act.name)))
-  -- (roles your class can't fill are greyed)
-  local can = { tank = true, healer = true, dps = true }
-  if C_SpecializationInfo == nil and UnitClass then
-    local _, cls = UnitClass("player")
-    local TANK = { WARRIOR = 1, PALADIN = 1, DRUID = 1, DEATHKNIGHT = 1, MONK = 1, DEMONHUNTER = 1, SHAMAN = 1 }
-    local HEAL = { PRIEST = 1, PALADIN = 1, DRUID = 1, SHAMAN = 1, MONK = 1, EVOKER = 1 }
-    can.tank, can.healer = TANK[cls] ~= nil, HEAL[cls] ~= nil
+  local ai = C_LFGList.GetActivityInfoTable and C_LFGList.GetActivityInfoTable(act.id)
+  want.id, want.cat, want.name = act.id, act.cat or (ai and ai.categoryID), dname or act.name
+  want.group = ai and (ai.groupFinderActivityGroupID or ai.activityGroupID)
+  pick.text:SetText(("List yourself for %s as:"):format(Q.Color(T.HEX.gold, act.name)) ..
+    "\n" .. Q.Color(T.HEX.dim, "The group finder opens; press again if it isn't listed yet."))
+  local pre = LF.cfg().role
+  for role, b in pairs(pick.btns) do
+    local on = pre == role
+    T.SetBorderColor(b, on and 0.75 or T.c.line[1], on and 0.45 or T.c.line[2], on and 1 or T.c.line[3], 1)
   end
-  for role, b in pairs(pick.btns) do if b.SetEnabled then b:SetEnabled(can[role]) end end
   pick:Show()
 end
+LF.Prompt = rolePrompt
 
--- the button: find the dungeon in the group finder, then list (asking the role first)
+-- the button: find the dungeon in the group finder, then ask the role (the click on it lists you)
 function LF:Find(area, name)
   local dname = name
   if not dname and Q.Dungeons then
     for _, e in ipairs(Q.Dungeons:List()) do if e.area == area then dname = e.name end end
   end
-  if not (C_LFGList and C_LFGList.CreateListing) then
+  if not (C_LFGList and C_LFGList.GetAvailableCategories) then
     Q:Print("The group finder isn't available here.")
-    return
-  end
-  if C_LFGList.HasActiveEntryInfo and C_LFGList.HasActiveEntryInfo() then
-    Q:Print("You're already listed in the group finder.")
-    openFinder()
     return
   end
   if IsInGroup and IsInGroup() and UnitIsGroupLeader and not UnitIsGroupLeader("player") then
@@ -239,26 +282,18 @@ function LF:Find(area, name)
   end
   local act = LF.Activity(dname or "")
   if not act then
-    Q:Print(("%s isn't in the group finder's list - the group finder is open, search for it there."):format(dname or "This dungeon"))
-    openFinder()
+    Q:Print(("%s isn't in the group finder's list."):format(dname or "This dungeon"))
     return
   end
-  local role = cfg().role
-  if role == "tank" or role == "healer" or role == "dps" then
-    LF:List(act, role, dname)
-  else
-    rolePrompt(act, dname)
-  end
+  rolePrompt(act, dname)
 end
 
 Q:Command("lfg", "list yourself in the group finder for the dungeon you're working on (/qc lfg why: what happened last time)", function(arg)
   if arg and arg:lower():find("why") then
     local d = Q.db.lfgDiag or LF.diag or {}
-    Q:Print(("last listing: %s (%s)  call %s  ok %s  result %s  listed %s  blocked %s"):format(tostring(d.name), tostring(d.act),
-      tostring(d.form), tostring(d.ok), tostring(d.res), tostring(d.listed), tostring(d.blocked or "no")))
-    Q:Print(("finder style %s"):format(tostring(d.style)))
-    Q:Print(("client: LFGListFrame %s  LFGListingFrame %s  playstyle enum %s"):format(tostring(LFGListFrame ~= nil),
-      tostring(LFGListingFrame ~= nil), tostring(Enum and Enum.LFGEntryPlaystyle ~= nil)))
+    Q:Print(("last try: %s (activity %s, category %s) as %s - listed %s"):format(tostring(d.name), tostring(d.act),
+      tostring(d.cat), tostring(d.role), tostring(d.listed)))
+    for _, l in ipairs(d.steps or {}) do Q:Print("  " .. l) end
     return
   end
   local s = Q.Planner and Q.Planner.steps
