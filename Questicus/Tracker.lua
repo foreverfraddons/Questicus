@@ -91,7 +91,7 @@ local function row(i)
     if btn == "RightButton" then TR:Menu(d.id, self); return end
     if IsShiftKeyDown and IsShiftKeyDown() then TR:Link(d.id); return end
     if IsControlKeyDown and IsControlKeyDown() then TR:Focus(d.id); return end
-    if IsAltKeyDown and IsAltKeyDown() then TR:Fold(d.id); return end
+    if IsAltKeyDown and IsAltKeyDown() then TR:Share(d.id); return end
     TR:OpenLog(d.id)
   end)
   r:SetScript("OnEnter", function(self)
@@ -103,7 +103,7 @@ local function row(i)
     end
     local ri = routeIndex()[d.id]
     GameTooltip:AddLine(ri and ("Route step " .. ri) or "Not on your route", 0.6, 0.8, 1)
-    GameTooltip:AddLine("Click: open in the quest log - Ctrl-click: focus - Shift-click: link - Alt-click: fold - Right-click: more", 0.6, 0.6, 0.6, true)
+    GameTooltip:AddLine("Click: open in the quest log - Ctrl-click: focus - Shift-click: link - Alt-click: share with your group - Right-click: more", 0.6, 0.6, 0.6, true)
     GameTooltip:Show()
   end)
   r:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -365,6 +365,25 @@ function TR:Link(id)
   if not link then link = ("|cffffff00|Hquest:%d:%d|h[%s]|h|r"):format(id, (e and e.level) or 0, (e and e.title) or ("Quest " .. id)) end
   if ChatEdit_InsertLink then ChatEdit_InsertLink(link) elseif ChatFrameUtil and ChatFrameUtil.InsertLink then ChatFrameUtil.InsertLink(link) end
 end
+-- share the quest with your party (the quest log's Share button)
+function TR:Share(id)
+  if not QS.log[id] then Q:Print("That quest isn't in your log."); return end
+  if not (IsInGroup and IsInGroup()) then Q:Print("You're not in a group - nobody to share it with."); return end
+  if C_QuestLog and C_QuestLog.IsPushableQuest and not C_QuestLog.IsPushableQuest(id) then
+    Q:Print("This quest can't be shared.")
+    return
+  end
+  local idx = C_QuestLog and C_QuestLog.GetLogIndexForQuestID and C_QuestLog.GetLogIndexForQuestID(id)
+  local prev = GetQuestLogSelection and GetQuestLogSelection()
+  if C_QuestLog and C_QuestLog.SetSelectedQuest then C_QuestLog.SetSelectedQuest(id) end
+  if idx and SelectQuestLogEntry then SelectQuestLogEntry(idx) end
+  if QuestLogPushQuest then
+    QuestLogPushQuest()
+    local e = QS.log[id]
+    Q:Print("Shared " .. ((e and e.title) or ("quest " .. id)) .. " with your group.")
+  end
+  if prev and prev > 0 and SelectQuestLogEntry then SelectQuestLogEntry(prev) end
+end
 function TR:ShowOnMap(id)
   local z = P.QuestZone and P.QuestZone(id)
   if not (WorldMapFrame and z) then return end
@@ -414,6 +433,7 @@ function TR:Menu(id, anchor)
   add("Fold / unfold", function() TR:Fold(id) end)
   add("Show on map", function() TR:ShowOnMap(id) end)
   add("Link in chat", function() TR:Link(id) end)
+  if inLog and IsInGroup and IsInGroup() then add("Share with group", function() TR:Share(id) end) end
   add("Wowhead link", function() TR:Wowhead(id) end)
   if inLog then add("Abandon", function() TR:Abandon(id) end) end
   local i = QS:Info(id)

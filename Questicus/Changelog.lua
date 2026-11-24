@@ -8,7 +8,7 @@ local Q = Questicus
 Q.Changelog = {
   { v = "next",
     added = {
-      "Quest tooltips on the map, minimap, tracker and dungeon window show what the quest says to do (the objective line from the quest log) and its quest ID. Right-click a quest in the tracker for a Wowhead link to copy.",
+      "Quest tooltips on the map, minimap, tracker and dungeon window show what the quest says to do (the objective line from the quest log) and its quest ID. Right-click a quest in the tracker for a Wowhead link to copy; Alt-click one to share it with your group.",
       "Quest tooltips list the reward items, and the items its chain ends with; hold Alt over the tooltip to see each item's own tooltip and compare them.",
     },
     fixed = {
