@@ -380,6 +380,17 @@ do
     local on = Q.OnTaxi()
     if wasOn and not on then landed() end
     wasOn = on
+    -- and whatever else happened (a loading screen on the way, a missed event): standing at the far end
+    -- of the "Fly to" step on the ground means it's done
+    local P = Q.Planner
+    local s = not on and P and P.steps and P.steps[1]
+    if s and s.type == "fly" and s.to and GetTime() - (F.flyCheck or 0) > 8 then
+      local here = D:PlayerPos()
+      if here and here.i == s.to.i and D.Dist(here, s.to) < 200 then
+        F.flyCheck = GetTime()
+        landed()
+      end
+    end
   end)
 end
 -- "New flight path discovered!"
