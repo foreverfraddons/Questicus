@@ -20,7 +20,8 @@ local EXACT_O, STUCK_O = 4, 9   -- the same for objects (they don't move: the ma
 local NEAR = 60            -- yards: progress here counts for the spot
 local UNDER = 28           -- yards: a mob this close to the marker is "under" it (they wander a bit)
 local SCAN_C = 2.5         -- seconds of looking for a creature at the marker before moving on
-local SCAN_O = 4           -- seconds for an object (give it time to come into view)
+local SCAN_O = 3           -- seconds for an object (give it time to come into view)
+local SCAN_O_LOOK = 1.2    -- the same when the object light makes the game pick objects all around you
 local FALLBACK = 60        -- seconds: respawn time nobody has measured yet
 local LEAN = 0.35          -- how much the next step pulls the choice (0 = just the closest)
 local KEEP = 0.8           -- a new spot must be this much closer to take over (no flip-flopping)
@@ -543,7 +544,12 @@ local function tick()
   -- (objects sit still: you must really be on the marker; mobs wander, so near it is enough)
   local s0 = e and e.p and source(e.p)
   local isObj = s0 ~= nil and s0:sub(1, 1) == "o"
-  local onIt = d and (d <= (isObj and EXACT_O or EXACT) or (d <= (isObj and STUCK_O or STUCK) and stillFor >= (isObj and 3 or 2)))
+  -- (with the object light on, the game picks the nearest object all around you out to its range: so
+  -- near enough to it, an object that isn't picked isn't there - no need to stand right on the marker)
+  local gc = isObj and Q.Glow and Q.Glow.cfg and Q.Glow.cfg()
+  local looks = gc and gc.on and (gc.arc or 0) >= 2 and not (Q.CollectOnly and Q.CollectOnly())
+  local objNear = looks and math.max(EXACT_O, math.min(12, (gc.range or 15) - 3)) or EXACT_O
+  local onIt = d and (d <= (isObj and objNear or EXACT) or (d <= (isObj and STUCK_O or STUCK) and stillFor >= (isObj and 3 or 2)))
   if not onIt then atSince, atKey = nil, nil return end
   local k = SP.Key(e.p)
   if atKey ~= k then atSince, atKey = GetTime(), k end
@@ -557,7 +563,7 @@ local function tick()
     atSince = GetTime() return                           -- it's there: go get it
   end
   if SP.calib and SP.calib.key == k then return end      -- waiting for it on purpose
-  local wait = (src and src:sub(1, 1) == "o") and SCAN_O or SCAN_C
+  local wait = (src and src:sub(1, 1) == "o") and (looks and SCAN_O_LOOK or SCAN_O) or SCAN_C
   if GetTime() - atSince >= wait then
     SP.Cool(e.p, "empty")
     atSince, atKey = nil, nil
