@@ -95,13 +95,28 @@ end
 local ROLES = { tank = "Tank", healer = "Healer", dps = "Damage" }
 local function setRole(role)
   local t, h, d = role == "tank", role == "healer", role == "dps"
+  if C_LFGListRoles and C_LFGListRoles.SetRoles then pcall(C_LFGListRoles.SetRoles, { tank = t, healer = h, dps = d }) end
   if C_LFGList and C_LFGList.SetRoles then pcall(C_LFGList.SetRoles, { tank = t, healer = h, dps = d }) end
   if SetLFGRoles then pcall(SetLFGRoles, false, t, h, d) end
 end
+-- the group finder window is a load-on-demand part of the game's UI: load it, then show its listing tab
+local function loadUI()
+  local load = (C_AddOns and C_AddOns.LoadAddOn) or LoadAddOn
+  if not load then return end
+  for _, n in ipairs({ "Blizzard_GroupFinder_VanillaStyle", "Blizzard_GroupFinder", "Blizzard_LookingForGroupUI" }) do pcall(load, n) end
+end
+local function finderShown()
+  for _, f in ipairs({ LFGParentFrame, PVEFrame, LFGListingFrame }) do if f and f:IsShown() then return true end end
+end
 local function openFinder()
-  if PVEFrame_ShowFrame then pcall(PVEFrame_ShowFrame, "GroupFinderFrame")
-  elseif ToggleLFGParentFrame then pcall(ToggleLFGParentFrame)
-  elseif LFGListingFrame and ShowUIPanel then pcall(ShowUIPanel, LFGListingFrame) end
+  loadUI()
+  if finderShown() then return true end
+  if ShowLFGParentFrame then pcall(ShowLFGParentFrame, 1) end
+  if not finderShown() and LFGParentFrame and ShowUIPanel then pcall(ShowUIPanel, LFGParentFrame) end
+  if not finderShown() and PVEFrame_ShowFrame then pcall(PVEFrame_ShowFrame, "GroupFinderFrame", LFGListPVEStub) end
+  if not finderShown() and ToggleLFGParentFrame then pcall(ToggleLFGParentFrame, 1) end
+  if not finderShown() and LFGMicroButton and LFGMicroButton.Click then pcall(LFGMicroButton.Click, LFGMicroButton) end
+  return finderShown()
 end
 LF.Open = openFinder
 -- what happened the last time (for "/qc lfg why"): the call used, its result, a blocked action
@@ -113,18 +128,10 @@ end)
 watch:RegisterEvent("ADDON_ACTION_BLOCKED")
 watch:RegisterEvent("ADDON_ACTION_FORBIDDEN")
 local function listed() return C_LFGList.HasActiveEntryInfo and C_LFGList.HasActiveEntryInfo() end
--- Blizzard's own listing screen with the dungeon picked, so one click on its List button does it
+-- the game's own listing screen (Questicus doesn't fill it in: the game blocks its List button if an
+-- addon touched the form, so you tick the dungeon yourself)
 local function openCreate(act)
-  openFinder()
-  C_Timer.After(0.2, function()
-    local f = LFGListFrame
-    if f and f.EntryCreation and LFGListEntryCreation_Show and act.cat then
-      pcall(LFGListEntryCreation_Show, f.EntryCreation, f.baseFilters, act.cat, act.filters or 0)
-      if LFGListEntryCreation_Select then pcall(LFGListEntryCreation_Select, f.EntryCreation, nil, nil, nil, act.id) end
-    elseif LFGListingFrame and LFGListingFrame_SetActivityID then
-      pcall(LFGListingFrame_SetActivityID, LFGListingFrame, act.id)
-    end
-  end)
+  if not openFinder() then Q:Print("Couldn't open the group finder - open it from the micro menu (the eye button).") end
 end
 LF.OpenCreate = openCreate
 -- (called from a click: the game only lets a listing be made right after you click something, and
@@ -133,9 +140,12 @@ function LF:List(act, role, dname)
   setRole(role)
   local ps, gps = styleValues()
   local form, ok, res
-  if LFGListingFrame and not LFGListFrame then
-    form = "ids"          -- the classic group finder: a list of activity ids
-    ok, res = pcall(C_LFGList.CreateListing, { act.id })
+  loadUI()
+  local vanilla = C_LFGList.GetPremadeGroupFinderStyle and Enum and Enum.PremadeGroupFinderStyle and
+    C_LFGList.GetPremadeGroupFinderStyle() == Enum.PremadeGroupFinderStyle.Vanilla
+  if vanilla or (LFGListingFrame and not LFGListFrame) then
+    form = "vanilla"      -- the classic group finder: activities and new-player-friendly only (no playstyle)
+    ok, res = pcall(C_LFGList.CreateListing, { activityIDs = { act.id }, newPlayerFriendly = false })
   elseif Enum and Enum.LFGEntryPlaystyle then
     form = "table"        -- current: one table with everything
     ok, res = pcall(C_LFGList.CreateListing, {
@@ -146,10 +156,10 @@ function LF:List(act, role, dname)
     form = "args"         -- older: activity, item level, honor level, auto accept, private
     ok, res = pcall(C_LFGList.CreateListing, act.id, 0, 0, false, false)
   end
-  LF.diag = { form = form, ok = ok, res = tostring(res), act = act.id, name = act.name, pending = true, t = time and time() }
+  LF.diag = { style = C_LFGList.GetPremadeGroupFinderStyle and tostring(C_LFGList.GetPremadeGroupFinderStyle()), form = form, ok = ok, res = tostring(res), act = act.id, name = act.name, pending = true, t = time and time() }
   Q.db.lfgDiag = LF.diag
   if not ok then
-    Q:Print(("Couldn't list you for %s - the group finder is open with it picked, press its List button."):format(dname or act.name))
+    Q:Print(("Couldn't list you for %s - the group finder is open: tick it and press List."):format(dname or act.name))
     openCreate(act)
     LF.diag.pending = nil
     return
@@ -164,7 +174,7 @@ function LF:List(act, role, dname)
         (ps or gps) and (" - " .. cfg().playstyle) or ""))
     else
       LF.diag.listed = false
-      Q:Print(("The game didn't take the listing%s - the group finder is open with %s picked, press its List button."):format(
+      Q:Print(("The game didn't take the listing%s - the group finder is open: tick %s and press List."):format(
         LF.diag.blocked and " (it only lets its own buttons do that)" or "", act.name))
       openCreate(act)
     end
@@ -246,6 +256,7 @@ Q:Command("lfg", "list yourself in the group finder for the dungeon you're worki
     local d = Q.db.lfgDiag or LF.diag or {}
     Q:Print(("last listing: %s (%s)  call %s  ok %s  result %s  listed %s  blocked %s"):format(tostring(d.name), tostring(d.act),
       tostring(d.form), tostring(d.ok), tostring(d.res), tostring(d.listed), tostring(d.blocked or "no")))
+    Q:Print(("finder style %s"):format(tostring(d.style)))
     Q:Print(("client: LFGListFrame %s  LFGListingFrame %s  playstyle enum %s"):format(tostring(LFGListFrame ~= nil),
       tostring(LFGListingFrame ~= nil), tostring(Enum and Enum.LFGEntryPlaystyle ~= nil)))
     return

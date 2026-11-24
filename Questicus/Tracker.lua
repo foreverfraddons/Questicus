@@ -148,11 +148,20 @@ function TR:Refresh()
   local n, y = 0, 0
   local fs = c.font
   local band = false
+  local bandTop, bandBottom
+  -- one purple band behind the whole dungeon group, with a solid line down its left side
+  if not TR.band then
+    TR.band = body:CreateTexture(nil, "BACKGROUND")
+    TR.band:SetColorTexture(0.55, 0.3, 0.85, 0.14)
+    TR.bandEdge = body:CreateTexture(nil, "BORDER")
+    TR.bandEdge:SetColorTexture(0.75, 0.45, 1, 0.95)
+    TR.bandEdge:SetWidth(3)
+  end
   local function put(text, right, h, data, bar)
     n = n + 1
     local r = row(n)
-    r.tint:SetShown(band)
-    r.edge:SetShown(band)
+    r.tint:Hide(); r.edge:Hide()
+    r.text:SetPoint("LEFT", band and 8 or 4, 0)
     TR.rowData[r] = data
     r:SetHeight(h)
     r.text:SetFont(T.FONT, data and data.header and fs or (fs - 1), "")
@@ -189,12 +198,14 @@ function TR:Refresh()
     -- headings between the dungeon's quests and the rest
     if dmode and inRun[id] and wasRun == nil then
       band = true
+      bandTop = y
       put("|T" .. Q.MEDIA .. "i_dungeon:13|t " .. Q.Color("c08cff", dname or "Dungeon"),
         Q.Color(T.HEX.dim, runN .. " quest" .. (runN == 1 and "" or "s")), fs + 8, nil)
+      y = y + 6        -- room between the dungeon's name and its first quest
       wasRun = true
     elseif dmode and not inRun[id] and wasRun ~= false then
       band = false
-      if wasRun then y = y + 4 end
+      if wasRun then bandBottom = y; y = y + 6 end
       put(Q.Color(T.HEX.dim, "Other quests"), nil, fs + 6, nil)
       wasRun = false
     end
@@ -224,9 +235,20 @@ function TR:Refresh()
       end
     end
     -- (a gap between quests; on the dungeon's band a thin tinted one, so the band stays whole)
-    if band then put("", nil, 3, nil) else y = y + 3 end
+    y = y + 3
   end
+  if band then bandBottom = y end
   band = false
+  TR.band:ClearAllPoints(); TR.bandEdge:ClearAllPoints()
+  if bandTop and bandBottom then
+    TR.band:SetPoint("TOPLEFT", body, "TOPLEFT", 0, -bandTop)
+    TR.band:SetPoint("BOTTOMRIGHT", body, "TOPRIGHT", 0, -bandBottom)
+    TR.bandEdge:SetPoint("TOPLEFT", body, "TOPLEFT", 0, -bandTop)
+    TR.bandEdge:SetPoint("BOTTOMLEFT", body, "TOPLEFT", 0, -bandBottom)
+    TR.band:Show(); TR.bandEdge:Show()
+  else
+    TR.band:Hide(); TR.bandEdge:Hide()
+  end
   if #added > 0 then
     put(Q.Color(T.HEX.dim, "Added to your route"), nil, fs + 6, nil)
     for _, id in ipairs(added) do
