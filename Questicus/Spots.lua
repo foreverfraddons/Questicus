@@ -52,7 +52,7 @@ SP.Source = source
 
 -- respawn seconds for a creature / object: measured here > measured by everyone (ForeverDB) > 1 minute
 -- the respawn from real timings only (yours, everyone's), nil when there are none
-local function timed(src)
+local function timedOne(src)
   local own = src and QuesticusCollect and QuesticusCollect.resp and QuesticusCollect.resp[src]
   local shared = src and D.db and D.db.resp and D.db.resp[src]
   local t
@@ -62,6 +62,44 @@ local function timed(src)
   elseif shared then
     t = shared
   end
+  return t, own
+end
+-- the same thing under other ids (the Pool of Tears' Atal'ai Artifacts are several objects of one
+-- name): one of them timed counts for the others that aren't
+local nameOf = {}
+local function sameName(a, b)
+  if a == b then return true end
+  if not (a and b) or a:sub(1, 1) ~= b:sub(1, 1) then return false end
+  nameOf[a] = nameOf[a] or D:Name(a) or a
+  nameOf[b] = nameOf[b] or D:Name(b) or b
+  return nameOf[a] == nameOf[b]
+end
+SP.SameName = sameName
+local sibCache = {}
+local function siblingsTimed(src)
+  local c = sibCache[src]
+  local tnow = GetTime and GetTime() or 0
+  if c and tnow - c.at < 30 then return c.t or nil end
+  local sum, n = 0, 0
+  local function look(tbl, isOwn)
+    for k, v in pairs(tbl or {}) do
+      if k ~= src and sameName(k, src) then
+        local t
+        if isOwn then t = (v.n or 0) > 0 and v.s / v.n or nil else t = tonumber(v) end
+        if t then sum, n = sum + t, n + 1 end
+      end
+    end
+  end
+  look(QuesticusCollect and QuesticusCollect.resp, true)
+  look(D.db and D.db.resp, false)
+  local t = n > 0 and sum / n or nil
+  sibCache[src] = { t = t or false, at = tnow }
+  return t
+end
+SP.SiblingsTimed = siblingsTimed
+local function timed(src)
+  local t, own = timedOne(src)
+  if not t and src then t = siblingsTimed(src) end
   return t, own
 end
 local LO_TRUST = 2.5      -- "not back after X" far beyond the timed respawn: it came back elsewhere (mobs
@@ -412,8 +450,9 @@ local function retime(src)
     Q.Throttle("respreplan", 20, function() P:Replan(5) end)
   end
   for _, c in pairs(cds()) do
-    if c.src == src then
-      local untl = (c.used or c.t or now()) + secs
+    if c.src == src or (c.src and sameName(c.src, src) and not timedOne(c.src)) then
+      local s2 = c.src == src and secs or SP.Respawn(c.src)
+      local untl = (c.used or c.t or now()) + s2
       if untl ~= c.untl then c.untl = untl; SP.changed = true end
     end
   end
@@ -430,6 +469,7 @@ local function measured(src, secs)
   e.min = e.min and math.min(e.min, secs) or secs
   r[src] = e
   Q:Debug(("respawn measured for %s: %ds (avg %ds over %d)"):format(src, secs, math.floor(e.s / e.n), e.n))
+  wipe(sibCache)
   retime(src)
 end
 -- not back yet this long after it was used: the respawn is longer than that
@@ -573,7 +613,7 @@ end)
 -- respawn, saved for the database so nobody has to do it again.
 local function known(src)
   local own = QuesticusCollect and QuesticusCollect.resp and QuesticusCollect.resp[src]
-  return (own and (own.n or 0) > 0) or (D.db and D.db.resp and D.db.resp[src]) and true or false
+  return ((own and (own.n or 0) > 0) or (D.db and D.db.resp and D.db.resp[src]) or siblingsTimed(src)) and true or false
 end
 SP.Known = known
 local function asked()

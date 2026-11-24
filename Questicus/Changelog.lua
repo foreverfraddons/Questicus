@@ -6,7 +6,11 @@
 -- update goes out once "next" holds 10 lines (release.yml, MIN_CHANGES).
 local Q = Questicus
 Q.Changelog = {
-  { v = "next" },
+  { v = "next",
+    fixed = {
+      "Respawn times count for every copy of a thing: a quest object (or mob) that comes under several ids with one name - the Pool of Tears' Atal'ai Artifacts - uses the respawn timed on any of them, so the arrow no longer sends you back to a spot after a minute when it takes seven to come back.",
+    },
+  },
   { v = "0.9.027",
     added = {
       "Quest dialog for ForeverDB: with \"Help fill the database\" on, every quest's texts (the offer, objectives, the \"have you got them?\" and the turn-in text) and the greetings above quest givers' lists are saved as the game shows them - your name, class and race are left out - so ForeverDB has WoW Forever's own words for every quest.",
