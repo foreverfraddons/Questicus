@@ -277,6 +277,86 @@ local function build()
     "Forget your own weights for this role and use the defaults again." } })
   refresh[#refresh + 1] = refreshWeights
 
+  -- Waypoint (the marker in the world, your own pins) - Beacon.lua, Waypoint.lua, Way.lua
+  local bc = function() return db.beacon end
+  local function choice(pg, text, opts, get, set, w)
+    local f = CreateFrame("Frame", nil, pg)
+    f:SetSize(440, 26)
+    f:SetPoint("TOPLEFT", 8, pg.y)
+    local l = T.Text(f, 12)
+    l:SetPoint("LEFT")
+    l:SetText(text)
+    local seg = T.Segments(f, opts, get, function(v) set(v); Q:Send("QC_OPTION") end, w or 64)
+    seg:SetPoint("LEFT", 130, 0)
+    refresh[#refresh + 1] = seg.Refresh
+    pg.y = pg.y - 30
+  end
+  local function beaconRefresh() if Q.Beacon then Q.Beacon.Refresh() end end
+  local function pickColor(key)
+    local c = bc()[key] or Q.Beacon.COLORS.pin
+    local function set(r, g, b) bc()[key] = { r, g, b }; beaconRefresh() end
+    local CP = ColorPickerFrame
+    if not CP then return end
+    if CP.SetupColorPickerAndShow then
+      CP:SetupColorPickerAndShow({ r = c[1], g = c[2], b = c[3], hasOpacity = false,
+        swatchFunc = function() set(CP:GetColorRGB()) end,
+        cancelFunc = function() set(c[1], c[2], c[3]) end })
+    else
+      CP.hasOpacity = false
+      CP.previousValues = { r = c[1], g = c[2], b = c[3] }
+      CP.func = function() set(CP:GetColorRGB()) end
+      CP.cancelFunc = function() set(c[1], c[2], c[3]) end
+      CP:SetColorRGB(c[1], c[2], c[3])
+      CP:Hide(); CP:Show()
+    end
+  end
+  p = page("Waypoint", "A marker in the world over where you're going, and waypoints of your own.")
+  group(p, "In the world")
+  check(p, "Show the waypoint in the world", function() return bc().on end, function(v) bc().on = v end,
+    "A marker with a beam of light over the place, how far it is, when you'll be there and what it is.")
+  check(p, "Pinpoint over the target when you're close", function() return bc().pinpoint ~= false end, function(v) bc().pinpoint = v end)
+  choice(p, "Pinpoint from", { { 30, "30 yd" }, { 60, "60 yd" }, { 100, "100 yd" } },
+    function() return bc().pinpointAt end, function(v) bc().pinpointAt = v end)
+  check(p, "Pointer at the screen's edge when it's off screen", function() return bc().navigator ~= false end, function(v) bc().navigator = v end)
+  check(p, "With an arrow", function() return bc().navArrow ~= false end, function(v) bc().navArrow = v end)
+  check(p, "Right-click it to clear it", function() return bc().rightClear end, function(v) bc().rightClear = v end,
+    "Questicus' own waypoint comes back when the route moves on to the next step.")
+  check(p, "Fade it when the mouse is over it", function() return bc().fadeHover end, function(v) bc().fadeHover = v end)
+  check(p, "Show it with the interface hidden (Alt-Z)", function() return bc().alwaysShow end,
+    function(v) bc().alwaysShow = v; beaconRefresh() end)
+  check(p, "Distances in meters", function() return bc().meters end, function(v) bc().meters = v end)
+  group(p, "Your own waypoints")
+  check(p, "Ctrl-click the minimap: a waypoint there", function() return bc().minimapPins ~= false end, function(v) bc().minimapPins = v end)
+  check(p, "Follow a pin you put on the world map", function() return bc().trackPlaced ~= false end, function(v) bc().trackPlaced = v end,
+    "Your pin is followed (arrow, marker in the world) until you get there, then the route again.")
+  check(p, "Follow a map link you click in chat", function() return bc().trackLinks ~= false end, function(v) bc().trackLinks = v end)
+  buttons(p, {
+    { "Paste /way lines", 130, function() frame:Hide(); Q.Way.ShowPaste() end, "Put in a list of /way lines: followed one after the other." },
+    { "Clear my waypoints", 140, function() Q.Way.Command("clear") end, "Back to the route." },
+  })
+
+  p = page("Waypoint look", "How the waypoint in the world looks and sounds.")
+  group(p, "Waypoint")
+  check(p, "Beam of light", function() return bc().beam ~= false end, function(v) bc().beam = v end)
+  choice(p, "Info under it", { { "all", "All" }, { "distance", "Distance" }, { "eta", "Arrival" }, { "name", "Name" }, { "none", "None" } },
+    function() return bc().info end, function(v) bc().info = v; bc().footer = v ~= "none" end, 58)
+  choice(p, "Size", { { 0.8, "Small" }, { 1, "Normal" }, { 1.25, "Large" } }, function() return bc().scale end,
+    function(v) bc().scale = v; bc().ppScale = v; bc().navScale = v end, 72)
+  check(p, "Smaller when it's further away", function() return bc().worldScale ~= false end, function(v) bc().worldScale = v end)
+  choice(p, "Opacity", { { 0.5, "50%" }, { 0.75, "75%" }, { 1, "100%" } }, function() return bc().alpha end, function(v) bc().alpha = v end, 72)
+  group(p, "Pinpoint")
+  check(p, "Say what it is (step, quest, NPC)", function() return bc().ppExtended ~= false end, function(v) bc().ppExtended = v; beaconRefresh() end)
+  group(p, "Colour")
+  check(p, "One colour of my own (else by what the step is)", function() return bc().customColor end,
+    function(v) bc().customColor = v; beaconRefresh() end)
+  buttons(p, {
+    { "Pick colour", 110, function() pickColor("color") end, "The marker's colour" },
+    { "Beam colour", 110, function() pickColor("beamColor") end, "The beam's colour" },
+  })
+  group(p, "Sound")
+  check(p, "Sounds (a new waypoint)", function() return bc().sound end, function(v) bc().sound = v end)
+  check(p, "When you get close and when you walk away", function() return bc().proximity ~= false end, function(v) bc().proximity = v end)
+
   -- 7. Highlights
   p = page("Highlights", "Ore, herbs, quest objects, chests and your fishing bobber light up as you come up to them.")
   check(p, "Highlights on", function() return Q.Glow.cfg().on end, function(v) Q.Glow.SetOn(v) end,

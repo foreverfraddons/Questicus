@@ -77,6 +77,18 @@ local DEFAULT_GLOBAL = {
   pins = { world = true, minimap = true, size = 1, others = true, autoPin = true },
   popups = { on = true, sound = true },  -- pop-up cards for quest items / objective progress (Popup.lua)
   marks = { plates = true },   -- X on mobs you need, star on quest givers (nameplates)
+  -- the in-world waypoint and your own pins (Beacon.lua, Waypoint.lua, Way.lua)
+  beacon = {
+    on = true, waypoint = true, pinpoint = true, navigator = true,
+    beam = true, beamAlpha = 0.7, footer = true, info = "all", footerAlpha = 1, subAlpha = 0.8,
+    scale = 1, worldScale = true, minScale = 0.6, maxScale = 1.2, alpha = 1,
+    pinpointAt = 60, hideAt = 4, ppInfo = true, ppExtended = true, ppIcon = true, ppScale = 1,
+    navArrow = true, navIcon = true, navScale = 1, navArrowScale = 1,
+    rightClear = true, fadeHover = true, alwaysShow = false, meters = false,
+    customColor = false, tintIcon = true,
+    sound = true, proximity = true, proxDist = 20, sounds = {},
+    minimapPins = true, trackPlaced = true, trackLinks = true,
+  },
 }
 -- per character: the survey answers drive everything (see Survey.lua)
 local DEFAULT_PREFS = {

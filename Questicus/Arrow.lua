@@ -99,6 +99,8 @@ local function shortText(s)
   return ""
 end
 
+A.ShortText = shortText
+
 -- while a ghost: where your corpse is (the game's corpse marker, else where you died)
 local RECLAIM = 35                       -- close enough to resurrect at the corpse
 local function corpse()

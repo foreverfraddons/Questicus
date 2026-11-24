@@ -44,6 +44,8 @@ Runs.lua
 QuestItem.lua
 Marks.lua
 Waypoint.lua
+Beacon.lua
+Way.lua
 Options.lua
 Minimap.lua
 Integrate.lua
