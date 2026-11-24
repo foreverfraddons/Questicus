@@ -358,13 +358,30 @@ if hooksecurefunc and TakeTaxiNode then
     if Q.Planner then Q.Planner.taxiPlanned = nil; Q.Planner:Replan(1.2) end
   end)
 end
+local function landed()
+  if flyingTo then pcall(noteLanding) end
+  flyingTo = nil
+  local P = Q.Planner
+  if P then P.taxiPlanned, P.afterTaxi, P.wasTaxi = nil, nil, nil; P:Replan(0.5) end
+  if Q.Pins then Q.After(0.3, function() Q.Pins:RefreshMinimap(true); Q.Pins:RefreshWorld(true) end) end
+end
 Q:On("PLAYER_CONTROL_GAINED", function()
-  if flyingTo and not (UnitOnTaxi and UnitOnTaxi("player")) then
-    pcall(noteLanding)
-    flyingTo = nil
-    if Q.Planner then Q.Planner:Replan(0.5) end
-  end
+  if flyingTo and not (UnitOnTaxi and UnitOnTaxi("player")) then landed() end
 end)
+-- landing, watched directly: PLAYER_CONTROL_GAINED can come while the game still says you're on the
+-- flight, and then nothing replanned (the "fly" step stayed after you'd landed)
+do
+  local wasOn, acc = false, 0
+  local w = CreateFrame("Frame")
+  w:SetScript("OnUpdate", function(_, el)
+    acc = acc + el
+    if acc < 0.5 then return end
+    acc = 0
+    local on = Q.OnTaxi()
+    if wasOn and not on then landed() end
+    wasOn = on
+  end)
+end
 -- "New flight path discovered!"
 Q:On("UI_INFO_MESSAGE", function(_, msg)
   if type(msg) == "string" and not Q.Secret(msg) and msg:lower():find("flight path") then
