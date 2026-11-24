@@ -304,7 +304,7 @@ local function lineClear(w, ax, ay, bx, by)
 end
 
 -- list of waypoints {i, x, y} from `from` to `to` (the last one is `to`)
-function N:Path(from, to)
+function N:Path(from, to, oneLeg)
   if not from or not to then return nil end
   if from.i ~= to.i then return { to } end
   N:Prepare(from)
@@ -314,14 +314,24 @@ function N:Path(from, to)
   -- (further than this a search covers thousands of cells - 50 ms and more - for a way that will be
   -- worked out again long before you get there: a straight line until you're closer)
   -- into another zone: only through the crossings between zones (no straight line over a zone line)
-  if D.ZoneWalkPath then
+  -- (each leg between crossings is worked out on its own, so it still goes round walls and the like)
+  if D.ZoneWalkPath and not oneLeg then
     local cp = D.ZoneWalkPath(from, to)
     if cp then
-      local out = {}
+      local out, at = {}, from
+      local stops = {}
       for _, q in ipairs(cp) do
-        if D.Dist(from, q) > 12 or #out > 0 then out[#out + 1] = q end
+        if D.Dist(from, q) > 12 or #stops > 0 then stops[#stops + 1] = q end
       end
-      out[#out + 1] = to
+      stops[#stops + 1] = to
+      for _, q in ipairs(stops) do
+        local ok, leg = pcall(N.Path, N, at, q, true)
+        if ok and leg and #leg > 0 then
+          for j = 1, #leg - 1 do out[#out + 1] = leg[j] end
+        end
+        out[#out + 1] = q
+        at = q
+      end
       return out
     end
   end
