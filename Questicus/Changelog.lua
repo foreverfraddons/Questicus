@@ -13,7 +13,7 @@ Q.Changelog = {
     fixed = {
       "Stutters near walls gone: routes round walls are worked out in the background now (a few ms a frame) instead of all at once, and every leg of the route on the map is kept instead of being searched again on every redraw. The line and the arrow also no longer loop back to a corner you've already walked past.",
       "The waypoint moves to the new step's spot even when it's close to the last one (it was left on the previous target), and \"Get the flight path\" steps lead to the flight master himself, by whatever name he goes (Wind Rider Master, Hippogryph Master, Bat Handler...).",
-      "Dungeon mode: everything inside the dungeon - its objectives, hand-ins to someone or something in there (the Idol of Hakkar, ...) and quests you can only pick up in there - waits until you've got every quest you can get outside, instead of sending you in early. Quests that start inside no longer hold the run up.",
+      "Dungeon mode: everything inside the dungeon - its objectives, hand-ins to someone or something in there (the Idol of Hakkar, ...) and quests you can only pick up in there - waits until you've got every quest you can get outside, instead of sending you in early. Quests that start inside no longer hold the run up. Outside dungeon mode, a finished quest whose hand-in is inside a dungeon is no longer a step that sends you in: it's handed in when you're in there.",
       "Dungeon list and window: how many of the dungeon's quests are in your log as well as how many are done, and a \"picked up inside\" mark on quests you get in the dungeon itself.",
     },
   },
