@@ -687,7 +687,7 @@ local function build()
   end)
   cur.lfg:Hide()
   -- a dungeon run folds away to one line; this opens / closes the quest list under it
-  cur.fold = T.Button(cur, "Quests +", 64, 18)
+  cur.fold = T.Button(cur, "Expand", 64, 18)
   cur.fold.tip = "Show or hide the dungeon's quests and what's left of each"
   cur.fold:SetScript("OnClick", function()
     Q.db.guide.dunOpen = not Q.db.guide.dunOpen or nil
@@ -991,7 +991,7 @@ function GD:Refresh()
   cur.lfg:ClearAllPoints()
   cur.lfg:SetPoint("RIGHT", cur.skip, "LEFT", -4, 0)
   cur.fold:SetShown(runStep ~= nil)
-  cur.fold:SetText(Q.db.guide.dunOpen and "Quests -" or "Quests +")
+  cur.fold:SetText(Q.db.guide.dunOpen and "Collapse" or "Expand")
   cur.fold:ClearAllPoints()
   cur.fold:SetPoint("RIGHT", cur.lfg:IsShown() and cur.lfg or cur.skip, "LEFT", -4, 0)
   -- the route list: every step after the current one when the window was sized by hand (it
