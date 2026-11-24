@@ -11,6 +11,8 @@ Q.Changelog = {
       "Respawn times count for every copy of a thing: a quest object (or mob) that comes under several ids with one name - the Pool of Tears' Atal'ai Artifacts - uses the respawn timed on any of them, so the arrow no longer sends you back to a spot after a minute when it takes seven to come back.",
       "Empty quest-object spots are given up much sooner: with the object light on (the default) the game picks objects all around you, so within about 12 yards of the marker, a second or so with nothing there moves the arrow on - no need to stand right on it for several seconds.",
       "Dungeon window tidied up: the facts in a neat two-column table, and the quests with a status icon, a short status (Done, In your log, Can get now, Needs an earlier quest...) and the quests you can only pick up inside the dungeon in their own box, marked with a key.",
+      "Dungeon run step tidied up: \"Run <dungeon>\" with each quest's name and what's left of it on short lines, instead of a wall of quest text. A Find group button on it lists you in the group finder for that dungeon after asking your role - playstyle Relaxed, both changeable in Options > Group finder (/qc lfg does the same).",
+      "Dungeon mode: the dungeon's quests sit together at the top of the quest tracker, under the dungeon's name on a purple band, apart from your other quests.",
       "On a flight the arrow says \"In flight to <place>\" with about how long is left, instead of pointing at the next step thousands of yards away.",
     },
   },

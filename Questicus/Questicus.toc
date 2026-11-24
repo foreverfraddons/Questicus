@@ -46,6 +46,7 @@ Marks.lua
 Waypoint.lua
 Beacon.lua
 Way.lua
+LFG.lua
 Options.lua
 Minimap.lua
 Integrate.lua

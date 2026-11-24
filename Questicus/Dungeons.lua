@@ -739,7 +739,7 @@ function DG:QuestRows(e, lv, textH)
       end
       -- the ones you can only get in there, in their own tinted box
       local top = y
-      local h = heading(c("ffc080ff", "Picked up inside the dungeon") .. c(DIM, ("   %d  -  you get these on the run"):format(#inside)), DG.INSIDE_ICON)
+      local h = heading(c("c080ff", "Picked up inside the dungeon") .. c(DIM, ("   %d  -  you get these on the run"):format(#inside)), DG.INSIDE_ICON)
       rows(inside, true)
       h.box:ClearAllPoints()
       h.box:SetPoint("TOPLEFT", h, "TOPLEFT", -2, 2)

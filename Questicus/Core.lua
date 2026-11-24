@@ -89,6 +89,8 @@ local DEFAULT_GLOBAL = {
     sound = true, proximity = true, proxDist = 20, sounds = {},
     minimapPins = true, trackPlaced = true, trackLinks = true,
   },
+  -- Find a group (LFG.lua): playstyle for your listing, your role ("ask" = every time)
+  lfg = { playstyle = "relaxed", role = "ask" },
 }
 -- per character: the survey answers drive everything (see Survey.lua)
 local DEFAULT_PREFS = {

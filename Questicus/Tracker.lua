@@ -63,6 +63,17 @@ local function row(i)
   if r then return r end
   r = CreateFrame("Button", nil, body)
   if r.RegisterForClicks then r:RegisterForClicks("LeftButtonUp", "RightButtonUp") end
+  -- (dungeon mode: the dungeon's quests sit on a purple band)
+  r.tint = r:CreateTexture(nil, "BACKGROUND")
+  r.tint:SetAllPoints()
+  r.tint:SetColorTexture(0.55, 0.3, 0.85, 0.14)
+  r.tint:Hide()
+  r.edge = r:CreateTexture(nil, "BORDER")
+  r.edge:SetPoint("TOPLEFT", 0, 0)
+  r.edge:SetPoint("BOTTOMLEFT", 0, 0)
+  r.edge:SetWidth(2)
+  r.edge:SetColorTexture(0.75, 0.45, 1, 0.9)
+  r.edge:Hide()
   r.text = T.Text(r, 12, T.c.text)
   r.text:SetPoint("LEFT", 4, 0)
   r.text:SetPoint("RIGHT", -4, 0)
@@ -124,11 +135,24 @@ function TR:Refresh()
   else
     table.sort(list, function(a, b) return a.ri < b.ri or (a.ri == b.ri and a.id < b.id) end)
   end
+  -- dungeon mode: the dungeon's quests first, together under its name, on a purple band
+  local dset = Q.Planner and Q.Planner.dset
+  local dmode = Q.char.dmode and dset and next(dset) ~= nil
+  local inRun = {}
+  if dmode then
+    local a, b = {}, {}
+    for _, q in ipairs(list) do if dset[q.id] then a[#a + 1] = q; inRun[q.id] = true else b[#b + 1] = q end end
+    list = a
+    for _, q in ipairs(b) do list[#list + 1] = q end
+  end
   local n, y = 0, 0
   local fs = c.font
+  local band = false
   local function put(text, right, h, data, bar)
     n = n + 1
     local r = row(n)
+    r.tint:SetShown(band)
+    r.edge:SetShown(band)
     TR.rowData[r] = data
     r:SetHeight(h)
     r.text:SetFont(T.FONT, data and data.header and fs or (fs - 1), "")
@@ -153,9 +177,28 @@ function TR:Refresh()
   for id, root in pairs(Q.char.forced or {}) do
     if root == id and not QS.log[id] and not QS.done[id] then added[#added + 1] = id end
   end
+  local dname
+  if dmode and Q.Dungeons then
+    for _, e in ipairs(Q.Dungeons:List()) do if e.area == Q.char.dmode then dname = e.name end end
+  end
+  local runN = 0
+  for id in pairs(inRun) do runN = runN + 1 end
+  local wasRun
   for _, q in ipairs(list) do
     local id, e = q.id, q.e
-    if c.sort == "zone" and q.zone ~= lastZone then
+    -- headings between the dungeon's quests and the rest
+    if dmode and inRun[id] and wasRun == nil then
+      band = true
+      put("|T" .. "Interface\\Icons\\INV_Misc_Key_14" .. ":12:12:0:0:64:64:5:59:5:59|t " .. Q.Color("c08cff", dname or "Dungeon"),
+        Q.Color(T.HEX.dim, runN .. " quest" .. (runN == 1 and "" or "s")), fs + 8, nil)
+      wasRun = true
+    elseif dmode and not inRun[id] and wasRun ~= false then
+      band = false
+      if wasRun then y = y + 4 end
+      put(Q.Color(T.HEX.dim, "Other quests"), nil, fs + 6, nil)
+      wasRun = false
+    end
+    if c.sort == "zone" and q.zone ~= lastZone and not (dmode and inRun[id]) then
       lastZone = q.zone
       put(Q.Color(T.HEX.dim, q.zone), nil, fs + 6, nil)
     end
@@ -180,8 +223,10 @@ function TR:Refresh()
         end
       end
     end
-    y = y + 3
+    -- (a gap between quests; on the dungeon's band a thin tinted one, so the band stays whole)
+    if band then put("", nil, 3, nil) else y = y + 3 end
   end
+  band = false
   if #added > 0 then
     put(Q.Color(T.HEX.dim, "Added to your route"), nil, fs + 6, nil)
     for _, id in ipairs(added) do

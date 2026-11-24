@@ -83,7 +83,11 @@ function GD.StepText(s, short)
       local whole = m and m.lines and part and #m.lines <= 1
       t[#t + 1] = c(gold, title) .. ((part and part ~= "" and not whole and (s.partial or #s.quests > 1)) and c(dim, " (" .. part .. ")") or "")
     end
-    return "Do " .. table.concat(t, ", ") .. (s.dungeon and (c(T.HEX.bad, " in " .. s.dungeon) .. (short and "" or c(dim, " (dungeon - bring a group)"))) or "")
+    -- a dungeon run: the dungeon is the step (the quests are listed under it)
+    if s.dungeon and not short then
+      return "Run " .. c("c08cff", s.dungeon) .. c(dim, ("   %d quest%s - bring a group"):format(#t, #t == 1 and "" or "s"))
+    end
+    return "Do " .. table.concat(t, ", ") .. (s.dungeon and c(T.HEX.bad, " in " .. s.dungeon) or "")
   end
   return s.type
 end
@@ -171,6 +175,36 @@ local function objectiveLines(s)
   end
   return out
 end
+
+-- a dungeon run, tidy: each quest's name, then what's left of it on short lines (no quest text)
+local function dungeonLines(s)
+  local out = {}
+  local items = Q.QuestItem and Q.QuestItem.Items and Q.QuestItem:Items() or {}
+  for k, id in ipairs(s.quests) do
+    local e = QS.log[id]
+    local title = (s.titles and s.titles[k]) or (QS:Info(id) or {}).title or ("Quest " .. id)
+    if k > 1 then out[#out + 1] = " " end
+    out[#out + 1] = c("c08cff", "|TInterface\\GossipFrame\\ActiveQuestIcon:12|t ") .. c(gold, title)
+    if e and e.complete then
+      out[#out + 1] = "     " .. c(good, "done - hand it in")
+    elseif e and e.objectives and #e.objectives > 0 then
+      for _, o in ipairs(e.objectives) do
+        local txt = o.text or ""
+        out[#out + 1] = "     " .. (o.finished and c(dim, txt) or (c(white, txt) .. sourceHint(id, txt)))
+      end
+    else
+      local m = P.Meta(id)
+      for _, l in ipairs(m and m.lines or {}) do
+        local verb = ({ kill = "Kill ", loot = "Get ", use = "Use ", explore = "", buy = "Buy " })[l.kind] or ""
+        out[#out + 1] = "     " .. verb .. c(white, l.name) .. (l.from and c(dim, "  " .. D:Name(l.from)) or "")
+      end
+    end
+    local item = items[id]
+    if item and not (e and e.complete) then out[#out + 1] = "     " .. c(dim, "use ") .. itemText(item) end
+  end
+  return out
+end
+GD.DungeonLines = dungeonLines
 
 -- ------------------------------------------------------------------ current target
 -- The point the arrow should point at: for objective steps, the nearest spot of an objective
@@ -639,6 +673,15 @@ local function build()
     end
   end)
   cur.map = T.Button(cur, "Map", 46, 18)
+  -- a dungeon run: list yourself in the group finder for it (LFG.lua)
+  cur.lfg = T.Button(cur, "Find group", 78, 18)
+  cur.lfg.tip = "List yourself in the group finder for this dungeon (asks your role first)"
+  cur.lfg:SetScript("OnClick", function()
+    local s2 = P.steps and P.steps[GD.focus]
+    local area, name = GD.DungeonOf(s2)
+    if area and Q.LFG then Q.LFG:Find(area, name) end
+  end)
+  cur.lfg:Hide()
   cur.map.tip = "Pin this objective on the map and open the map there"
   cur.map:SetScript("OnClick", function()
     local p = GD:Target()
@@ -860,8 +903,8 @@ function GD:Refresh()
     cur.icon:SetTexture(stepIcon(s))
     cur.num:SetText(GD.focus == 1 and "NOW" or ("#" .. GD.focus))
     cur.text:SetText(GD.StepText(s))
-    local lines = s.type == "complete" and objectiveLines(s) or {}
     local dArea, dName = GD.DungeonOf(s)
+    local lines = s.type == "complete" and (dArea and dungeonLines(s) or objectiveLines(s)) or {}
     cur.glow:SetShown(dArea ~= nil)
     cur.banner:SetShown(dArea ~= nil)
     if dArea then
@@ -877,7 +920,7 @@ function GD:Refresh()
         end
       end
       cur.banner.text:SetText("DUNGEON RUN - " .. (dName or "dungeon"):upper() .. (total > 0 and ("   bosses %d/%d"):format(done, total) or ""))
-      table.insert(lines, 1, c("c08cff", "  Bring a group, then go in: ") .. c(dim, "every quest of this dungeon is done in this one run (/qc bosses for the boss tracker)"))
+
     else
       cur.icon:SetVertexColor(1, 1, 1, 1)
       T.SetBorderColor(cur, T.c.accent[1], T.c.accent[2], T.c.accent[3], 0.45)
@@ -890,7 +933,7 @@ function GD:Refresh()
     -- items you put together for a quest (qx 21): "Combine A + B -> C"
     for _, id in ipairs(s.type == "complete" and s.quests or {}) do
       local combine = Q.Bosses and Q.Bosses.CombineText and Q.Bosses.CombineText(id)
-      if combine then lines[#lines + 1] = c(T.HEX.gold, "  Combine: ") .. combine end
+      if combine then lines[#lines + 1] = (dArea and "     " .. c(dim, "combine ") or c(T.HEX.gold, "  Combine: ")) .. combine end
     end
     -- hand-checked tip for where you are going (ForeverDB fixes.json), e.g. "stands in the murloc hut"
     local tp = GD:Target()
@@ -928,6 +971,10 @@ function GD:Refresh()
   cur:SetHeight(h + 18)
   cur.map:SetPoint("BOTTOMRIGHT", -6, 5)
   cur.skip:SetPoint("RIGHT", cur.map, "LEFT", -4, 0)
+  local runStep = steps[GD.focus] and GD.DungeonOf(steps[GD.focus])
+  cur.lfg:SetShown(runStep ~= nil and Q.LFG ~= nil)
+  cur.lfg:ClearAllPoints()
+  cur.lfg:SetPoint("RIGHT", cur.skip, "LEFT", -4, 0)
   -- the route list: every step after the current one when the window was sized by hand (it
   -- scrolls), otherwise the next few (More) and the window grows to fit
   local g = Q.db.guide
