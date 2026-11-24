@@ -296,17 +296,29 @@ function LF.Overlay(btn)
   if btn.qcOverlay then return end
   local o = CreateFrame("Button", "QuesticusGroupFinderButton", UIParent, "SecureActionButtonTemplate")
   btn.qcOverlay = o
-  o:SetFrameStrata("HIGH")
-  o:RegisterForClicks("AnyUp")
+  -- (secure buttons act on the press or the release depending on the ActionButtonUseKeyDown setting:
+  -- registered for both, the game uses the one that setting says)
+  o:RegisterForClicks("AnyUp", "AnyDown")
   o:SetAttribute("type", "macro")
   o:Hide()
-  o:SetScript("PreClick", function(self)
+  o:SetScript("PreClick", function(self, _, down)
     if InCombatLockdown and InCombatLockdown() then return end
     local m = microBtn()
-    self:SetAttribute("macrotext", m and m:GetName() and ("/click " .. m:GetName()) or "")
+    -- (only one of press / release may run it, or the window opens and shuts again)
+    local keyDown = GetCVarBool and GetCVarBool("ActionButtonUseKeyDown")
+    local mine = (down and true or false) == (keyDown and true or false)
+    self:SetAttribute("macrotext", (mine and m and m:GetName()) and ("/click " .. m:GetName()) or "")
   end)
-  o:SetScript("PostClick", function()
+  o:SetScript("PostClick", function(_, _, down)
     if not microBtn() then Q:Print("Couldn't find the game's group finder button - open it from the micro menu.") end
+    if down then return end
+    C_Timer.After(0.4, function()
+      if not finderShown() then
+        local m = microBtn()
+        Q:Print(("The group finder didn't open (button %s, key-down %s)."):format(tostring(m and m:GetName()),
+          tostring(GetCVarBool and GetCVarBool("ActionButtonUseKeyDown"))))
+      end
+    end)
   end)
   o:SetScript("OnEnter", function() local f = btn:GetScript("OnEnter"); if f then f(btn) end end)
   o:SetScript("OnLeave", function() local f = btn:GetScript("OnLeave"); if f then f(btn) end end)
@@ -319,6 +331,9 @@ function LF.Overlay(btn)
     o:ClearAllPoints()
     o:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", l * s, b * s)
     o:SetSize(w * s, h * s)
+    -- (just above the button, whatever window it's in)
+    if o:GetFrameStrata() ~= btn:GetFrameStrata() then o:SetFrameStrata(btn:GetFrameStrata()) end
+    if o:GetFrameLevel() <= btn:GetFrameLevel() then o:SetFrameLevel(btn:GetFrameLevel() + 5) end
     if not o:IsShown() then o:Show() end
   end
   btn:HookScript("OnUpdate", place)
