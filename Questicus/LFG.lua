@@ -56,14 +56,14 @@ function LF.Activity(name)
     local base = n:gsub("heroic", ""):gsub("normal", ""):gsub("mythic", "")
     if want[n] or want[base] then
       local heroic = n:find("heroic") or n:find("mythic")
-      if not best or (best.heroic and not heroic) then best = { id = a.id, name = a.name, heroic = heroic } end
+      if not best or (best.heroic and not heroic) then best = { id = a.id, name = a.name, cat = a.cat, heroic = heroic } end
     end
   end
   if not best then
     -- a looser match: the group finder's name contains the dungeon's
     local w = norm(name)
     for _, a in ipairs(activities()) do
-      if norm(a.name):find(w, 1, true) and not norm(a.name):find("heroic") then best = { id = a.id, name = a.name }; break end
+      if norm(a.name):find(w, 1, true) and not norm(a.name):find("heroic") then best = { id = a.id, name = a.name, cat = a.cat }; break end
     end
   end
   return best
@@ -104,23 +104,71 @@ local function openFinder()
   elseif LFGListingFrame and ShowUIPanel then pcall(ShowUIPanel, LFGListingFrame) end
 end
 LF.Open = openFinder
--- (called from a click: the game only lets a listing be made right after you click something)
+-- what happened the last time (for "/qc lfg why"): the call used, its result, a blocked action
+LF.diag = {}
+local watch = CreateFrame("Frame")
+watch:SetScript("OnEvent", function(_, ev, who, fn)
+  if LF.diag.pending then LF.diag.blocked = ("%s %s %s"):format(ev, tostring(who), tostring(fn)) end
+end)
+watch:RegisterEvent("ADDON_ACTION_BLOCKED")
+watch:RegisterEvent("ADDON_ACTION_FORBIDDEN")
+local function listed() return C_LFGList.HasActiveEntryInfo and C_LFGList.HasActiveEntryInfo() end
+-- Blizzard's own listing screen with the dungeon picked, so one click on its List button does it
+local function openCreate(act)
+  openFinder()
+  C_Timer.After(0.2, function()
+    local f = LFGListFrame
+    if f and f.EntryCreation and LFGListEntryCreation_Show and act.cat then
+      pcall(LFGListEntryCreation_Show, f.EntryCreation, f.baseFilters, act.cat, act.filters or 0)
+      if LFGListEntryCreation_Select then pcall(LFGListEntryCreation_Select, f.EntryCreation, nil, nil, nil, act.id) end
+    elseif LFGListingFrame and LFGListingFrame_SetActivityID then
+      pcall(LFGListingFrame_SetActivityID, LFGListingFrame, act.id)
+    end
+  end)
+end
+LF.OpenCreate = openCreate
+-- (called from a click: the game only lets a listing be made right after you click something, and
+-- only once per click - so one call, in the form this client's group finder takes)
 function LF:List(act, role, dname)
   setRole(role)
   local ps, gps = styleValues()
-  local ok, res = pcall(C_LFGList.CreateListing, {
-    activityIDs = { act.id }, playstyle = ps, generalPlaystyle = gps,
-    isAutoAccept = false, isPrivateGroup = false, newPlayerFriendly = false,
-  })
-  -- (older group finders take the activities as a plain list)
-  if not ok or res == false then ok, res = pcall(C_LFGList.CreateListing, { act.id }) end
-  if ok and res ~= false then
-    Q:Print(("Listed for %s as %s%s. Players can now find you in the group finder."):format(act.name, ROLES[role] or role,
-      (ps or gps) and (" - " .. cfg().playstyle) or ""))
+  local form, ok, res
+  if LFGListingFrame and not LFGListFrame then
+    form = "ids"          -- the classic group finder: a list of activity ids
+    ok, res = pcall(C_LFGList.CreateListing, { act.id })
+  elseif Enum and Enum.LFGEntryPlaystyle then
+    form = "table"        -- current: one table with everything
+    ok, res = pcall(C_LFGList.CreateListing, {
+      activityIDs = { act.id }, playstyle = ps, generalPlaystyle = gps,
+      isAutoAccept = false, isPrivateGroup = false, newPlayerFriendly = false,
+    })
   else
-    Q:Print(("Couldn't list you for %s - the group finder is open, list from there."):format(dname or act.name))
-    openFinder()
+    form = "args"         -- older: activity, item level, honor level, auto accept, private
+    ok, res = pcall(C_LFGList.CreateListing, act.id, 0, 0, false, false)
   end
+  LF.diag = { form = form, ok = ok, res = tostring(res), act = act.id, name = act.name, pending = true, t = time and time() }
+  Q.db.lfgDiag = LF.diag
+  if not ok then
+    Q:Print(("Couldn't list you for %s - the group finder is open with it picked, press its List button."):format(dname or act.name))
+    openCreate(act)
+    LF.diag.pending = nil
+    return
+  end
+  Q:Print(("Listing you for %s as %s..."):format(act.name, ROLES[role] or role))
+  -- the listing turns up a moment later; if it doesn't, say so and open the game's own screen
+  C_Timer.After(2, function()
+    LF.diag.pending = nil
+    if listed() then
+      LF.diag.listed = true
+      Q:Print(("Listed for %s as %s%s. Players can now find you in the group finder."):format(act.name, ROLES[role] or role,
+        (ps or gps) and (" - " .. cfg().playstyle) or ""))
+    else
+      LF.diag.listed = false
+      Q:Print(("The game didn't take the listing%s - the group finder is open with %s picked, press its List button."):format(
+        LF.diag.blocked and " (it only lets its own buttons do that)" or "", act.name))
+      openCreate(act)
+    end
+  end)
 end
 
 -- the role prompt
@@ -193,7 +241,15 @@ function LF:Find(area, name)
   end
 end
 
-Q:Command("lfg", "list yourself in the group finder for the dungeon you're working on", function()
+Q:Command("lfg", "list yourself in the group finder for the dungeon you're working on (/qc lfg why: what happened last time)", function(arg)
+  if arg and arg:lower():find("why") then
+    local d = Q.db.lfgDiag or LF.diag or {}
+    Q:Print(("last listing: %s (%s)  call %s  ok %s  result %s  listed %s  blocked %s"):format(tostring(d.name), tostring(d.act),
+      tostring(d.form), tostring(d.ok), tostring(d.res), tostring(d.listed), tostring(d.blocked or "no")))
+    Q:Print(("client: LFGListFrame %s  LFGListingFrame %s  playstyle enum %s"):format(tostring(LFGListFrame ~= nil),
+      tostring(LFGListingFrame ~= nil), tostring(Enum and Enum.LFGEntryPlaystyle ~= nil)))
+    return
+  end
   local s = Q.Planner and Q.Planner.steps
   for _, st in ipairs(s or {}) do
     local area, name = Q.Guide.DungeonOf(st)
