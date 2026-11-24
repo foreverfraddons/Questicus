@@ -154,7 +154,8 @@ function A:Update()
   -- aim along the less obstructed path (Nav.lua), not straight through walls and water
   -- (close by - within sight - straight at it: a detour along ground walked before would point you
   -- away from a target you can see)
-  local wp = (d > 80 and Q.Nav and Q.Nav:Next(here, p)) or p
+  local walled = Q.Nav and Q.Nav.HitsWall and Q.Nav.HitsWall(here.i, here.x, here.y, p.x, p.y)
+  local wp = ((d > 80 or walled or body) and Q.Nav and Q.Nav:Next(here, p)) or p
   local dx, dy = wp.x - here.x, wp.y - here.y
   if body and d < RECLAIM then
     frame.arrow:Hide(); frame.here:Show()

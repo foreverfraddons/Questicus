@@ -219,6 +219,7 @@ function N.SetWall(i, id, pts)
   N.WallsChanged()
   if Q.Planner then Q.Planner:Replan(1) end
 end
+local WALL_PAD = 3              -- yards past each end of a wall piece that still count as wall
 local function segsOf(i)
   local s = wallSegs[i]
   if s then return s end
@@ -227,7 +228,16 @@ local function segsOf(i)
   for _, wl in pairs(wallList(i)) do
     local n = wl.n
     for j = 1, #n - 3, 2 do
-      local seg = { n[j], n[j + 1], n[j + 2], n[j + 3] }
+      -- (each piece a little longer at both ends: a way can't slip past a wall's end or a joint by a hair)
+      local ax, ay, bx2, by2 = n[j], n[j + 1], n[j + 2], n[j + 3]
+      local l = math.sqrt((bx2 - ax) ^ 2 + (by2 - ay) ^ 2)
+      local seg
+      if l > 0 then
+        local ux, uy = (bx2 - ax) / l * WALL_PAD, (by2 - ay) / l * WALL_PAD
+        seg = { ax - ux, ay - uy, bx2 + ux, by2 + uy }
+      else
+        seg = { ax, ay, bx2, by2 }
+      end
       local x0, x1 = math.floor(math.min(seg[1], seg[3]) / WB), math.floor(math.max(seg[1], seg[3]) / WB)
       local y0, y1 = math.floor(math.min(seg[2], seg[4]) / WB), math.floor(math.max(seg[2], seg[4]) / WB)
       for bx = x0, x1 do
@@ -565,8 +575,11 @@ function N:Route(here, to)
   if p and #p > 0 then p[#p] = to end            -- (exactly the target, not the one 10 yards off)
   -- drop waypoints you reached (walking to a person / object / place: only once you're really at the
   -- corner, so the arrow doesn't turn early; mobs wander, so those keep the looser radius)
-  local reach = N.precise and 8 or 25
-  while p and #p > 1 and D.Dist(here, p[1]) < reach do table.remove(p, 1) end
+  local reach = (N.precise or (UnitIsGhost and UnitIsGhost("player"))) and 8 or 25
+  -- (and only once the way on to the next one is clear: never cut a corner round a wall's end)
+  while p and #p > 1 and D.Dist(here, p[1]) < reach and not hitsWall(here.i, here.x, here.y, p[2].x, p[2].y) do
+    table.remove(p, 1)
+  end
   return p
 end
 
