@@ -34,6 +34,13 @@ local function pool(parent, size)
         for i, l in ipairs(tip) do
           if i == 1 then GameTooltip:AddLine(l, 1, 0.82, 0.3, true) else GameTooltip:AddLine(l, 0.9, 0.9, 0.9, true) end
         end
+        -- the quest's objective text and id (a step pin: each of its quests)
+        local qs = s.quests or (s.quest and { s.quest }) or {}
+        for k, qid in ipairs(qs) do
+          if k > 3 then break end
+          if #qs > 1 then local i = QS:Info(qid); GameTooltip:AddLine(i and i.title or ("Quest " .. qid), 1, 0.82, 0.3, true) end
+          for _, l in ipairs(QS:TipExtra(qid)) do GameTooltip:AddLine(l, 0.9, 0.9, 0.9, true) end
+        end
         if s.spot or s.spotK then GameTooltip:AddLine("Ctrl-click: wrong spot? Remove it from the database", 0.6, 0.6, 0.6, true) end
         GameTooltip:Show()
       end)
@@ -59,7 +66,7 @@ local function pool(parent, size)
   function p:Release()
     for i = 1, #self.list do
       local b = self.list[i]
-      b:Hide(); b.tip = nil; b.step = nil; b.spot = nil
+      b:Hide(); b.tip = nil; b.step = nil; b.spot = nil; b.quest = nil; b.quests = nil
       b.tipFn, b.spotK, b.spotP, b.ta, b.tb, b.tc, b.td = nil, nil, nil, nil, nil, nil, nil
     end
     self.used = 0
@@ -370,6 +377,7 @@ function PN:RefreshWorld(force)
                 k == 1 and 1 or col[2], k == 1 and 1 or col[3], 1)
               b.tip = { QS:Info(id).title, D:Name(op.key) .. " patrols along this line", PN.LABELS[k] }
               b.step = e.index
+              b.quest = id
               place(b, x, y)
             end
           end
@@ -386,6 +394,7 @@ function PN:RefreshWorld(force)
             end
             b.tip = { QS:Info(id).title, D:Name(op.key or ""), PN.LABELS[k] }
             b.step = e.index
+            b.quest = id
             if op.key and op.key:sub(1, 1) ~= "t" then b.spot = { op.key, op } end
             place(b, x, y)
           end
@@ -446,6 +455,7 @@ function PN:RefreshWorld(force)
       local note = D:Note(pt.key)
       if note then table.insert(b.tip, 2, note) end
       b.step = e.index
+      b.quests = (s.type ~= "fly" and s.type ~= "boat") and s.quests or nil
       place(b, x, y)
       px, py, prevPt = x, y, pt
     else
@@ -733,6 +743,7 @@ function PN:Objectives(mapID, size, place)
             local b = wpool:Get()
             style(b, ICON.turnin, size * 0.9, 1, 1, 1, 1)
             b.tip = { title, "Hand in to " .. D:Name(k), "Finished" }
+            b.quest = id
             place(b, x, y)
             n = n + 1
             break
@@ -1244,16 +1255,22 @@ end
 -- minimap pins' tooltips, built only when you point at one (no tables per refresh)
 local MMTIP = {}
 function MMTIP.giver(b) return QS:QuestTip(b.ta, D:Name(b.tb), "Quest you can pick up") end
-function MMTIP.skull(b) return { D:Name("c" .. b.ta), "Kill for: " .. tostring(b.tb), "Current step" } end
-function MMTIP.mob(b) return { D:Name("c" .. b.ta), "For: " .. tostring(b.tb) } end
+function MMTIP.skull(b) return QS:TipExtra(QS:IdByTitle(b.tb), { D:Name("c" .. b.ta), "Kill for: " .. tostring(b.tb), "Current step" }) end
+function MMTIP.mob(b) return QS:TipExtra(QS:IdByTitle(b.tb), { D:Name("c" .. b.ta), "For: " .. tostring(b.tb) }) end
 function MMTIP.obj(b)
   local info = QS:Info(b.tb)
-  return { D:Name(b.ta or ""), info and info.title or "", PN.LABELS[b.tc] }
+  return QS:TipExtra(b.tb, { D:Name(b.ta or ""), info and info.title or "", PN.LABELS[b.tc] })
 end
 function MMTIP.step(b)
   local t = { Q.Guide.StepText(b.ta), PN.LABELS[b.tb] .. " - step " .. b.tc .. " of your route" }
   local note = b.td and D:Note(b.td)
   if note then t[#t + 1] = note end
+  local qs = b.ta and b.ta.type ~= "fly" and b.ta.type ~= "boat" and b.ta.quests or {}
+  for k, qid in ipairs(qs) do
+    if k > 3 then break end
+    if #qs > 1 then local i = QS:Info(qid); t[#t + 1] = "|cffffd100" .. (i and i.title or ("Quest " .. qid)) .. "|r" end
+    QS:TipExtra(qid, t)
+  end
   return t
 end
 

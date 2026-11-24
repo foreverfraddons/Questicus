@@ -7,6 +7,9 @@
 local Q = Questicus
 Q.Changelog = {
   { v = "next",
+    added = {
+      "Quest tooltips on the map, minimap, tracker and dungeon window show what the quest says to do (the objective line from the quest log) and its quest ID. Right-click a quest in the tracker for a Wowhead link to copy.",
+    },
     fixed = {
       "Respawn times count for every copy of a thing: a quest object (or mob) that comes under several ids with one name - the Pool of Tears' Atal'ai Artifacts - uses the respawn timed on any of them, so the arrow no longer sends you back to a spot after a minute when it takes seven to come back.",
       "Empty quest-object spots are given up much sooner: with the object light on (the default) the game picks objects all around you, so within about 12 yards of the marker, a second or so with nothing there moves the arrow on - no need to stand right on it for several seconds.",

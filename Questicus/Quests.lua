@@ -273,6 +273,20 @@ local function money(c)
   return table.concat(t, " ")
 end
 QS.MoneyText = money
+-- for any quest tooltip: what the quest says to do (the line under its title in the quest log)
+-- and its quest id, added to the lines `t` (returns t)
+function QS:TipExtra(id, t)
+  t = t or {}
+  if not id then return t end
+  local how = Q.Guide and Q.Guide.HowText and Q.Guide.HowText(id)
+  if how then t[#t + 1] = "|cffffd100Objective:|r " .. how end
+  t[#t + 1] = "|cff808080Quest ID: " .. id .. "|r"
+  return t
+end
+-- the quest in your log with this title (for tooltips that only know the name)
+function QS:IdByTitle(title)
+  for id, e in pairs(QS.log or {}) do if e.title == title then return id end end
+end
 -- tooltip lines for a quest you could pick up: level, XP, money, the chain it's in
 function QS:QuestTip(id, giverName, footer)
   local info = QS:Info(id)
@@ -298,6 +312,7 @@ function QS:QuestTip(id, giverName, footer)
     lines[#lines + 1] = ("Chain (%d of %d): "):format((function() for i, c in ipairs(chain) do if c == id then return i end end end)() or 1, #chain)
       .. table.concat(parts, " > ")
   end
+  QS:TipExtra(id, lines)
   if footer then lines[#lines + 1] = footer end
   return lines
 end

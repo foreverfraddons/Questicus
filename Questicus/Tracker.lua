@@ -414,6 +414,7 @@ function TR:Menu(id, anchor)
   add("Fold / unfold", function() TR:Fold(id) end)
   add("Show on map", function() TR:ShowOnMap(id) end)
   add("Link in chat", function() TR:Link(id) end)
+  add("Wowhead link", function() TR:Wowhead(id) end)
   if inLog then add("Abandon", function() TR:Abandon(id) end) end
   local i = QS:Info(id)
   menu.title:SetText((i and i.title) or (QS.log[id] and QS.log[id].title) or ("Quest " .. id))
@@ -433,6 +434,45 @@ function TR:Menu(id, anchor)
   TR.menuAnchor = anchor
   menu:Show()
   return items
+end
+
+-- ------------------------------------------------------------------ wowhead link (copy box)
+local wh
+function TR:Wowhead(id)
+  local url = "https://www.wowhead.com/classic/quest=" .. id
+  if not wh then
+    wh = T.Window("QuesticusWowhead", 380, 96, "Wowhead link", nil)
+    wh:SetFrameStrata("DIALOG")
+    wh.what = T.Text(wh, 11, T.c.dim)
+    wh.what:SetPoint("TOPLEFT", 14, -32)
+    wh.what:SetPoint("RIGHT", -14, 0)
+    wh.what:SetWordWrap(false)
+    local box = CreateFrame("Frame", nil, wh)
+    box:SetPoint("TOPLEFT", 12, -50)
+    box:SetPoint("RIGHT", -12, 0)
+    box:SetHeight(24)
+    T.RFill(box, { T.c.bg[1] * 0.6, T.c.bg[2] * 0.6, T.c.bg[3] * 0.6, 1 }, 4)
+    T.Border(box, T.c.line, 4)
+    wh.input = CreateFrame("EditBox", nil, box)
+    wh.input:SetAutoFocus(true)
+    wh.input:SetFontObject(ChatFontNormal)
+    wh.input:SetPoint("TOPLEFT", 6, -4)
+    wh.input:SetPoint("BOTTOMRIGHT", -6, 4)
+    wh.input:SetScript("OnEscapePressed", function() wh:Hide() end)
+    wh.input:SetScript("OnEnterPressed", function() wh:Hide() end)
+    -- (keep the link as it is: typing puts it back, so it's always whole to copy)
+    wh.input:SetScript("OnTextChanged", function(self, user)
+      if user and wh.url then self:SetText(wh.url); self:HighlightText() end
+    end)
+    if UISpecialFrames then table.insert(UISpecialFrames, "QuesticusWowhead") end
+  end
+  local i = QS:Info(id)
+  wh.url = url
+  wh.what:SetText(((i and i.title) or ("Quest " .. id)) .. "  -  Ctrl-C to copy")
+  wh:Show()
+  wh.input:SetText(url)
+  wh.input:SetFocus()
+  wh.input:HighlightText()
 end
 
 -- ------------------------------------------------------------------ add a quest (search)
