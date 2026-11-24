@@ -1125,8 +1125,11 @@ local function bestAction(st, cands)
           end
         end
         if same then back = math.max(back, travel(p, same.centre, lv) * 0.9) end
+        -- dungeon mode: a hand-in inside the dungeon (its NPC / object is in there) is part of the run, so
+        -- it waits like the dungeon's objectives until every quest for it is picked up
+        local inside = P.dset and dPending > 0 and p and p.dungeon
         offer({ type = "turnin", id = id, point = p, t = t, back = back, sameEnder = same and same.id },
-          v * 1.15 / (t + back))
+          v * 1.15 / (t + back) * (inside and 0.01 or 1))
       elseif st.udone and st.udone[id] then
         -- (already planned once below: one "Do" step for it is enough)
       elseif not m.obj or not st.open[id] or not next(groups[id] or {}) then
