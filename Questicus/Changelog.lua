@@ -6,7 +6,8 @@
 -- update goes out once "next" holds 10 lines (release.yml, MIN_CHANGES).
 local Q = Questicus
 Q.Changelog = {
-  { v = "next",
+  { v = "next" },
+  { v = "0.9.026",
     added = {
       "Waypoint in the world: a marker with a beam of light stands over where you're going, with the distance, when you'll get there and what it is (the step, your corpse, your own pin), coloured by what the step is. Close up it turns into a card over the target saying what it is; off screen a pointer at the edge shows which way to turn. Right-click to clear it. No other waypoint addon needed.",
       "Your own waypoints: /way [zone] x y [name] (or /qway), /way paste for a list followed one after the other, /way clear, Ctrl-click on the minimap, a pin you put on the world map, or a map link clicked in chat - followed (arrow, map, marker in the world) until you get there, then the route again.",
