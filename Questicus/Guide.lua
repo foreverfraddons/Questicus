@@ -85,7 +85,12 @@ function GD.StepText(s, short)
     end
     -- a dungeon run: the dungeon is the step (the quests are listed under it)
     if s.dungeon and not short then
-      return "Run " .. c("c08cff", s.dungeon) .. c(dim, ("   %d quest%s - bring a group"):format(#t, #t == 1 and "" or "s"))
+      local done = 0
+      for _, id in ipairs(s.quests) do
+        local e = QS.log[id]
+        if (e and e.complete) or (QS.IsDone and QS:IsDone(id)) then done = done + 1 end
+      end
+      return "Run " .. c("c08cff", s.dungeon) .. c(dim, ("   %d/%d quests done"):format(done, #s.quests))
     end
     return "Do " .. table.concat(t, ", ") .. (s.dungeon and c(T.HEX.bad, " in " .. s.dungeon) or "")
   end
@@ -682,6 +687,14 @@ local function build()
     if area and Q.LFG then Q.LFG:Find(area, name) end
   end)
   cur.lfg:Hide()
+  -- a dungeon run folds away to one line; this opens / closes the quest list under it
+  cur.fold = T.Button(cur, "Quests +", 64, 18)
+  cur.fold.tip = "Show or hide the dungeon's quests and what's left of each"
+  cur.fold:SetScript("OnClick", function()
+    Q.db.guide.dunOpen = not Q.db.guide.dunOpen or nil
+    GD:Refresh()
+  end)
+  cur.fold:Hide()
   cur.map.tip = "Pin this objective on the map and open the map there"
   cur.map:SetScript("OnClick", function()
     local p = GD:Target()
@@ -904,7 +917,8 @@ function GD:Refresh()
     cur.num:SetText(GD.focus == 1 and "NOW" or ("#" .. GD.focus))
     cur.text:SetText(GD.StepText(s))
     local dArea, dName = GD.DungeonOf(s)
-    local lines = s.type == "complete" and (dArea and dungeonLines(s) or objectiveLines(s)) or {}
+    local open = Q.db.guide.dunOpen
+    local lines = s.type == "complete" and (dArea and (open and dungeonLines(s) or {}) or objectiveLines(s)) or {}
     cur.glow:SetShown(dArea ~= nil)
     cur.banner:SetShown(dArea ~= nil)
     if dArea then
@@ -931,7 +945,7 @@ function GD:Refresh()
       lines[#lines + 1] = c(dim, "  Wait on the platform / dock until it arrives, then get on; the route carries on where it lands.")
     end
     -- items you put together for a quest (qx 21): "Combine A + B -> C"
-    for _, id in ipairs(s.type == "complete" and s.quests or {}) do
+    for _, id in ipairs((s.type == "complete" and (open or not dArea)) and s.quests or {}) do
       local combine = Q.Bosses and Q.Bosses.CombineText and Q.Bosses.CombineText(id)
       if combine then lines[#lines + 1] = (dArea and "     " .. c(dim, "combine ") or c(T.HEX.gold, "  Combine: ")) .. combine end
     end
@@ -944,6 +958,7 @@ function GD:Refresh()
         for _, l in ipairs(m and m.lines or {}) do note = note or D:Note(l.from or l.key) end
       end
     end
+    if dArea and not open then note = nil end
     if note then lines[#lines + 1] = c(T.HEX.accent, "  Tip: ") .. c(dim, note) end
     -- the author's notes for this step (AuthorNotes.lua)
     for _, n in ipairs(Q.Author and Q.Author:NotesFor(s) or {}) do
@@ -975,6 +990,10 @@ function GD:Refresh()
   cur.lfg:SetShown(runStep ~= nil and Q.LFG ~= nil)
   cur.lfg:ClearAllPoints()
   cur.lfg:SetPoint("RIGHT", cur.skip, "LEFT", -4, 0)
+  cur.fold:SetShown(runStep ~= nil)
+  cur.fold:SetText(Q.db.guide.dunOpen and "Quests -" or "Quests +")
+  cur.fold:ClearAllPoints()
+  cur.fold:SetPoint("RIGHT", cur.lfg:IsShown() and cur.lfg or cur.skip, "LEFT", -4, 0)
   -- the route list: every step after the current one when the window was sized by hand (it
   -- scrolls), otherwise the next few (More) and the window grows to fit
   local g = Q.db.guide
