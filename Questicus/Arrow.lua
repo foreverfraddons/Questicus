@@ -99,15 +99,43 @@ local function shortText(s)
   return ""
 end
 
+-- while a ghost: where your corpse is (the game's corpse marker, else where you died)
+local RECLAIM = 35                       -- close enough to resurrect at the corpse
+local function corpse()
+  if not (UnitIsGhost and UnitIsGhost("player")) then return end
+  if C_DeathInfo and C_DeathInfo.GetCorpseMapPosition and C_Map and C_Map.GetBestMapForUnit then
+    local map = C_Map.GetBestMapForUnit("player")
+    for _ = 1, 4 do
+      if not map then break end
+      local ok, pos = pcall(C_DeathInfo.GetCorpseMapPosition, map)
+      if ok and pos then
+        local mx, my
+        if pos.GetXY then mx, my = pos:GetXY() else mx, my = pos.x, pos.y end
+        if mx and (mx > 0 or my > 0) then
+          local i, x, y = D:WorldPos(map, mx, my)
+          if i then return { i = i, x = x, y = y } end
+        end
+      end
+      local info = C_Map.GetMapInfo and C_Map.GetMapInfo(map)
+      map = info and info.parentMapID
+      if map == 0 then map = nil end
+    end
+  end
+  return Q.Planner and Q.Planner.deathPos
+end
+A.Corpse = corpse
+
 function A:Update()
   local p, s = Q.Guide:Target()
   local here = D:PlayerPos()
+  local body = corpse()
+  if body then p, s = body, nil end
   if not p or not here or not Q.db.arrow.shown or (Q.CollectOnly and Q.CollectOnly()) then frame:Hide(); return end
   frame:Show()
-  frame.label:SetText(shortText(s))
+  frame.label:SetText(body and "Your corpse" or shortText(s))
   if p.i ~= here.i then
     frame.arrow:Hide(); frame.here:Hide(); frame.skull:Hide()
-    frame.dist:SetText("other continent")
+    frame.dist:SetText(body and "corpse is in another zone or instance" or "other continent")
     return
   end
   local d = D.Dist(here, p)
@@ -126,6 +154,11 @@ function A:Update()
   -- away from a target you can see)
   local wp = (d > 80 and Q.Nav and Q.Nav:Next(here, p)) or p
   local dx, dy = wp.x - here.x, wp.y - here.y
+  if body and d < RECLAIM then
+    frame.arrow:Hide(); frame.here:Show()
+    frame.dist:SetText("at your corpse - resurrect")
+    return
+  end
   -- "here" only when you're really on it (the spot's own check starts there: Spots.lua)
   if d < 5 then
     frame.arrow:Hide(); frame.here:Show()

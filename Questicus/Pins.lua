@@ -1419,3 +1419,73 @@ Q:On("PLAYER_CONTROL_LOST", flightChanged)
 Q:On("PLAYER_CONTROL_GAINED", flightChanged)
 Q:On("QC_PLAN_UPDATED", function() available = nil; PN:RefreshWorld() end)
 Q:On("QC_TARGET_CHANGED", function() PN:RefreshWorld() end)
+
+-- ------------------------------------------------------------------ your corpse (while a ghost)
+-- a pin on the world map and the minimap where your body is (the arrow leads there too: Arrow.lua)
+local CORPSE_TEX = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull"
+local corpseW, corpseM
+local function corpsePin(parent, size)
+  local b = CreateFrame("Frame", nil, parent)
+  b:SetSize(size, size)
+  b.ring = b:CreateTexture(nil, "BACKGROUND")
+  b.ring:SetTexture(Q.MEDIA .. "glow")
+  b.ring:SetPoint("CENTER")
+  b.ring:SetSize(size * 1.9, size * 1.9)
+  b.ring:SetVertexColor(1, 0.25, 0.2, 0.7)
+  b.tex = b:CreateTexture(nil, "ARTWORK")
+  b.tex:SetTexture(CORPSE_TEX)
+  b.tex:SetAllPoints()
+  b:EnableMouse(true)
+  b:SetScript("OnEnter", function(s)
+    GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
+    GameTooltip:AddLine("Your corpse", 1, 0.82, 0.3)
+    GameTooltip:AddLine("Run back here to resurrect", 0.9, 0.9, 0.9)
+    GameTooltip:Show()
+  end)
+  b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  b:Hide()
+  return b
+end
+function PN:RefreshCorpse()
+  local body = Q.Arrow and Q.Arrow.Corpse and Q.Arrow.Corpse()
+  -- world map
+  if body and WorldMapFrame and WorldMapFrame:IsShown() and PN.overlay and canvas and Q.db.pins.world then
+    if not corpseW then corpseW = corpsePin(PN.overlay, 24) end
+    local x, y = onMap(body, WorldMapFrame:GetMapID())
+    if x then
+      local cs = canvasScale(WorldMapFrame.ScrollContainer)
+      corpseW:SetFrameLevel(PN.overlay:GetFrameLevel() + 30)
+      corpseW:SetScale(1 / cs)
+      corpseW:ClearAllPoints()
+      corpseW:SetPoint("CENTER", canvas, "TOPLEFT", x * canvas:GetWidth() * cs, -y * canvas:GetHeight() * cs)
+      corpseW:Show()
+    else corpseW:Hide() end
+  elseif corpseW then corpseW:Hide() end
+  -- minimap (at the edge when it's further than the minimap shows)
+  local here = body and Minimap and D:PlayerPos()
+  if here and here.i == body.i and Q.db.pins.minimap then
+    if not corpseM then corpseM = corpsePin(Minimap, 16) end
+    local x, y = minimapXY(here, body, true)
+    if x then
+      corpseM:SetFrameLevel(Minimap:GetFrameLevel() + 20)
+      corpseM:ClearAllPoints()
+      corpseM:SetPoint("CENTER", Minimap, "CENTER", x, y)
+      corpseM:Show()
+    else corpseM:Hide() end
+  elseif corpseM then corpseM:Hide() end
+end
+do
+  local acc = 0
+  local f = CreateFrame("Frame")
+  f:SetScript("OnUpdate", function(_, el)
+    acc = acc + el
+    if acc < 0.1 then return end
+    acc = 0
+    if not (UnitIsGhost and UnitIsGhost("player")) then
+      if corpseW and corpseW:IsShown() then corpseW:Hide() end
+      if corpseM and corpseM:IsShown() then corpseM:Hide() end
+      return
+    end
+    pcall(PN.RefreshCorpse, PN)
+  end)
+end

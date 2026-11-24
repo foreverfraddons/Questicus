@@ -8,6 +8,7 @@ local Q = Questicus
 Q.Changelog = {
   { v = "next",
     added = {
+      "While you're a ghost the arrow leads you back to your corpse (\"Your corpse\", along the walkable path) and says when you're close enough to resurrect, and a corpse pin shows where it is on the world map and the minimap (at the minimap's edge when it's further). Back to the route once you're alive.",
       "Your findings now reach ForeverDB from inside the game: respawn times, new spawn points, zone border crossings and objects that only appear on a kill are passed quietly (addon messages, nothing in chat) to ForeverDB's collector when it's online in your guild or group, so the next ForeverDB update has them for everyone. Turn it off with \"Help fill the database\" in Options > Advanced; /qc relay shows how much got through.",
       "Hand-checked walking paths: where a route step's walk has been set by hand (ForeverDB), the arrow and the map follow it exactly instead of working the way out, and that walk isn't learned or recorded any more.",
       "New spawn points: a quest mob standing next to you (out of combat) more than 30 yards from every spawn the database knows is added as a new spawn point - on your map, in the arrow's spots and in the route right away, and in ForeverDB for everyone with your recordings.",
