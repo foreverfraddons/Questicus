@@ -288,18 +288,41 @@ function LF:Find(area, name)
   rolePrompt(act, dname)
 end
 
-Q:Command("lfg", "list yourself in the group finder for the dungeon you're working on (/qc lfg why: what happened last time)", function(arg)
-  if arg and arg:lower():find("why") then
-    local d = Q.db.lfgDiag or LF.diag or {}
-    Q:Print(("last try: %s (activity %s, category %s) as %s - listed %s"):format(tostring(d.name), tostring(d.act),
-      tostring(d.cat), tostring(d.role), tostring(d.listed)))
-    for _, l in ipairs(d.steps or {}) do Q:Print("  " .. l) end
-    return
+-- ------------------------------------------------------------------ the Group finder button
+-- Opens the game's group finder. Addon code can't open it itself without breaking it (its searches
+-- then hang until /reload), so an invisible secure button lies over ours and presses the game's own
+-- group finder (eye) button. It sits on UIParent and is moved / hidden only out of combat.
+function LF.Overlay(btn)
+  if btn.qcOverlay then return end
+  local o = CreateFrame("Button", "QuesticusGroupFinderButton", UIParent, "SecureActionButtonTemplate")
+  btn.qcOverlay = o
+  o:SetFrameStrata("HIGH")
+  o:RegisterForClicks("AnyUp")
+  o:SetAttribute("type", "macro")
+  o:Hide()
+  o:SetScript("PreClick", function(self)
+    if InCombatLockdown and InCombatLockdown() then return end
+    local m = microBtn()
+    self:SetAttribute("macrotext", m and m:GetName() and ("/click " .. m:GetName()) or "")
+  end)
+  o:SetScript("PostClick", function()
+    if not microBtn() then Q:Print("Couldn't find the game's group finder button - open it from the micro menu.") end
+  end)
+  o:SetScript("OnEnter", function() local f = btn:GetScript("OnEnter"); if f then f(btn) end end)
+  o:SetScript("OnLeave", function() local f = btn:GetScript("OnLeave"); if f then f(btn) end end)
+  local function place()
+    if InCombatLockdown and InCombatLockdown() then return end
+    if not btn:IsVisible() then if o:IsShown() then o:Hide() end; return end
+    local l, b, w, h = btn:GetLeft(), btn:GetBottom(), btn:GetWidth(), btn:GetHeight()
+    if not l then return end
+    local s = btn:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    o:ClearAllPoints()
+    o:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", l * s, b * s)
+    o:SetSize(w * s, h * s)
+    if not o:IsShown() then o:Show() end
   end
-  local s = Q.Planner and Q.Planner.steps
-  for _, st in ipairs(s or {}) do
-    local area, name = Q.Guide.DungeonOf(st)
-    if area then LF:Find(area, name); return end
-  end
-  if Q.char.dmode then LF:Find(Q.char.dmode) else Q:Print("No dungeon on your route.") end
-end)
+  btn:HookScript("OnUpdate", place)
+  btn:HookScript("OnHide", function() if not (InCombatLockdown and InCombatLockdown()) then o:Hide() end end)
+  -- (in combat the overlay is hidden; a click then lands on the button itself)
+  btn:SetScript("OnClick", function() Q:Print("The group finder can't be opened by Questicus in combat - try after the fight.") end)
+end

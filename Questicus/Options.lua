@@ -335,16 +335,6 @@ local function build()
     { "Clear my waypoints", 140, function() Q.Way.Command("clear") end, "Back to the route." },
   })
 
-  p = page("Group finder", "The Find group button on a dungeon run lists you in the game's group finder for that dungeon.")
-  group(p, "Your listing")
-  choice(p, "Playstyle", Q.LFG and Q.LFG.STYLES or { { "relaxed", "Relaxed" } },
-    function() return db.lfg.playstyle end, function(v) db.lfg.playstyle = v end, 72)
-  choice(p, "Role", { { "ask", "Ask me" }, { "tank", "Tank" }, { "healer", "Healer" }, { "dps", "Damage" } },
-    function() return db.lfg.role end, function(v) db.lfg.role = v end, 64)
-  buttons(p, {
-    { "Find group now", 120, function() frame:Hide(); if Q.commands.lfg then Q.commands.lfg.fn("") end end, "For the dungeon on your route" },
-  })
-
   p = page("Waypoint look", "How the waypoint in the world looks and sounds.")
   group(p, "Waypoint")
   check(p, "Beam of light", function() return bc().beam ~= false end, function(v) bc().beam = v end)

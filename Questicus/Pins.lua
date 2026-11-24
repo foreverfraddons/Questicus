@@ -31,11 +31,12 @@ local function pool(parent, size)
         if not tip and s.tipFn then tip = s.tipFn(s) end        -- built only when you point at it
         if not tip then return end
         GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
+        QS.tipItems = tip.items
         for i, l in ipairs(tip) do
           if i == 1 then GameTooltip:AddLine(l, 1, 0.82, 0.3, true) else GameTooltip:AddLine(l, 0.9, 0.9, 0.9, true) end
         end
         -- the quest's objective text and id (a step pin: each of its quests)
-        local qs = s.quests or (s.quest and { s.quest }) or {}
+        local qs = (not tip.hasId) and (s.quests or (s.quest and { s.quest })) or {}
         for k, qid in ipairs(qs) do
           if k > 3 then break end
           if #qs > 1 then local i = QS:Info(qid); GameTooltip:AddLine(i and i.title or ("Quest " .. qid), 1, 0.82, 0.3, true) end

@@ -677,14 +677,10 @@ local function build()
     end
   end)
   cur.map = T.Button(cur, "Map", 46, 18)
-  -- a dungeon run: list yourself in the group finder for it (LFG.lua)
-  cur.lfg = T.Button(cur, "Find group", 78, 18)
-  cur.lfg.tip = "List yourself in the group finder for this dungeon (asks your role first)"
-  cur.lfg:SetScript("OnClick", function()
-    local s2 = P.steps and P.steps[GD.focus]
-    local area, name = GD.DungeonOf(s2)
-    if area and Q.LFG then Q.LFG:Find(area, name) end
-  end)
+  -- a dungeon run: the game's group finder (LFG.lua lays a secure button over this one)
+  cur.lfg = T.Button(cur, "Group finder", 84, 18)
+  cur.lfg.tip = "Open the game's group finder to look for or list a group for this dungeon"
+  if Q.LFG and Q.LFG.Overlay then Q.LFG.Overlay(cur.lfg) end
   cur.lfg:Hide()
   -- a dungeon run folds away to one line; this opens / closes the quest list under it
   cur.fold = T.Button(cur, "Expand", 64, 18)

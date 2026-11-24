@@ -287,6 +287,14 @@ end
 function QS:IdByTitle(title)
   for id, e in pairs(QS.log or {}) do if e.title == title then return id end end
 end
+-- an item's name in its quality colour (with its icon), for tooltips
+function QS.ItemText(it)
+  local name, _, q = GetItemInfo and GetItemInfo(it)
+  local icon = (C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(it)) or (GetItemIcon and GetItemIcon(it))
+  name = name or D:Name("i" .. it) or ("item " .. it)
+  local col = q and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[q] and ITEM_QUALITY_COLORS[q].hex or "|cffffffff"
+  return (icon and ("|T" .. icon .. ":12|t ") or "") .. col .. name .. "|r"
+end
 -- tooltip lines for a quest you could pick up: level, XP, money, the chain it's in
 function QS:QuestTip(id, giverName, footer)
   local info = QS:Info(id)
@@ -313,8 +321,32 @@ function QS:QuestTip(id, giverName, footer)
     lines[#lines + 1] = ("Chain (%d of %d): "):format((function() for i, c in ipairs(chain) do if c == id then return i end end end)() or 1, #chain)
       .. table.concat(parts, " > ")
   end
-  QS:TipExtra(id, lines, false, true)      -- the quest ID last
+  -- what you get: this quest's items, and the ones the chain ends with
+  local function items(qid)
+    local r = QS.Rewards(qid)
+    local t = {}
+    for _, k in ipairs({ 3, 4 }) do for _, it in ipairs(r and r[k] or {}) do t[#t + 1] = it end end
+    if #t == 0 then for _, it in ipairs(D.rewards and D.rewards[qid] or {}) do t[#t + 1] = it end end
+    return t
+  end
+  local own, last = items(id), chain[#chain]
+  local fin = (#chain > 1 and last ~= id) and items(last) or {}
+  local function names(list)
+    local p = {}
+    for i, it in ipairs(list) do if i <= 6 then p[#p + 1] = QS.ItemText(it) end end
+    return table.concat(p, ", ") .. (#list > 6 and (" +" .. (#list - 6)) or "")
+  end
+  if #own > 0 then lines[#lines + 1] = "|cffffd100Rewards:|r " .. names(own) end
+  if #fin > 0 then
+    local lq = D:Quest(last)
+    lines[#lines + 1] = "|cffffd100Chain ends with|r " .. ((lq and lq[1]) or ("quest " .. last)) .. ": " .. names(fin)
+  end
   if footer then lines[#lines + 1] = footer end
+  if #own > 0 or #fin > 0 then lines[#lines + 1] = "|cff808080Hold Alt to look at the reward items|r" end
+  QS:TipExtra(id, lines, false, true)      -- the quest ID last
+  lines.hasId = true
+  lines.items = (#own > 0 or #fin > 0) and { own = own, fin = fin, last = last } or nil
+  QS.tipItems = lines.items       -- (callers that show it right away; map pins set it when hovered)
   return lines
 end
 
@@ -630,3 +662,108 @@ function QS:NotOffered(npcKey, offered)
 end
 
 Q:On("UNIT_QUEST_LOG_CHANGED", function(unit) if unit == "player" then Q.Throttle("log", 0.3, changed) end end)
+
+
+-- ------------------------------------------------------------------ reward items (hold Alt on a quest tooltip)
+-- Holding Alt while a quest tooltip is up opens a strip of the reward items (this quest's and the
+-- ones its chain ends with) beside it; it stays while Alt is held or the mouse is on it, and each
+-- item shows its own tooltip, so you can compare them.
+do
+  local T = Q.T
+  local panel, itemTip
+  local function build()
+    panel = CreateFrame("Frame", "QuesticusRewardItems", UIParent)
+    panel:SetFrameStrata("TOOLTIP")
+    panel:EnableMouse(true)
+    T.RFill(panel, { T.c.bg[1], T.c.bg[2], T.c.bg[3], 0.97 }, 6)
+    T.Border(panel, T.c.line, 6)
+    panel.rows = {}
+    panel.icons = {}
+    itemTip = CreateFrame("GameTooltip", "QuesticusRewardItemTip", UIParent, "GameTooltipTemplate")
+    itemTip:SetFrameStrata("TOOLTIP")
+    panel:Hide()
+  end
+  local function icon(i)
+    local b = panel.icons[i]
+    if b then return b end
+    b = CreateFrame("Button", nil, panel)
+    b:SetSize(30, 30)
+    b.tex = b:CreateTexture(nil, "ARTWORK")
+    b.tex:SetAllPoints()
+    b:SetScript("OnEnter", function(self)
+      itemTip:SetOwner(self, "ANCHOR_RIGHT")
+      itemTip:SetHyperlink("item:" .. self.item)
+      itemTip:Show()
+    end)
+    b:SetScript("OnLeave", function() itemTip:Hide() end)
+    b:SetScript("OnClick", function(self)
+      if IsModifiedClick and IsModifiedClick("CHATLINK") then
+        local _, link = GetItemInfo(self.item)
+        if link and ChatEdit_InsertLink then ChatEdit_InsertLink(link) end
+      elseif IsModifiedClick and IsModifiedClick("DRESSUP") then
+        local _, link = GetItemInfo(self.item)
+        if link and DressUpItemLink then DressUpItemLink(link) end
+      end
+    end)
+    panel.icons[i] = b
+    return b
+  end
+  local function label(i)
+    local l = panel.rows[i]
+    if not l then l = T.Text(panel, 11, T.c.gold); panel.rows[i] = l end
+    return l
+  end
+  local function show()
+    local info = QS.tipItems
+    if not info then return end
+    if not panel then build() end
+    local y, n, li = -8, 0, 0
+    local w = 160
+    local function group(title, list)
+      if #list == 0 then return end
+      li = li + 1
+      local l = label(li)
+      l:ClearAllPoints(); l:SetPoint("TOPLEFT", 8, y); l:SetText(title); l:Show()
+      w = math.max(w, (l:GetStringWidth() or 100) + 16)
+      y = y - 16
+      for k, it in ipairs(list) do
+        n = n + 1
+        local b = icon(n)
+        b.item = it
+        b.tex:SetTexture((C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(it)) or (GetItemIcon and GetItemIcon(it)) or 134400)
+        b:ClearAllPoints()
+        b:SetPoint("TOPLEFT", 8 + ((k - 1) % 6) * 34, y - math.floor((k - 1) / 6) * 34)
+        b:Show()
+      end
+      y = y - math.ceil(#list / 6) * 34 - 4
+      w = math.max(w, 16 + math.min(#list, 6) * 34)
+    end
+    group("Rewards", info.own)
+    local lq = D:Quest(info.last)
+    group("Chain ends with " .. ((lq and lq[1]) or "the last quest"), info.fin)
+    for i = n + 1, #panel.icons do panel.icons[i]:Hide() end
+    for i = li + 1, #panel.rows do panel.rows[i]:Hide() end
+    if n == 0 then return end
+    panel:SetSize(w, -y + 4)
+    -- (pinned where the tooltip is now: it stays put when the tooltip goes as you move onto it)
+    local s = (GameTooltip.GetEffectiveScale and (GameTooltip:GetEffectiveScale() or 1) / (UIParent:GetEffectiveScale() or 1)) or 1
+    panel:ClearAllPoints()
+    panel:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", (GameTooltip:GetLeft() or 0) * s, ((GameTooltip:GetBottom() or 0) * s) - 2)
+    panel:Show()
+  end
+  -- the quest a tooltip was built for is forgotten when that tooltip closes (unless the strip is up)
+  GameTooltip:HookScript("OnHide", function()
+    if not (panel and panel:IsShown()) then QS.tipItems = nil end
+  end)
+  local watch = CreateFrame("Frame")
+  local wasAlt = false
+  watch:SetScript("OnUpdate", function()
+    local alt = IsAltKeyDown and IsAltKeyDown()
+    if alt and not wasAlt and QS.tipItems and GameTooltip:IsShown() then show() end
+    wasAlt = alt
+    if panel and panel:IsShown() and not alt and not panel:IsMouseOver() then
+      panel:Hide(); itemTip:Hide()
+      if not GameTooltip:IsShown() then QS.tipItems = nil end
+    end
+  end)
+end
