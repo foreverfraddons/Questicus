@@ -459,7 +459,6 @@ end
 -- the line from you to the step you're on (along the less obstructed path, Nav.lua): the only part
 -- of the map drawing that follows you as you move
 PN.legLines = {}
-PN.legCaps = {}
 -- the walking path as it's drawn: the grid's stair steps taken out (points that sit within a few yards
 -- of a straight line between their neighbours go, unless that line would cross a wall) and the corners
 -- rounded off - a smooth, solid line that still follows the lay of the land. Only for drawing: the
@@ -575,25 +574,11 @@ function PN:DrawLeg()
         l.px = 5
         l.fg:SetThickness(5 / cs)
         l.bg:SetThickness(8 / cs)
-        -- a round cap on each joint: no notches where two pieces meet
-        if used > 1 then
-          local cp = PN.legCaps[used]
-          if not cp then
-            cp = { bg = PN.overlay:CreateTexture(nil, "OVERLAY", nil, 6), fg = PN.overlay:CreateTexture(nil, "OVERLAY", nil, 7) }
-            cp.bg:SetTexture(Q.MEDIA .. "disc"); cp.fg:SetTexture(Q.MEDIA .. "disc")
-            cp.bg:SetVertexColor(0, 0, 0, 0.75)
-            PN.legCaps[used] = cp
-          end
-          cp.bg:ClearAllPoints(); cp.bg:SetPoint("CENTER", canvas, "TOPLEFT", a1, b1); cp.bg:SetSize(8 / cs, 8 / cs); cp.bg:Show()
-          cp.fg:ClearAllPoints(); cp.fg:SetPoint("CENTER", canvas, "TOPLEFT", a1, b1); cp.fg:SetSize(5 / cs, 5 / cs); cp.fg:Show()
-          cp.fg:SetVertexColor(L.col[1], L.col[2], L.col[3], 0.95)
-        end
         ax, ay = leg[1], leg[2]
       end
     end
   end
   for i = used + 1, #PN.legLines do PN.legLines[i].bg:Hide(); PN.legLines[i].fg:Hide() end
-  for i = 2, #PN.legCaps do if i > used then PN.legCaps[i].bg:Hide(); PN.legCaps[i].fg:Hide() end end
   -- (the icon may have moved: a waypoint marker over it is looked for again)
   local ic = PN.leg and PN.leg.icon
   local cx, cy
