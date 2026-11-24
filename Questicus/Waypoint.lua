@@ -135,7 +135,10 @@ function W:Follow(force)
   local cooled = last and Q.Spots and Q.Spots.OnCooldown(last) and GetTime() - (W.lastCooled or 0) > 5
   if last and last.i == p.i and not cooled then
     local d = D.Dist(last, p)
-    if d < 60 or (key == lastStep and d < 400) then return end
+    -- (the same step: not for every small move of its spot; a new step: on its own spot, even when that's
+    -- close to the last one - the waypoint was left on the previous target)
+    if key == lastStep and d < 400 then return end
+    if key ~= lastStep and d < 3 then lastStep = key; return end
   end
   if cooled then W.lastCooled = GetTime() end
   if W:Pin(p) then lastStep = key end

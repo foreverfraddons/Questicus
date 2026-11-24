@@ -1254,7 +1254,7 @@ local function bestAction(st, cands)
     for _, n in ipairs(Q.Flight:Unknown(st.pos, P.dset and 600 or 350)) do
       if not st.fp[n.id] then
         local t = travel(st.pos, n, lv) + 8
-        offer({ type = "fp", node = n, point = n, t = t }, (P.dset and DVALUE * 0.5 or QS.QuestXP(lv, lv) * 0.4) / t)
+        offer({ type = "fp", node = n, point = Q.Flight.MasterPoint and Q.Flight.MasterPoint(n) or n, t = t }, (P.dset and DVALUE * 0.5 or QS.QuestXP(lv, lv) * 0.4) / t)
       end
     end
   end

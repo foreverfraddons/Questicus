@@ -420,7 +420,8 @@ watch:SetScript("OnUpdate", function(_, el)
   local s = Q.Planner and Q.Planner.steps and Q.Planner.steps[1]
   if not (s and s.type == "fp" and s.node) or F:Known(s.node.id) then return end
   local here = D:PlayerPos()
-  if not (here and here.i == s.node.i and D.Dist(here, s.node) <= 25) then return end
+  local at = F.MasterPoint(s.node)
+  if not (here and here.i == at.i and D.Dist(here, at) <= 25) then return end
   waited[s.node.id] = (waited[s.node.id] or 0) + dt
   if waited[s.node.id] >= 30 then
     Q.char.noFP = Q.char.noFP or {}
@@ -433,6 +434,26 @@ watch:SetScript("OnUpdate", function(_, el)
     if Q.Planner then Q.Planner:Replan(0.2) end
   end
 end)
+
+-- where the flight master himself stands (the flight node is where the bird lands, often a little way
+-- off): the nearest flight master within 120 yards of the node, else the node
+function F.MasterPoint(n)
+  if not n then return nil end
+  if n.fm == nil then
+    n.fm = false
+    local best, bd
+    for _, id in ipairs(D.flightMasters or {}) do
+      for _, p in ipairs(D:Points("c" .. id) or {}) do
+        if p.i == n.i then
+          local d = D.Dist(p, n)
+          if d <= 120 and (not bd or d < bd) then best, bd = p, d end
+        end
+      end
+    end
+    if best then n.fm = { i = best.i, x = best.x, y = best.y } end
+  end
+  return n.fm or n
+end
 
 Q:Command("flights", "flight masters this character knows", function()
   local t = {}

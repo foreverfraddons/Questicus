@@ -46,9 +46,11 @@ function D:Index()
   end
   D.startItem = {}               -- quest -> item that starts it
   for item, q in pairs(DB.start or {}) do D.startItem[q] = item end
-  D.flightMasters = {}           -- npc ids whose title is Flight Master
+  D.flightMasters = {}           -- npc ids whose title is a flight master's (any race's name for it)
+  local FM = { ["flight master"] = true, ["wind rider master"] = true, ["gryphon master"] = true,
+    ["hippogryph master"] = true, ["bat handler"] = true, ["wind rider keeper"] = true }
   for id, n in pairs(DB.npc or {}) do
-    if n[2] == "Flight Master" then D.flightMasters[#D.flightMasters + 1] = id end
+    if type(n[2]) == "string" and FM[n[2]:lower()] then D.flightMasters[#D.flightMasters + 1] = id end
   end
 end
 

@@ -12,6 +12,7 @@ Q.Changelog = {
     },
     fixed = {
       "Stutters near walls gone: routes round walls are worked out in the background now (a few ms a frame) instead of all at once, and every leg of the route on the map is kept instead of being searched again on every redraw. The line and the arrow also no longer loop back to a corner you've already walked past.",
+      "The waypoint moves to the new step's spot even when it's close to the last one (it was left on the previous target), and \"Get the flight path\" steps lead to the flight master himself, by whatever name he goes (Wind Rider Master, Hippogryph Master, Bat Handler...).",
     },
   },
   { v = "0.9.026",
