@@ -1074,7 +1074,8 @@ local function bestAction(st, cands)
   local dPending = #P.PrepStages(st)
   for id in pairs(P.dset or {}) do
     local inf = QS:Info(id)
-    if not st.done[id] and not st.log[id] and inf and (inf.min or 1) <= lv then dPending = dPending + 1 end
+    -- (one you can only pick up inside doesn't hold the run up: it's got in there)
+    if not st.done[id] and not st.log[id] and inf and (inf.min or 1) <= lv and not P.InsideStart(id) then dPending = dPending + 1 end
   end
   -- every group of objectives still waiting, for the "don't walk away from them" check
   local pending, groups = {}, {}
@@ -1129,7 +1130,7 @@ local function bestAction(st, cands)
         -- it waits like the dungeon's objectives until every quest for it is picked up
         local inside = P.dset and dPending > 0 and p and p.dungeon
         offer({ type = "turnin", id = id, point = p, t = t, back = back, sameEnder = same and same.id },
-          v * 1.15 / (t + back) * (inside and 0.01 or 1))
+          v * 1.15 / (t + back) * (inside and 1e-6 or 1))
       elseif st.udone and st.udone[id] then
         -- (already planned once below: one "Do" step for it is enough)
       elseif not m.obj or not st.open[id] or not next(groups[id] or {}) then
@@ -1185,7 +1186,7 @@ local function bestAction(st, cands)
           offer({ type = "complete", id = id, point = target, bundle = bundle, parts = parts, t = t, back = back,
             together = together, inArea = here,
             partial = #g.lines < (function() local n = 0 for _ in pairs(open) do n = n + 1 end return n end)() },
-            value / (t + back + tail) * (here and 3 or 1) * ((P.dset and m.dungeon and dPending > 0) and 0.01 or 1)
+            value / (t + back + tail) * (here and 3 or 1) * ((P.dset and m.dungeon and dPending > 0) and 1e-6 or 1)
               * ((P.dset and P.dset[id] and not m.dungeon and sameZone(st.pos, target)) and 1.6 or 1))
         end
       end
@@ -1206,6 +1207,8 @@ local function bestAction(st, cands)
       local here = t * speed(lv) <= NEAR
       local ew = (Q.prefs.style == "speed" and 1.0) or (Q.prefs.style == "complete" and 0.15) or 0.5
       local score = P.dset and (DVALUE / (t + 5)) or (questValue(id, lv) / (t + ew * P.Effort(m) + 5))
+      -- dungeon mode: picked up inside - that's part of the run, after everything outside
+      if P.dset and dPending > 0 and not P.HasStartItem(m.info) and P.InsideStart(id) then score = score * 1e-6 end
       -- its objectives are where you're going anyway: do them together
       local overlap
       for _, c in pairs(m.lc or {}) do
@@ -1354,6 +1357,38 @@ end
 
 local function npcName(point)
   return point and point.key and D:Name(point.key) or "?"
+end
+
+-- picked up inside a dungeon: every place its giver stands is in a dungeon, or it starts from an item
+-- that only drops inside one (and isn't in your bags). Returns the dungeon's area id.
+local insideCache = {}
+local function insideOf(keys)
+  local area, any = nil, false
+  for _, k in ipairs(keys or {}) do
+    for _, p in ipairs(D:Points(k) or {}) do
+      any = true
+      if not p.dungeon then return nil end
+      area = area or p.dungeon
+    end
+  end
+  return any and area or nil
+end
+function P.InsideStart(id)
+  local c = insideCache[id]
+  if c ~= nil then return c or nil end
+  local info = QS:Info(id)
+  local area
+  if info then
+    if info.givers and #info.givers > 0 then
+      area = insideOf(info.givers)
+    elseif info.startItem then
+      local keys = {}
+      for _, src in ipairs(D:ItemSources(info.startItem) or {}) do keys[#keys + 1] = src.key end
+      area = insideOf(keys)
+    end
+  end
+  insideCache[id] = area or false
+  return area
 end
 
 -- quests started by an item that drops from these mobs (so the guide can say "loot it")

@@ -537,14 +537,18 @@ function DG:Show()
     local zt = (pic == DG.CASTLE and not tiles) and DG.ZoneTile(e.area)
     r.pic:SetTexture((tiles and tiles[6]) or zt or pic)
     r.pic:SetDesaturated(not inRange)
-    local total, doneN = #e.quests, 0
-    for _, id in ipairs(e.quests) do if QS.done[id] then doneN = doneN + 1 end end
+    local total, doneN, logN = #e.quests, 0, 0
+    for _, id in ipairs(e.quests) do
+      if QS.done[id] then doneN = doneN + 1 elseif QS.log[id] then logN = logN + 1 end
+    end
     local complete = total > 0 and doneN == total
     r.name:SetText((active and c(GOLD, "> ") or "") .. (complete and c(T.HEX.good, e.name) or (inRange and c(T.HEX.white, e.name) or c(DIM, e.name))) ..
       (e.forever and c(T.HEX.good, "  new") or ""))
     r.done:SetShown(complete)
     r.lv:SetText(e.lo and (e.lo == e.hi and tostring(e.lo) or (e.lo .. "-" .. (e.hi or e.lo))) or "?")
-    r.q:SetText(total > 0 and (complete and c(T.HEX.good, ("%d/%d quests"):format(doneN, total)) or ("%d/%d quests"):format(doneN, total)) or "")
+    -- done of all, and how many you're carrying now
+    r.q:SetText(total > 0 and (complete and c(T.HEX.good, ("%d/%d quests"):format(doneN, total))
+      or (("%d/%d done"):format(doneN, total) .. (logN > 0 and c(T.HEX.white, ("  %d in log"):format(logN)) or ""))) or "")
     r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y); r:SetPoint("RIGHT", 0, 0); r:Show()
     y = y + 34
   end
@@ -611,7 +615,10 @@ function DG:QuestRows(e, lv, textH)
     local st, word = DG:QuestState(id, lv)
     local d = { id = id }
     DG.qdata[r] = d
-    r.text:SetText(c(DG.STATUS_COLOR[st], ("[%d] %s"):format(inf.level, inf.title)) .. "  " .. c(DG.STATUS_COLOR[st], "- " .. word))
+    -- picked up inside the dungeon (its giver is in there, or the item that starts it drops in there)
+    local inside = st ~= "done" and st ~= "log" and P.InsideStart and P.InsideStart(id)
+    r.text:SetText(c(DG.STATUS_COLOR[st], ("[%d] %s"):format(inf.level, inf.title)) .. "  " .. c(DG.STATUS_COLOR[st], "- " .. word)
+      .. (inside and c("ffc080ff", "  - picked up inside") or ""))
     local hgt = 18
     if st == "locked" then
       local starts = DG:ChainStart(id)
@@ -770,7 +777,9 @@ function DG:ShowDungeon(e)
   end
   if #e.quests > 0 then
     add(" ")
-    add(c(GOLD, "Quests") .. c(DIM, ("  %d/%d done"):format((function() local n = 0 for _, id in ipairs(e.quests) do if QS.done[id] then n = n + 1 end end return n end)(), #e.quests)))
+      local dn, ln = 0, 0
+    for _, id in ipairs(e.quests) do if QS.done[id] then dn = dn + 1 elseif QS.log[id] then ln = ln + 1 end end
+    add(c(GOLD, "Quests") .. c(DIM, ("  %d/%d done"):format(dn, #e.quests)) .. (ln > 0 and c(T.HEX.white, ("  -  %d in your log"):format(ln)) or ""))
   else
     add(" ")
     add(c(DIM, "No quests for your character here."))
