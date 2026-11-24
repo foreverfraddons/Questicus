@@ -282,7 +282,7 @@ N.HitsWall = hitsWall
 -- you and the target, the walls drawn into it, every square's distance to the nearest wall worked out,
 -- and a search that pays extra for squares close to a wall - so in a corridor the way runs down the
 -- middle instead of bouncing from one wall's corner to the other's.
-local FG_MAX = 150              -- squares a side at most (the square size grows past that)
+local FG_MAX = 420              -- squares a side at most (the square size grows past that)
 local FG_NEAR = 5               -- squares: closer than this to a wall costs extra
 function N.WallGrid(from, to)
   local i = from.i
@@ -352,7 +352,7 @@ function N.WallGrid(from, to)
   local found, expanded = false, 0
   pause()
   local t0 = sliced and debugprofilestop and debugprofilestop()
-  while #open > 0 and expanded < 9000 do
+  while #open > 0 and expanded < (sliced and 80000 or 20000) do
     local cur = heapPop(open)
     if cur == goal then found = true; break end
     expanded = expanded + 1
@@ -689,7 +689,8 @@ function N:Path(from, to, oneLeg)
     while idx <= #cells do
       local far = idx
       for j = #cells, idx, -1 do
-        if lineClear(w, anchor.x, anchor.y, cells[j].x, cells[j].y) then far = j; break end
+        if lineClear(w, anchor.x, anchor.y, cells[j].x, cells[j].y)
+        and not (hasWalls and hitsWall(from.i, anchor.x, anchor.y, cells[j].x, cells[j].y)) then far = j; break end
       end
       out[#out + 1] = cells[far]
       anchor = cells[far]
