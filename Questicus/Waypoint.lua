@@ -48,6 +48,14 @@ end
 function W:Follow()
   if not (Q.db.pins.autoPin ~= false and Q.char and Q.char.surveyDone) then return end
   if Q.CollectOnly and Q.CollectOnly() then return end
+  -- a ghost: the waypoint goes on your corpse (once), and back on the step when you're alive
+  local body = Q.Arrow and Q.Arrow.Corpse and Q.Arrow.Corpse()
+  if body then
+    if W.onCorpse and D.Dist(W.onCorpse, body) < 5 then return end
+    if W:Pin(body) then W.onCorpse = body; lastStep = nil end
+    return
+  end
+  if W.onCorpse then W.onCorpse = nil; last = nil; lastStep = nil end
   local p, s = Q.Guide:Target()
   if not p then return end
   local key = stepKey(s)
@@ -63,3 +71,7 @@ end
 
 Q:On("QC_TARGET_CHANGED", function() Q.Throttle("autopin", 0.5, function() W:Follow() end) end)
 Q:On("QC_PLAN_UPDATED", function() Q.Throttle("autopin", 0.5, function() W:Follow() end) end)
+-- released / alive again: the waypoint moves to your corpse / back to the step
+for _, ev in ipairs({ "PLAYER_DEAD", "PLAYER_ALIVE", "PLAYER_UNGHOST" }) do
+  Q:On(ev, function() Q.After(0.5, function() W:Follow() end) end)
+end

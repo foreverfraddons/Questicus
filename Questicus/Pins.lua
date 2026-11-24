@@ -463,8 +463,13 @@ function PN:DrawLeg()
   local used = 0
   local L = PN.leg
   local here = D:PlayerPos()
+  -- a ghost: the line leads to your corpse instead (back to the step once you're alive)
+  local body = Q.Arrow and Q.Arrow.Corpse and Q.Arrow.Corpse()
+  if body and canvas and lastMap then
+    L = { pt = body, mapID = lastMap, cw = canvas:GetWidth(), ch = canvas:GetHeight(), col = PN.COLORS[1] }
+  end
   -- the step you're on: its nearest open spot now (its icon moves there, nothing else is redrawn)
-  if L and L.live and canvas and L.mapID == lastMap then
+  if L and L.live and not body and canvas and L.mapID == lastMap then
     local now = Q.Guide:Target()
     if now and now ~= L.pt then
       local nx, ny = onMap(now, L.mapID)
@@ -1269,7 +1274,8 @@ function PN:RefreshMinimap(force)
   local here = D:PlayerPos()
   if not here then mpool:Release(); mlineN = 0; mmHideLines(); return end
   local route = PN.RouteSteps()
-  if not force and mmUnchanged(here, route[1] and route[1].point) then return end
+  local body = Q.Arrow and Q.Arrow.Corpse and Q.Arrow.Corpse()
+  if not force and mmUnchanged(here, body or (route[1] and route[1].point)) then return end
   mpool:Release()
   mlineN = 0
   local lines = Q.db.pins.mmRoute ~= false
@@ -1348,7 +1354,9 @@ function PN:RefreshMinimap(force)
       end
     end
     if not pt or pt.i ~= here.i then break end
-    if lines then
+    if lines and body then
+      -- (a ghost: the route's lines give way to the one to your corpse, below)
+    elseif lines then
       -- route line from the previous point (you, then the step before); the first leg follows
       -- the less obstructed path. Lines are clipped at the minimap's edge, so they still show
       -- the way to steps that are further away.
@@ -1391,6 +1399,18 @@ function PN:RefreshMinimap(force)
     if not lines and not inside then break end   -- dotted trail: nothing beyond the edge
     prev, prevX, prevY = pt, x or prevX, y or prevY
   end
+  -- a ghost: the route line leads to your corpse (along the walkable path)
+  if body and lines and body.i == here.i then
+    local col = PN.COLORS[1]
+    local ax, ay = minimapRaw(here, here)
+    local path = Q.Nav and navRoute(here, body)
+    if not (path and #path > 1) then path = { body } end
+    for _, wpt in ipairs(path) do
+      local bx, by = minimapRaw(here, wpt)
+      mmLine(ax, ay, bx, by, col, 3, 0.95)
+      ax, ay = bx, by
+    end
+  end
   mmHideLines()
 end
 
@@ -1419,6 +1439,11 @@ Q:On("PLAYER_CONTROL_LOST", flightChanged)
 Q:On("PLAYER_CONTROL_GAINED", flightChanged)
 Q:On("QC_PLAN_UPDATED", function() available = nil; PN:RefreshWorld() end)
 Q:On("QC_TARGET_CHANGED", function() PN:RefreshWorld() end)
+-- dying / released / alive again: the route line switches between your corpse and the step
+local function lifeChanged()
+  Q.After(0.2, function() PN.MinimapDirty(); PN:RefreshMinimap(true); PN:RefreshWorld(true) end)
+end
+for _, ev in ipairs({ "PLAYER_DEAD", "PLAYER_ALIVE", "PLAYER_UNGHOST" }) do Q:On(ev, lifeChanged) end
 
 -- ------------------------------------------------------------------ your corpse (while a ghost)
 -- a pin on the world map and the minimap where your body is (the arrow leads there too: Arrow.lua)
