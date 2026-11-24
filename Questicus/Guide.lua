@@ -637,8 +637,7 @@ local function build()
   cur.glow:Hide()
   cur.banner = CreateFrame("Frame", nil, cur)
   cur.banner:SetHeight(16)
-  cur.banner:SetPoint("BOTTOMLEFT", cur, "TOPLEFT", 40, -8)      -- a tab sitting on the step's top edge
-  cur.banner:SetPoint("BOTTOMRIGHT", cur, "TOPRIGHT", -40, -8)
+  cur.banner:SetPoint("BOTTOM", cur, "TOP", 0, -8)      -- a tab sitting on the step's top edge, as wide as its text
   cur.banner:SetFrameLevel(cur:GetFrameLevel() + 6)
   T.RFill(cur.banner, { 0.42, 0.22, 0.62, 1 }, 5)
   cur.banner.text = T.Text(cur.banner, 10, { 1, 0.92, 0.7, 1 }, "OUTLINE")
@@ -934,6 +933,7 @@ function GD:Refresh()
         end
       end
       cur.banner.text:SetText("DUNGEON RUN - " .. (dName or "dungeon"):upper() .. (total > 0 and ("   bosses %d/%d"):format(done, total) or ""))
+      cur.banner:SetWidth(math.min((cur.banner.text:GetStringWidth() or 200) + 24, math.max(120, (cur:GetWidth() or 300) - 12)))
 
     else
       cur.icon:SetVertexColor(1, 1, 1, 1)
