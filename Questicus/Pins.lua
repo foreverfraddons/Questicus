@@ -459,6 +459,62 @@ end
 -- the line from you to the step you're on (along the less obstructed path, Nav.lua): the only part
 -- of the map drawing that follows you as you move
 PN.legLines = {}
+PN.legCaps = {}
+-- the walking path as it's drawn: the grid's stair steps taken out (points that sit within a few yards
+-- of a straight line between their neighbours go, unless that line would cross a wall) and the corners
+-- rounded off - a smooth, solid line that still follows the lay of the land. Only for drawing: the
+-- arrow keeps the exact path.
+local SMOOTH_EPS = 15              -- yards
+local function simplify(pts, a, b, out)
+  local A, B = pts[a], pts[b]
+  local best, bi = 0, nil
+  local dx, dy = B.x - A.x, B.y - A.y
+  local l2 = dx * dx + dy * dy
+  for k = a + 1, b - 1 do
+    local P = pts[k]
+    local t = l2 > 0 and math.max(0, math.min(1, ((P.x - A.x) * dx + (P.y - A.y) * dy) / l2)) or 0
+    local d = math.sqrt((P.x - A.x - dx * t) ^ 2 + (P.y - A.y - dy * t) ^ 2)
+    if d > best then best, bi = d, k end
+  end
+  local walled = bi and Q.Nav and Q.Nav.HitsWall and Q.Nav.HitsWall(A.i or 0, A.x, A.y, B.x, B.y)
+  if bi and (best > SMOOTH_EPS or walled) then
+    simplify(pts, a, bi, out)
+    simplify(pts, bi, b, out)
+  else
+    out[#out + 1] = B
+  end
+end
+local smoothCache = {}
+function PN.SmoothPath(start, path)
+  if not (start and path and #path > 1) then return path end
+  local c = smoothCache
+  if c.path == path and c.n == #path and c.last == path[#path] and math.abs(c.x - start.x) < 2 and math.abs(c.y - start.y) < 2 then
+    return c.out
+  end
+  local pts = { { i = start.i, x = start.x, y = start.y } }
+  for _, q in ipairs(path) do pts[#pts + 1] = { i = q.i or start.i, x = q.x, y = q.y } end
+  local simple = { pts[1] }
+  simplify(pts, 1, #pts, simple)
+  -- rounded corners (Chaikin: each corner cut at a quarter of its two sides), twice
+  local cur = simple
+  for _ = 1, 2 do
+    if #cur < 3 then break end
+    local nxt = { cur[1] }
+    for k = 1, #cur - 1 do
+      local P, R = cur[k], cur[k + 1]
+      local q = { i = P.i, x = P.x * 0.75 + R.x * 0.25, y = P.y * 0.75 + R.y * 0.25 }
+      local rr = { i = P.i, x = P.x * 0.25 + R.x * 0.75, y = P.y * 0.25 + R.y * 0.75 }
+      if k > 1 then nxt[#nxt + 1] = q end
+      if k < #cur - 1 then nxt[#nxt + 1] = rr end
+    end
+    nxt[#nxt + 1] = cur[#cur]
+    cur = nxt
+  end
+  local out = {}
+  for k = 2, #cur do out[#out + 1] = cur[k] end
+  c.path, c.n, c.last, c.x, c.y, c.out = path, #path, path[#path], start.x, start.y, out
+  return out
+end
 function PN:DrawLeg()
   local used = 0
   local L = PN.leg
@@ -494,6 +550,7 @@ function PN:DrawLeg()
       if Q.Nav then
         local path = Q.Nav:Route(here, L.pt)
         if path and #path > 1 then
+          path = PN.SmoothPath(here, path)
           legs = {}
           for _, wpt in ipairs(path) do
             local wx, wy = onMap(wpt, L.mapID)
@@ -518,11 +575,25 @@ function PN:DrawLeg()
         l.px = 5
         l.fg:SetThickness(5 / cs)
         l.bg:SetThickness(8 / cs)
+        -- a round cap on each joint: no notches where two pieces meet
+        if used > 1 then
+          local cp = PN.legCaps[used]
+          if not cp then
+            cp = { bg = PN.overlay:CreateTexture(nil, "OVERLAY", nil, 6), fg = PN.overlay:CreateTexture(nil, "OVERLAY", nil, 7) }
+            cp.bg:SetTexture(Q.MEDIA .. "disc"); cp.fg:SetTexture(Q.MEDIA .. "disc")
+            cp.bg:SetVertexColor(0, 0, 0, 0.75)
+            PN.legCaps[used] = cp
+          end
+          cp.bg:ClearAllPoints(); cp.bg:SetPoint("CENTER", canvas, "TOPLEFT", a1, b1); cp.bg:SetSize(8 / cs, 8 / cs); cp.bg:Show()
+          cp.fg:ClearAllPoints(); cp.fg:SetPoint("CENTER", canvas, "TOPLEFT", a1, b1); cp.fg:SetSize(5 / cs, 5 / cs); cp.fg:Show()
+          cp.fg:SetVertexColor(L.col[1], L.col[2], L.col[3], 0.95)
+        end
         ax, ay = leg[1], leg[2]
       end
     end
   end
   for i = used + 1, #PN.legLines do PN.legLines[i].bg:Hide(); PN.legLines[i].fg:Hide() end
+  for i = 2, #PN.legCaps do if i > used then PN.legCaps[i].bg:Hide(); PN.legCaps[i].fg:Hide() end end
   -- (the icon may have moved: a waypoint marker over it is looked for again)
   local ic = PN.leg and PN.leg.icon
   local cx, cy
@@ -1362,6 +1433,7 @@ function PN:RefreshMinimap(force)
       -- the way to steps that are further away.
       local ax, ay = minimapRaw(here, prev)
       local path = k == 1 and Q.Nav and not Q.OnTaxi() and navRoute(here, pt)
+      if path and #path > 1 then path = PN.SmoothPath(here, path) end
       if path and #path > 1 then
         for _, wpt in ipairs(path) do
           local bx, by = minimapRaw(here, wpt)
@@ -1404,7 +1476,7 @@ function PN:RefreshMinimap(force)
     local col = PN.COLORS[1]
     local ax, ay = minimapRaw(here, here)
     local path = Q.Nav and navRoute(here, body)
-    if not (path and #path > 1) then path = { body } end
+    if not (path and #path > 1) then path = { body } else path = PN.SmoothPath(here, path) end
     for _, wpt in ipairs(path) do
       local bx, by = minimapRaw(here, wpt)
       mmLine(ax, ay, bx, by, col, 3, 0.95)
