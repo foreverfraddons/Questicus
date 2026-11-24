@@ -571,7 +571,7 @@ local ICON = {
   can = "Interface\\GossipFrame\\AvailableQuestIcon",
   locked = "Interface\\GossipFrame\\AvailableQuestIcon",
 }
-DG.INSIDE_ICON = "Interface\\Icons\\INV_Misc_Key_14"
+DG.INSIDE_ICON = Q.MEDIA .. "i_dungeon"
 local function qrow(i)
   local r = qrows[i]
   if r then return r end
@@ -608,6 +608,13 @@ local function qrow(i)
       GameTooltip:AddLine(" ")
       GameTooltip:AddLine("Picked up inside the dungeon", 0.75, 0.5, 1)
     end
+    if d.reason then
+      GameTooltip:AddLine(" ")
+      GameTooltip:AddLine("Not eligible yet: " .. d.reason, 1, 0.4, 0.4, true)
+      if d.starts and #d.starts > 0 then
+        GameTooltip:AddLine("+ Route puts the start of its chain on your route.", 0.7, 0.7, 0.7, true)
+      end
+    end
     if d.starts and #d.starts > 0 then
       GameTooltip:AddLine(" ")
       GameTooltip:AddLine("Start the chain with:", 1, 0.25, 0.25)
@@ -630,7 +637,7 @@ local function head(i)
   h.icon = h:CreateTexture(nil, "ARTWORK")
   h.icon:SetSize(16, 16)
   h.icon:SetPoint("TOPLEFT", 4, -3)
-  h.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
   h.text = T.Text(h, 12, T.c.text)
   h.text:SetPoint("TOPLEFT", 4, -4)
   h.text:SetPoint("RIGHT", -4, 0)
@@ -645,7 +652,7 @@ local function head(i)
 end
 local SHORT = {
   ["done"] = "Done", ["ready to hand in"] = "Ready to hand in", ["in your log"] = "In your log",
-  ["can get now"] = "Can get now", ["needs an earlier quest"] = "Needs an earlier quest",
+  ["can get now"] = "Eligible",
 }
 function DG:QuestRows(e, lv, textH)
   local outside, inside = {}, {}
@@ -695,7 +702,9 @@ function DG:QuestRows(e, lv, textH)
       r.icon:SetDesaturated(st == "locked" or (st == "log" and word ~= "ready to hand in"))
       r.icon:SetAlpha(st == "locked" and 0.5 or 1)
       r.text:SetText(c(DG.STATUS_COLOR[st], inf.title) .. c(DIM, ("  %d"):format(inf.level)))
-      r.status:SetText(SHORT[word] or (word:gsub("^needs level", "Needs level")))
+      -- eligible or not (why not: on hover, and the chain's start under it)
+      r.status:SetText(st == "locked" and c("ff6060", "Not eligible") or SHORT[word] or word)
+      d.reason = st == "locked" and word or nil
       local hgt = 20
       if st == "locked" then
         local starts = DG:ChainStart(id)

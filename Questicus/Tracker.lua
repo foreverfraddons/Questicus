@@ -189,7 +189,7 @@ function TR:Refresh()
     -- headings between the dungeon's quests and the rest
     if dmode and inRun[id] and wasRun == nil then
       band = true
-      put("|T" .. "Interface\\Icons\\INV_Misc_Key_14" .. ":12:12:0:0:64:64:5:59:5:59|t " .. Q.Color("c08cff", dname or "Dungeon"),
+      put("|T" .. Q.MEDIA .. "i_dungeon:13|t " .. Q.Color("c08cff", dname or "Dungeon"),
         Q.Color(T.HEX.dim, runN .. " quest" .. (runN == 1 and "" or "s")), fs + 8, nil)
       wasRun = true
     elseif dmode and not inRun[id] and wasRun ~= false then
