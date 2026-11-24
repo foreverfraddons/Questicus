@@ -275,12 +275,12 @@ end
 QS.MoneyText = money
 -- for any quest tooltip: what the quest says to do (the line under its title in the quest log)
 -- and its quest id, added to the lines `t` (returns t)
-function QS:TipExtra(id, t)
+function QS:TipExtra(id, t, noId, noHow)
   t = t or {}
   if not id then return t end
-  local how = Q.Guide and Q.Guide.HowText and Q.Guide.HowText(id)
+  local how = not noHow and Q.Guide and Q.Guide.HowText and Q.Guide.HowText(id)
   if how then t[#t + 1] = "|cffffd100Objective:|r " .. how end
-  t[#t + 1] = "|cff808080Quest ID: " .. id .. "|r"
+  if not noId then t[#t + 1] = "|cff808080Quest ID: " .. id .. "|r" end
   return t
 end
 -- the quest in your log with this title (for tooltips that only know the name)
@@ -298,6 +298,7 @@ function QS:QuestTip(id, giverName, footer)
   local m = QS.RewardMoney(id)
   lines[#lines + 1] = ("%d XP%s"):format(xp or 0, (m and m > 0) and ("   " .. money(m)) or "")
   if giverName then lines[#lines + 1] = "From " .. giverName end
+  QS:TipExtra(id, lines, true)             -- the objective, with the chain under it
   local chain = QS:Chain(id)
   if #chain > 1 then
     local parts = {}
@@ -312,7 +313,7 @@ function QS:QuestTip(id, giverName, footer)
     lines[#lines + 1] = ("Chain (%d of %d): "):format((function() for i, c in ipairs(chain) do if c == id then return i end end end)() or 1, #chain)
       .. table.concat(parts, " > ")
   end
-  QS:TipExtra(id, lines)
+  QS:TipExtra(id, lines, false, true)      -- the quest ID last
   if footer then lines[#lines + 1] = footer end
   return lines
 end
