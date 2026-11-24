@@ -278,6 +278,89 @@ local function hitsWall(i, ax, ay, bx, by)
   end
 end
 N.HitsWall = hitsWall
+-- the shortest way round hand-drawn walls: points just past each wall's ends and off both sides of its
+-- bends, joined where nothing's in the way (a visibility graph), searched from you to the target.
+-- Only walls near the way count (at most 160 points).
+local WALL_OFF = 7              -- yards off a wall's end / bend (past the 3-yard pad)
+function N.WallWay(from, to)
+  local i = from.i
+  local pad = 350
+  local minx, maxx = math.min(from.x, to.x) - pad, math.max(from.x, to.x) + pad
+  local miny, maxy = math.min(from.y, to.y) - pad, math.max(from.y, to.y) + pad
+  local nodes = { { x = from.x, y = from.y }, { x = to.x, y = to.y } }
+  local cand = {}
+  local sx, sy = to.x - from.x, to.y - from.y
+  local sl2 = sx * sx + sy * sy
+  local function add(x, y)
+    if x >= minx and x <= maxx and y >= miny and y <= maxy then
+      -- (how far off the straight way: the nearest ones are kept when there are too many)
+      local t = sl2 > 0 and math.max(0, math.min(1, ((x - from.x) * sx + (y - from.y) * sy) / sl2)) or 0
+      local d = (x - from.x - sx * t) ^ 2 + (y - from.y - sy * t) ^ 2
+      cand[#cand + 1] = { x = x, y = y, d = d }
+    end
+  end
+  for _, wl in pairs(wallList(i)) do
+    local n = wl.n
+    local m = #n / 2
+    for k = 1, m do
+      local x, y = n[2 * k - 1], n[2 * k]
+      if x >= minx and x <= maxx and y >= miny and y <= maxy then
+        if k == 1 or k == m then
+          -- past the end, along the wall
+          local ox, oy = (k == 1) and n[3] or n[2 * k - 3], (k == 1) and n[4] or n[2 * k - 2]
+          local dx, dy = x - ox, y - oy
+          local l = math.sqrt(dx * dx + dy * dy)
+          if l > 0 then add(x + dx / l * WALL_OFF, y + dy / l * WALL_OFF) end
+        else
+          -- off both sides of a bend
+          local ax, ay = n[2 * k - 3], n[2 * k - 2]
+          local bx, by = n[2 * k + 1], n[2 * k + 2]
+          local u1x, u1y = x - ax, y - ay
+          local u2x, u2y = bx - x, by - y
+          local l1, l2 = math.sqrt(u1x * u1x + u1y * u1y), math.sqrt(u2x * u2x + u2y * u2y)
+          if l1 > 0 and l2 > 0 then
+            local nx, ny = -(u1y / l1 + u2y / l2), (u1x / l1 + u2x / l2)
+            local nl = math.sqrt(nx * nx + ny * ny)
+            if nl > 0.05 then
+              nx, ny = nx / nl, ny / nl
+              add(x + nx * WALL_OFF, y + ny * WALL_OFF)
+              add(x - nx * WALL_OFF, y - ny * WALL_OFF)
+            end
+          end
+        end
+      end
+    end
+  end
+  if #cand > 160 then table.sort(cand, function(p, q) return p.d < q.d end) end
+  for k = 1, math.min(160, #cand) do nodes[#nodes + 1] = cand[k] end
+  -- Dijkstra over the points, edges checked lazily
+  local n = #nodes
+  local dist, prev, done = { [1] = 0 }, {}, {}
+  for _ = 1, n do
+    local u, ud
+    for k = 1, n do
+      if not done[k] and dist[k] and (not ud or dist[k] < ud) then u, ud = k, dist[k] end
+    end
+    if not u or u == 2 then break end
+    done[u] = true
+    local a = nodes[u]
+    for v = 1, n do
+      if not done[v] then
+        local b = nodes[v]
+        local d = ud + math.sqrt((a.x - b.x) ^ 2 + (a.y - b.y) ^ 2)
+        if (not dist[v] or d < dist[v]) and not hitsWall(i, a.x, a.y, b.x, b.y) then dist[v], prev[v] = d, u end
+      end
+    end
+  end
+  if not dist[2] then return nil end
+  local out, k = {}, 2
+  while k and k ~= 1 do
+    table.insert(out, 1, { i = i, x = nodes[k].x, y = nodes[k].y })
+    k = prev[k]
+  end
+  out[#out] = to
+  return out
+end
 -- round a wall: the end of the whole wall line nearer the way (a little past it)
 local function roundWall(i, from, to)
   local best, bd
@@ -357,82 +440,110 @@ function N:Path(from, to, oneLeg)
     return { to }
   end
   if not walled and (not w or dist < CELL * 2 or lineClear(w, from.x, from.y, to.x, to.y)) then return { to } end
-  w = w or {}
-  local zones = D:HasBorders(from.i)
-  local zgoal = zones and D:ZoneAt(from.i, to.x, to.y)
-  local zstart = zones and D:ZoneAt(from.i, from.x, from.y)
-  local oneZone = zgoal and zgoal ~= 0 and zgoal == zstart
-  local sx, sy = cellOf(from.x, from.y)
-  local gx, gy = cellOf(to.x, to.y)
-  local minx, maxx = math.min(sx, gx) - MARGIN, math.max(sx, gx) + MARGIN
-  local miny, maxy = math.min(sy, gy) - MARGIN, math.max(sy, gy) + MARGIN
-  local start, goal = keyOf(sx, sy), keyOf(gx, gy)
-  local tr = QuesticusCollect and QuesticusCollect.trail and QuesticusCollect.trail[from.i]
-  local g, came, open = { [start] = 0 }, {}, {}
-  local cxOf, cyOf = { [start] = sx }, { [start] = sy }
-  heapPush(open, start, 0)
-  local expanded, found = 0, false
-  while #open > 0 and expanded < MAX_EXPAND do
-    local cur = heapPop(open)
-    if cur == goal then found = true; break end
-    expanded = expanded + 1
-    local cx, cy = cxOf[cur], cyOf[cur]
-    for dx = -1, 1 do
-      for dy = -1, 1 do
-        if dx ~= 0 or dy ~= 0 then
-          local nx, ny = cx + dx, cy + dy
-          if nx >= minx and nx <= maxx and ny >= miny and ny <= maxy then
-            local nk = keyOf(nx, ny)
-            local step = (dx ~= 0 and dy ~= 0) and 1.414 or 1
-            -- (never through a wall drawn by hand)
-            if hasWalls and hitsWall(from.i, (cx + 0.5) * CELL, (cy + 0.5) * CELL, (nx + 0.5) * CELL, (ny + 0.5) * CELL) then
-              step = math.huge
-            end
-            if not w[nk] then
-              step = step * UNKNOWN_COST
-              if zones then
-                local zn = zoneOfCell(from.i, nk, nx, ny)
-                if zn == 0 then step = step * VOID_COST
-                elseif zn then
-                  local zc = zoneOfCell(from.i, cur, cx, cy)
-                  if zc and zc ~= 0 and zc ~= zn then step = step * BORDER_COST end
-                  if oneZone and zn ~= zgoal then step = step * OTHER_ZONE end
-                end
+  local function grid()
+    w = w or {}
+    local zones = D:HasBorders(from.i)
+    local zgoal = zones and D:ZoneAt(from.i, to.x, to.y)
+    local zstart = zones and D:ZoneAt(from.i, from.x, from.y)
+    local oneZone = zgoal and zgoal ~= 0 and zgoal == zstart
+    local sx, sy = cellOf(from.x, from.y)
+    local gx, gy = cellOf(to.x, to.y)
+    local minx, maxx = math.min(sx, gx) - MARGIN, math.max(sx, gx) + MARGIN
+    local miny, maxy = math.min(sy, gy) - MARGIN, math.max(sy, gy) + MARGIN
+    local start, goal = keyOf(sx, sy), keyOf(gx, gy)
+    local tr = QuesticusCollect and QuesticusCollect.trail and QuesticusCollect.trail[from.i]
+    local g, came, open = { [start] = 0 }, {}, {}
+    local cxOf, cyOf = { [start] = sx }, { [start] = sy }
+    heapPush(open, start, 0)
+    local expanded, found = 0, false
+    while #open > 0 and expanded < MAX_EXPAND do
+      local cur = heapPop(open)
+      if cur == goal then found = true; break end
+      expanded = expanded + 1
+      local cx, cy = cxOf[cur], cyOf[cur]
+      for dx = -1, 1 do
+        for dy = -1, 1 do
+          if dx ~= 0 or dy ~= 0 then
+            local nx, ny = cx + dx, cy + dy
+            if nx >= minx and nx <= maxx and ny >= miny and ny <= maxy then
+              local nk = keyOf(nx, ny)
+              local step = (dx ~= 0 and dy ~= 0) and 1.414 or 1
+              -- (never through a wall drawn by hand)
+              if hasWalls and hitsWall(from.i, (cx + 0.5) * CELL, (cy + 0.5) * CELL, (nx + 0.5) * CELL, (ny + 0.5) * CELL) then
+                step = math.huge
               end
-            elseif tr and tr[nk] then step = step * WALKED_COST end
-            step = step * avoidCost(nk)
-            local ng = g[cur] + step
-            if step < math.huge and (not g[nk] or ng < g[nk]) then
-              g[nk], came[nk], cxOf[nk], cyOf[nk] = ng, cur, nx, ny
-              local hx, hy = gx - nx, gy - ny
-              heapPush(open, nk, ng + math.sqrt(hx * hx + hy * hy))
+              if not w[nk] then
+                step = step * UNKNOWN_COST
+                if zones then
+                  local zn = zoneOfCell(from.i, nk, nx, ny)
+                  if zn == 0 then step = step * VOID_COST
+                  elseif zn then
+                    local zc = zoneOfCell(from.i, cur, cx, cy)
+                    if zc and zc ~= 0 and zc ~= zn then step = step * BORDER_COST end
+                    if oneZone and zn ~= zgoal then step = step * OTHER_ZONE end
+                  end
+                end
+              elseif tr and tr[nk] then step = step * WALKED_COST end
+              step = step * avoidCost(nk)
+              local ng = g[cur] + step
+              if step < math.huge and (not g[nk] or ng < g[nk]) then
+                g[nk], came[nk], cxOf[nk], cyOf[nk] = ng, cur, nx, ny
+                local hx, hy = gx - nx, gy - ny
+                heapPush(open, nk, ng + math.sqrt(hx * hx + hy * hy))
+              end
             end
           end
         end
       end
     end
-  end
-  if not found then return { to } end
-  -- cells back to front -> world points (cell centres)
-  local cells = {}
-  local k = goal
-  while k do
-    table.insert(cells, 1, { i = from.i, x = (cxOf[k] + 0.5) * CELL, y = (cyOf[k] + 0.5) * CELL })
-    k = came[k]
-  end
-  cells[#cells] = { i = to.i, x = to.x, y = to.y }
-  -- string pulling: keep only the corners
-  local out, anchor, idx = {}, from, 1
-  while idx <= #cells do
-    local far = idx
-    for j = #cells, idx, -1 do
-      if lineClear(w, anchor.x, anchor.y, cells[j].x, cells[j].y) then far = j; break end
+    if not found then return { to } end
+    -- cells back to front -> world points (cell centres)
+    local cells = {}
+    local k = goal
+    while k do
+      table.insert(cells, 1, { i = from.i, x = (cxOf[k] + 0.5) * CELL, y = (cyOf[k] + 0.5) * CELL })
+      k = came[k]
     end
-    out[#out + 1] = cells[far]
-    anchor = cells[far]
-    idx = far + 1
+    cells[#cells] = { i = to.i, x = to.x, y = to.y }
+    -- string pulling: keep only the corners
+    local out, anchor, idx = {}, from, 1
+    while idx <= #cells do
+      local far = idx
+      for j = #cells, idx, -1 do
+        if lineClear(w, anchor.x, anchor.y, cells[j].x, cells[j].y) then far = j; break end
+      end
+      out[#out + 1] = cells[far]
+      anchor = cells[far]
+      idx = far + 1
+    end
+    return out
   end
-  return out
+  -- hand-drawn walls about: also the shortest way round the walls themselves (through the openings
+  -- between them, past their ends) - the grid's 20-yard squares can't see a narrow opening, so its way
+  -- can go far round or (corners joined up) over a wall
+  if hasWalls then
+    local vis = N.WallWay and N.WallWay(from, to)
+    local ok, a = pcall(grid)
+    a = ok and a or nil
+    if vis then
+      local function len(list)
+        local d, px, py = 0, from.x, from.y
+        for _, q in ipairs(list) do d = d + math.sqrt((q.x - px) ^ 2 + (q.y - py) ^ 2); px, py = q.x, q.y end
+        return d
+      end
+      local function crossesWall(list)
+        local px, py = from.x, from.y
+        for _, q in ipairs(list) do
+          if hitsWall(from.i, px, py, q.x, q.y) then return true end
+          px, py = q.x, q.y
+        end
+        return false
+      end
+      if not a or (#a == 1 and a[1] == to) or crossesWall(a) or len(a) > len(vis) * 1.25 then return vis end
+    end
+    return a or { to }
+  end
+  return grid()
 end
 
 -- cached paths, one per target (the arrow and the minimap ask for different targets: with a single

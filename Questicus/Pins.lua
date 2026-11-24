@@ -509,6 +509,17 @@ function PN.SmoothPath(start, path)
     nxt[#nxt + 1] = cur[#cur]
     cur = nxt
   end
+  -- the rounding must not cut over a wall (a narrow opening, a wall's end): then without it - and if even
+  -- the straightened line would, the path as it was found
+  local HW = Q.Nav and Q.Nav.HitsWall
+  local function clear(list)
+    if not HW then return true end
+    for k = 1, #list - 1 do
+      if HW(start.i or 0, list[k].x, list[k].y, list[k + 1].x, list[k + 1].y) then return false end
+    end
+    return true
+  end
+  if not clear(cur) then cur = clear(simple) and simple or pts end
   local out = {}
   for k = 2, #cur do out[#out + 1] = cur[k] end
   c.path, c.n, c.last, c.x, c.y, c.out = path, #path, path[#path], start.x, start.y, out
