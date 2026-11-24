@@ -284,6 +284,36 @@ N.HitsWall = hitsWall
 -- middle instead of bouncing from one wall's corner to the other's.
 local FG_MAX = 420              -- squares a side at most (the square size grows past that)
 local FG_NEAR = 5               -- squares: closer than this to a wall costs extra
+-- pcall that a background search can still pause inside (the game's Lua can't pause across a pcall,
+-- so in the background it's a plain call - the background job itself catches errors)
+local function softcall(f, ...)
+  local co, isMain = coroutine.running()
+  if co and not isMain then return true, f(...) end
+  return pcall(f, ...)
+end
+N.softcall = softcall
+-- in the background: pause once this frame's few ms are used up
+local sliceT0
+local function tick()
+  local co, isMain = coroutine.running()
+  if not co or isMain or not debugprofilestop then return end
+  local now = debugprofilestop()
+  if not sliceT0 then sliceT0 = now; return end
+  if now - sliceT0 > 3 then coroutine.yield(); sliceT0 = debugprofilestop() end
+end
+N.tick = tick
+function N.SliceStart() sliceT0 = debugprofilestop and debugprofilestop() end
+-- any hand-drawn wall within the box?
+function N.WallsNear(i, x0, x1, y0, y1)
+  local segs = segsOf(i)
+  if not next(segs) then return false end
+  for bxx = math.floor(x0 / WB), math.floor(x1 / WB) do
+    for byy = math.floor(y0 / WB), math.floor(y1 / WB) do
+      if segs[bxx .. ":" .. byy] then return true end
+    end
+  end
+  return false
+end
 function N.WallGrid(from, to)
   local i = from.i
   local margin = 160
@@ -313,6 +343,7 @@ function N.WallGrid(from, to)
       if not ((ax < x0 and bx < x0) or (ax > x1 and bx > x1) or (ay < y0 and by < y0) or (ay > y1 and by > y1)) then
         local l = math.sqrt((bx - ax) ^ 2 + (by - ay) ^ 2)
         local steps = math.max(1, math.ceil(l / (c * 0.5)))
+        tick()
         for k = 0, steps do
           local px, py = ax + (bx - ax) * k / steps, ay + (by - ay) * k / steps
           local cx, cy = math.floor((px - x0) / c), math.floor((py - y0) / c)
@@ -397,6 +428,7 @@ function N.WallGrid(from, to)
   -- fewer points, same shape (within a couple of yards, never over a wall)
   local out = {}
   local function simp(a, b)
+    tick()
     local A, B = cells[a], cells[b]
     local dx, dy = B.x - A.x, B.y - A.y
     local l2 = dx * dx + dy * dy
@@ -418,44 +450,13 @@ function N.WallGrid(from, to)
   return out
 end
 
--- the fine wall search, in the background: the answer for this target when there's one worked out from
--- near here; else one is started (a few ms a frame) and the route is looked at again when it's done
-local wgDone, wgJob, wgQueue = {}, nil, {}
-local function wgKey(to) return (to.i or 0) .. ":" .. math.floor(to.x / 10) .. ":" .. math.floor(to.y / 10) end
+-- the fine wall search: only inside a background route search (N.Background) - on the spot it's too slow
+-- for a frame. (N.syncWalls: tests, all at once.)
+local wgDone = {}
 function N.WallGridFor(from, to)
-  local k = wgKey(to)
-  local d = wgDone[k]
-  if d and d.from.i == from.i and (d.from.x - from.x) ^ 2 + (d.from.y - from.y) ^ 2 < 40 * 40 then
-    return d.path or nil
-  end
-  -- (tests and anything outside the game: right away)
-  if not (CreateFrame and debugprofilestop and N.wgFrame) then return N.WallGrid(from, to) end
-  if not (wgJob and wgJob.k == k) then
-    wgQueue[k] = { k = k, from = { i = from.i, x = from.x, y = from.y }, to = to }
-  end
+  local co, isMain = coroutine.running()
+  if (co and not isMain) or N.syncWalls then return N.WallGrid(from, to) end
   return nil
-end
-if CreateFrame then
-  N.wgFrame = CreateFrame("Frame")
-  N.wgFrame:SetScript("OnUpdate", function()
-    if not wgJob then
-      local k, j = next(wgQueue)
-      if not k then return end
-      wgQueue[k] = nil
-      j.co = coroutine.create(function() return N.WallGrid(j.from, j.to) end)
-      wgJob = j
-    end
-    local ok, res = coroutine.resume(wgJob.co)
-    if not ok or coroutine.status(wgJob.co) == "dead" then
-      local n = 0
-      for _ in pairs(wgDone) do n = n + 1 end
-      if n > 30 then wipe(wgDone) end
-      wgDone[wgJob.k] = { from = wgJob.from, path = ok and res or false }
-      wgJob = nil
-      -- (the route looks again, now with it)
-      if N.ForgetRoutes then N.ForgetRoutes() end
-    end
-  end)
 end
 -- the shortest way round hand-drawn walls: points just past each wall's ends and off both sides of its
 -- bends, joined where nothing's in the way (a visibility graph), searched from you to the target.
@@ -597,7 +598,7 @@ function N:Path(from, to, oneLeg)
       end
       stops[#stops + 1] = to
       for _, q in ipairs(stops) do
-        local ok, leg = pcall(N.Path, N, at, q, true)
+        local ok, leg = softcall(N.Path, N, at, q, true)
         if ok and leg and #leg > 0 then
           for j = 1, #leg - 1 do out[#out + 1] = leg[j] end
         end
@@ -635,10 +636,17 @@ function N:Path(from, to, oneLeg)
     local cxOf, cyOf = { [start] = sx }, { [start] = sy }
     heapPush(open, start, 0)
     local expanded, found = 0, false
+    local co, isMain = coroutine.running()
+    local sliced = co and not isMain
+    local t0 = sliced and debugprofilestop and debugprofilestop()
     while #open > 0 and expanded < MAX_EXPAND do
       local cur = heapPop(open)
       if cur == goal then found = true; break end
       expanded = expanded + 1
+      if sliced and expanded % 100 == 0 and (not t0 or debugprofilestop() - t0 > 3) then
+        coroutine.yield()
+        t0 = debugprofilestop and debugprofilestop()
+      end
       local cx, cy = cxOf[cur], cyOf[cur]
       for dx = -1, 1 do
         for dy = -1, 1 do
@@ -689,6 +697,7 @@ function N:Path(from, to, oneLeg)
     while idx <= #cells do
       local far = idx
       for j = #cells, idx, -1 do
+        tick()
         if lineClear(w, anchor.x, anchor.y, cells[j].x, cells[j].y)
         and not (hasWalls and hitsWall(from.i, anchor.x, anchor.y, cells[j].x, cells[j].y)) then far = j; break end
       end
@@ -705,7 +714,7 @@ function N:Path(from, to, oneLeg)
     -- (WallWay's visibility graph is far too slow with many walls - seconds - so only the grid; in
     -- the game it's worked out in the background and used once it's there)
     local vis = N.WallGridFor and N.WallGridFor(from, to)
-    local ok, a = pcall(grid)
+    local ok, a = softcall(grid)
     a = ok and a or nil
     if vis then
       local function len(list)
@@ -735,6 +744,34 @@ end
 local cache, cacheN = {}, 0
 function N:Forget() wipe(cache); cacheN = 0; wipe(zcell); wipe(wallSegs); wipe(wgDone) end
 function N.ForgetRoutes() wipe(cache); cacheN = 0 end
+-- route searches in the background, one at a time, a few ms a frame
+local bgQueue, bgJob = {}, nil
+function N.Background(key, e, from, to)
+  if bgJob and bgJob.key == key then return end
+  bgQueue[key] = { key = key, e = e, from = from, to = to }
+end
+if CreateFrame then
+  N.bgFrame = CreateFrame("Frame")
+  N.bgFrame:SetScript("OnUpdate", function()
+    if not bgJob then
+      local k, j = next(bgQueue)
+      if not k then return end
+      bgQueue[k] = nil
+      j.co = coroutine.create(function() return N:Path(j.from, j.to) end)
+      bgJob = j
+    end
+    N.SliceStart()
+    local ok, res = coroutine.resume(bgJob.co)
+    if not ok or coroutine.status(bgJob.co) == "dead" then
+      local j = bgJob
+      bgJob = nil
+      if cache[j.key] == j.e then
+        j.e.path = (ok and res) or j.e.path or { j.to }
+        j.e.from = j.from
+      end
+    end
+  end)
+end
 local function airborne()
   return (Q.OnTaxi and Q.OnTaxi()) or (IsFlying and IsFlying()) or false
 end
@@ -858,16 +895,31 @@ function N:Route(here, to)
   if not stale and e.from and D.Dist(here, e.from) > math.max(80, D.Dist(e.from, to) * 0.15) then stale = true end
   if stale then
     if not e then
-      if cacheN >= 8 then wipe(cache); cacheN = 0 end
+      -- (room for every leg of the route on the map: with only 8 they pushed each other out and were
+      -- all searched again on every redraw)
+      if cacheN >= 48 then
+        local oldK, oldAt
+        for k2, e2 in pairs(cache) do if not oldAt or e2.at < oldAt then oldK, oldAt = k2, e2.at end end
+        cache[oldK] = nil; cacheN = cacheN - 1
+      end
       e = {}; cache[key] = e; cacheN = cacheN + 1
     end
     e.at, e.from = now, { i = here.i, x = here.x, y = here.y }
-    local t0 = debugprofilestop and debugprofilestop()
-    local ok, res = pcall(N.Path, N, here, to)
-    -- (a slow search - walls, a long way - is kept longer before it's worked out again)
-    local took = t0 and (debugprofilestop() - t0) or 0
-    if took > 15 then e.at = now + math.min(30, took / 2) end
-    e.path = ok and res or { to }
+    local pad = 200
+    local near = N.WallsNear and here.i == to.i and N.WallsNear(here.i, math.min(here.x, to.x) - pad, math.max(here.x, to.x) + pad,
+      math.min(here.y, to.y) - pad, math.max(here.y, to.y) + pad)
+    if near and N.bgFrame then
+      -- walls about: worked out in the background (a few ms a frame); the old way, or straight, till then
+      N.Background(key, e, { i = here.i, x = here.x, y = here.y }, to)
+      e.path = e.path or { to }
+    else
+      local t0 = debugprofilestop and debugprofilestop()
+      local ok, res = pcall(N.Path, N, here, to)
+      -- (a slow search - a long way - is kept longer before it's worked out again)
+      local took = t0 and (debugprofilestop() - t0) or 0
+      if took > 15 then e.at = now + math.min(30, took / 2) end
+      e.path = ok and res or { to }
+    end
     p = e.path
   end
   if p and #p > 0 then p[#p] = to end            -- (exactly the target, not the one 10 yards off)
@@ -877,6 +929,18 @@ function N:Route(here, to)
   -- (and only once the way on to the next one is clear: never cut a corner round a wall's end)
   while p and #p > 1 and D.Dist(here, p[1]) < reach and not hitsWall(here.i, here.x, here.y, p[2].x, p[2].y) do
     table.remove(p, 1)
+  end
+  -- corners already behind you (the way was worked out a little way back - in the background, or before
+  -- you moved on): dropped once you're nearer the next one than they are, and the way to it is clear,
+  -- so the line doesn't loop back behind you and the arrow doesn't point back at them
+  while p and #p > 1 do
+    local a, b = p[1], p[2]
+    if D.Dist(here, b) < D.Dist(a, b) and D.Dist(here, a) < 120
+      and not hitsWall(here.i, here.x, here.y, b.x, b.y) then
+      table.remove(p, 1)
+    else
+      break
+    end
   end
   return p
 end

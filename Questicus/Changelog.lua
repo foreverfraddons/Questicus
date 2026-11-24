@@ -10,6 +10,9 @@ Q.Changelog = {
     added = {
       "Quest dialog for ForeverDB: with \"Help fill the database\" on, every quest's texts (the offer, objectives, the \"have you got them?\" and the turn-in text) and the greetings above quest givers' lists are saved as the game shows them - your name, class and race are left out - so ForeverDB has WoW Forever's own words for every quest.",
     },
+    fixed = {
+      "Stutters near walls gone: routes round walls are worked out in the background now (a few ms a frame) instead of all at once, and every leg of the route on the map is kept instead of being searched again on every redraw. The line and the arrow also no longer loop back to a corner you've already walked past.",
+    },
   },
   { v = "0.9.026",
     added = {
