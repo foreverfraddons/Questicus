@@ -98,7 +98,7 @@ local function row(i)
     local d = TR.rowData[self]
     if not (d and d.id) then return end
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    for i, l in ipairs(QS:QuestTip(d.id, nil, nil)) do
+    for i, l in ipairs(QS:QuestTip(d.id, nil, nil, true)) do
       if i == 1 then GameTooltip:AddLine(l, 1, 0.82, 0.3) else GameTooltip:AddLine(l, 0.9, 0.9, 0.9, true) end
     end
     local ri = routeIndex()[d.id]

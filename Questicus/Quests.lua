@@ -296,7 +296,7 @@ function QS.ItemText(it)
   return (icon and ("|T" .. icon .. ":12|t ") or "") .. col .. name .. "|r"
 end
 -- tooltip lines for a quest you could pick up: level, XP, money, the chain it's in
-function QS:QuestTip(id, giverName, footer)
+function QS:QuestTip(id, giverName, footer, iconsOnly)   -- iconsOnly: rewards as icons (the tracker)
   local info = QS:Info(id)
   local q = D:Quest(id)
   local title = (info and info.title) or (q and q[1]) or ("Quest " .. id)
@@ -333,13 +333,21 @@ function QS:QuestTip(id, giverName, footer)
   local fin = (#chain > 1 and last ~= id) and items(last) or {}
   local function names(list)
     local p = {}
+    if iconsOnly then
+      for _, it in ipairs(list) do
+        local ic = (C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(it)) or (GetItemIcon and GetItemIcon(it)) or 134400
+        p[#p + 1] = "|T" .. ic .. ":18|t"
+      end
+      return table.concat(p, " ")
+    end
     for i, it in ipairs(list) do if i <= 6 then p[#p + 1] = QS.ItemText(it) end end
     return table.concat(p, ", ") .. (#list > 6 and (" +" .. (#list - 6)) or "")
   end
   if #own > 0 then lines[#lines + 1] = "|cffffd100Rewards:|r " .. names(own) end
   if #fin > 0 then
     local lq = D:Quest(last)
-    lines[#lines + 1] = "|cffffd100Chain ends with|r " .. ((lq and lq[1]) or ("quest " .. last)) .. ": " .. names(fin)
+    lines[#lines + 1] = iconsOnly and ("|cffffd100Chain ends with:|r " .. names(fin)) or
+      ("|cffffd100Chain ends with|r " .. ((lq and lq[1]) or ("quest " .. last)) .. ": " .. names(fin))
   end
   if footer then lines[#lines + 1] = footer end
   if #own > 0 or #fin > 0 then lines[#lines + 1] = "|cff808080Hold Alt to look at the reward items|r" end
