@@ -278,6 +278,134 @@ local function hitsWall(i, ax, ay, bx, by)
   end
 end
 N.HitsWall = hitsWall
+-- a way between hand-drawn walls that keeps to the middle of the passages: a fine grid (5 yards) round
+-- you and the target, the walls drawn into it, every square's distance to the nearest wall worked out,
+-- and a search that pays extra for squares close to a wall - so in a corridor the way runs down the
+-- middle instead of bouncing from one wall's corner to the other's.
+local FG_MAX = 240              -- squares a side at most (the square size grows past that)
+local FG_NEAR = 5               -- squares: closer than this to a wall costs extra
+function N.WallGrid(from, to)
+  local i = from.i
+  local margin = 160
+  local x0, x1 = math.min(from.x, to.x) - margin, math.max(from.x, to.x) + margin
+  local y0, y1 = math.min(from.y, to.y) - margin, math.max(from.y, to.y) + margin
+  -- (no wall anywhere near: nothing to do)
+  local segs, any = segsOf(i), false
+  for bxx = math.floor(x0 / WB), math.floor(x1 / WB) do
+    for byy = math.floor(y0 / WB), math.floor(y1 / WB) do
+      if segs[bxx .. ":" .. byy] then any = true; break end
+    end
+    if any then break end
+  end
+  if not any then return nil end
+  local c = math.max(5, math.max(x1 - x0, y1 - y0) / FG_MAX)
+  local W, H = math.floor((x1 - x0) / c) + 1, math.floor((y1 - y0) / c) + 1
+  local function idx(cx, cy) return cy * W + cx end
+  local block = {}
+  -- the walls into the grid (each piece walked in half-square steps)
+  for _, wl in pairs(wallList(i)) do
+    local n = wl.n
+    for j = 1, #n - 3, 2 do
+      local ax, ay, bx, by = n[j], n[j + 1], n[j + 2], n[j + 3]
+      if not ((ax < x0 and bx < x0) or (ax > x1 and bx > x1) or (ay < y0 and by < y0) or (ay > y1 and by > y1)) then
+        local l = math.sqrt((bx - ax) ^ 2 + (by - ay) ^ 2)
+        local steps = math.max(1, math.ceil(l / (c * 0.5)))
+        for k = 0, steps do
+          local px, py = ax + (bx - ax) * k / steps, ay + (by - ay) * k / steps
+          local cx, cy = math.floor((px - x0) / c), math.floor((py - y0) / c)
+          if cx >= 0 and cx < W and cy >= 0 and cy < H then block[idx(cx, cy)] = true end
+        end
+      end
+    end
+  end
+  if not next(block) then return nil end
+  -- distance (in squares) to the nearest wall square, up to FG_NEAR
+  local near, q, head = {}, {}, 1
+  for k in pairs(block) do near[k] = 0; q[#q + 1] = k end
+  while head <= #q do
+    local k = q[head]; head = head + 1
+    local d = near[k]
+    if d < FG_NEAR then
+      local cx, cy = k % W, math.floor(k / W)
+      for dx = -1, 1 do
+        for dy = -1, 1 do
+          local nx, ny = cx + dx, cy + dy
+          if nx >= 0 and nx < W and ny >= 0 and ny < H then
+            local nk = idx(nx, ny)
+            if near[nk] == nil then near[nk] = d + 1; q[#q + 1] = nk end
+          end
+        end
+      end
+    end
+  end
+  local sx, sy = math.floor((from.x - x0) / c), math.floor((from.y - y0) / c)
+  local gx, gy = math.floor((to.x - x0) / c), math.floor((to.y - y0) / c)
+  local start, goal = idx(sx, sy), idx(gx, gy)
+  block[start], block[goal] = nil, nil
+  local g, came, open = { [start] = 0 }, {}, {}
+  heapPush(open, start, 0)
+  local found, expanded = false, 0
+  while #open > 0 and expanded < 40000 do
+    local cur = heapPop(open)
+    if cur == goal then found = true; break end
+    expanded = expanded + 1
+    local cx, cy = cur % W, math.floor(cur / W)
+    local gc = g[cur]
+    for dx = -1, 1 do
+      for dy = -1, 1 do
+        if dx ~= 0 or dy ~= 0 then
+          local nx, ny = cx + dx, cy + dy
+          if nx >= 0 and nx < W and ny >= 0 and ny < H then
+            local nk = idx(nx, ny)
+            -- (no squeezing diagonally between two wall squares)
+            if not block[nk] and not (dx ~= 0 and dy ~= 0 and block[idx(cx + dx, cy)] and block[idx(cx, cy + dy)]) then
+              local d = near[nk]
+              local pen = d and (FG_NEAR + 1 - d) * 0.6 or 0
+              local ng = gc + ((dx ~= 0 and dy ~= 0) and 1.414 or 1) * (1 + pen)
+              if not g[nk] or ng < g[nk] then
+                g[nk] = ng
+                came[nk] = cur
+                heapPush(open, nk, ng + math.sqrt((nx - gx) ^ 2 + (ny - gy) ^ 2))
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+  if not found then return nil end
+  local cells = {}
+  local k = goal
+  while k do
+    table.insert(cells, 1, { i = i, x = x0 + (k % W + 0.5) * c, y = y0 + (math.floor(k / W) + 0.5) * c })
+    k = came[k]
+  end
+  cells[1] = { i = i, x = from.x, y = from.y }
+  cells[#cells] = to
+  -- fewer points, same shape (within a couple of yards, never over a wall)
+  local out = {}
+  local function simp(a, b)
+    local A, B = cells[a], cells[b]
+    local dx, dy = B.x - A.x, B.y - A.y
+    local l2 = dx * dx + dy * dy
+    local best, bi = 0, nil
+    for m = a + 1, b - 1 do
+      local P = cells[m]
+      local t = l2 > 0 and math.max(0, math.min(1, ((P.x - A.x) * dx + (P.y - A.y) * dy) / l2)) or 0
+      local d = (P.x - A.x - dx * t) ^ 2 + (P.y - A.y - dy * t) ^ 2
+      if d > best then best, bi = d, m end
+    end
+    if bi and (best > (c * 0.6) ^ 2 or hitsWall(i, A.x, A.y, B.x, B.y)) then
+      simp(a, bi); simp(bi, b)
+    else
+      out[#out + 1] = B
+    end
+  end
+  simp(1, #cells)
+  out.fine = true                 -- (already the shape to draw: the map's smoothing only rounds it)
+  return out
+end
+
 -- the shortest way round hand-drawn walls: points just past each wall's ends and off both sides of its
 -- bends, joined where nothing's in the way (a visibility graph), searched from you to the target.
 -- Only walls near the way count (at most 160 points).
@@ -522,7 +650,7 @@ function N:Path(from, to, oneLeg)
   -- between them, past their ends) - the grid's 20-yard squares can't see a narrow opening, so its way
   -- can go far round or (corners joined up) over a wall
   if hasWalls then
-    local vis = N.WallWay and N.WallWay(from, to)
+    local vis = (N.WallGrid and N.WallGrid(from, to)) or (N.WallWay and N.WallWay(from, to))
     local ok, a = pcall(grid)
     a = ok and a or nil
     if vis then

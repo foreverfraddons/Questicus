@@ -493,7 +493,11 @@ function PN.SmoothPath(start, path)
   local pts = { { i = start.i, x = start.x, y = start.y } }
   for _, q in ipairs(path) do pts[#pts + 1] = { i = q.i or start.i, x = q.x, y = q.y } end
   local simple = { pts[1] }
-  simplify(pts, 1, #pts, simple)
+  if path.fine then
+    for k = 2, #pts do simple[#simple + 1] = pts[k] end
+  else
+    simplify(pts, 1, #pts, simple)
+  end
   -- rounded corners (Chaikin: each corner cut at a quarter of its two sides), twice
   local cur = simple
   for _ = 1, 2 do
