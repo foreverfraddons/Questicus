@@ -153,15 +153,21 @@ function TR:Refresh()
   if not TR.band then
     TR.band = body:CreateTexture(nil, "BACKGROUND")
     TR.band:SetColorTexture(0.55, 0.3, 0.85, 0.14)
+    -- a line down the left, along the bottom and up the right (open at the top, under the name)
     TR.bandEdge = body:CreateTexture(nil, "BORDER")
-    TR.bandEdge:SetColorTexture(0.75, 0.45, 1, 0.95)
-    TR.bandEdge:SetWidth(3)
+    TR.bandEdge:SetColorTexture(0.75, 0.45, 1, 0.9)
+    TR.bandEdge:SetWidth(2)
+    TR.bandRight = body:CreateTexture(nil, "BORDER")
+    TR.bandRight:SetColorTexture(0.75, 0.45, 1, 0.9)
+    TR.bandRight:SetWidth(2)
+    TR.bandBottom = body:CreateTexture(nil, "BORDER")
+    TR.bandBottom:SetColorTexture(0.75, 0.45, 1, 0.9)
+    TR.bandBottom:SetHeight(2)
   end
   local function put(text, right, h, data, bar)
     n = n + 1
     local r = row(n)
     r.tint:Hide(); r.edge:Hide()
-    r.text:SetPoint("LEFT", band and 8 or 4, 0)
     TR.rowData[r] = data
     r:SetHeight(h)
     r.text:SetFont(T.FONT, data and data.header and fs or (fs - 1), "")
@@ -201,7 +207,6 @@ function TR:Refresh()
       bandTop = y
       put("|T" .. Q.MEDIA .. "i_dungeon:13|t " .. Q.Color("c08cff", dname or "Dungeon"),
         Q.Color(T.HEX.dim, runN .. " quest" .. (runN == 1 and "" or "s")), fs + 8, nil)
-      y = y + 6        -- room between the dungeon's name and its first quest
       wasRun = true
     elseif dmode and not inRun[id] and wasRun ~= false then
       band = false
@@ -239,15 +244,16 @@ function TR:Refresh()
   end
   if band then bandBottom = y end
   band = false
-  TR.band:ClearAllPoints(); TR.bandEdge:ClearAllPoints()
+  for _, t in ipairs({ TR.band, TR.bandEdge, TR.bandRight, TR.bandBottom }) do t:ClearAllPoints(); t:SetShown(bandTop ~= nil and bandBottom ~= nil) end
   if bandTop and bandBottom then
     TR.band:SetPoint("TOPLEFT", body, "TOPLEFT", 0, -bandTop)
     TR.band:SetPoint("BOTTOMRIGHT", body, "TOPRIGHT", 0, -bandBottom)
     TR.bandEdge:SetPoint("TOPLEFT", body, "TOPLEFT", 0, -bandTop)
     TR.bandEdge:SetPoint("BOTTOMLEFT", body, "TOPLEFT", 0, -bandBottom)
-    TR.band:Show(); TR.bandEdge:Show()
-  else
-    TR.band:Hide(); TR.bandEdge:Hide()
+    TR.bandRight:SetPoint("TOPRIGHT", body, "TOPRIGHT", 0, -bandTop)
+    TR.bandRight:SetPoint("BOTTOMRIGHT", body, "TOPRIGHT", 0, -bandBottom)
+    TR.bandBottom:SetPoint("BOTTOMLEFT", body, "TOPLEFT", 0, -bandBottom)
+    TR.bandBottom:SetPoint("BOTTOMRIGHT", body, "TOPRIGHT", 0, -bandBottom)
   end
   if #added > 0 then
     put(Q.Color(T.HEX.dim, "Added to your route"), nil, fs + 6, nil)

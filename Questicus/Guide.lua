@@ -918,6 +918,8 @@ function GD:Refresh()
     local dArea, dName = GD.DungeonOf(s)
     local open = Q.db.guide.dunOpen
     local lines = s.type == "complete" and (dArea and (open and dungeonLines(s) or {}) or objectiveLines(s)) or {}
+    -- (the DUNGEON label under the icon is wider than it: move the step text clear of it)
+    cur.text:SetPoint("TOPLEFT", cur.icon, "TOPRIGHT", dArea and 22 or 8, 0)
     cur.glow:SetShown(dArea ~= nil)
     cur.banner:SetShown(dArea ~= nil)
     if dArea then
