@@ -7,6 +7,7 @@
 local Q = Questicus
 Q.Changelog = {
   { v = "next" },
+  { v = "0.9.033" },
   { v = "0.9.032" },
   { v = "0.9.031",
     added = {
