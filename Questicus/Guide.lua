@@ -49,8 +49,10 @@ function GD.DungeonOf(s)
     if m and m.dungeon then return m.dungeon, m.dungeonName end
   end
 end
+GD.ESCORT_ICON = "Interface\\Icons\\Spell_Holy_SealOfProtection"   -- a shield: someone to protect
 local function stepIcon(s)
   if GD.DungeonOf(s) then return Q.MEDIA .. "i_dungeon" end
+  if GD.EscortOf(s) then return GD.ESCORT_ICON end
   if s.type == "complete" then
     local m = P.Meta(s.quests[1])
     local first = m and m.lines and m.lines[1]
@@ -327,6 +329,8 @@ end
 function GD:OnTheWay(s)
   local out, keys, named = {}, {}, {}
   GD.wayKeys = keys
+  -- (an escort: nothing else on the way - you stay with the one you're escorting)
+  if GD.EscortOf(s) then return out end
   local here = D:PlayerPos()
   local tgt = GD:Target()
   if not here or not tgt or here.i ~= tgt.i then return out end
@@ -976,7 +980,7 @@ function GD:Refresh()
     if esc then
       -- an escort: green, and it asks before it starts (Auto.lua)
       cur.glow:SetVertexColor(0.35, 0.95, 0.45, 0.8)
-      cur.icon:SetVertexColor(0.7, 1, 0.7, 1)
+      cur.icon:SetVertexColor(1, 1, 1, 1)
       cur.num:SetText(c("5cff6a", "ESCORT"))
       T.SetBorderColor(cur, 0.35, 0.9, 0.45, 1)
       local info = QS:Info(esc)

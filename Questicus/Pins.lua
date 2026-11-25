@@ -445,7 +445,7 @@ function PN:RefreshWorld(force)
       ring:SetFrameLevel(ring:GetFrameLevel() + 1)
       ring.lvlOff = 6
       local b = wpool:Get()
-      local icon = (s.type == "accept" and ICON.accept) or (s.type == "turnin" and ICON.turnin) or
+      local icon = (Q.Guide.EscortOf(s) and Q.Guide.ESCORT_ICON) or (s.type == "accept" and ICON.accept) or (s.type == "turnin" and ICON.turnin) or
         (s.type == "buy" and ICON.buy) or ICON[s.type] or ICON.kill
       style(b, icon, size * (k == 1 and 1.3 or 1.0), 1, 1, 1, 1, tostring(e.index))
       if k == 1 and PN.leg then PN.leg.ring, PN.leg.icon = ring, b end
@@ -1481,7 +1481,7 @@ function PN:RefreshMinimap(force)
       style(ring, DOT, k == 1 and 20 or 15, col[1], col[2], col[3], 0.9)
       mmPut(ring, x, y)
       local b = mpool:Get()
-      style(b, s.type == "turnin" and ICON.turnin or (s.type == "accept" and ICON.accept) or
+      style(b, (Q.Guide.EscortOf(s) and Q.Guide.ESCORT_ICON) or s.type == "turnin" and ICON.turnin or (s.type == "accept" and ICON.accept) or
         (s.type == "buy" and ICON.buy or ICON[s.type] or ICON.kill), k == 1 and 14 or 11, 1, 1, 1, 1)
       b:SetFrameLevel(ring:GetFrameLevel() + 2)
       b.tipFn, b.ta, b.tb, b.tc, b.td = MMTIP.step, s, k, e.index, pt.key
