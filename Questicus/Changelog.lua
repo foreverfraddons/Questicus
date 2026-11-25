@@ -6,7 +6,8 @@
 -- update goes out once "next" holds 10 lines (release.yml, MIN_CHANGES).
 local Q = Questicus
 Q.Changelog = {
-  { v = "next",
+  { v = "next" },
+  { v = "0.9.031",
     added = {
       "Escort quests stand out on the route: the step is green with an \"ESCORT QUEST\" tab, and before an escort starts Questicus asks (Start escort / Not now), even with auto-accept on.",
       "Options > Automation: every setting where Questicus does something on its own - accepting and handing in quests, suggesting rewards, taking flights, pinning the next objective.",
