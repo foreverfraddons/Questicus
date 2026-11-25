@@ -6,11 +6,7 @@
 -- update goes out once "next" holds 10 lines (release.yml, MIN_CHANGES).
 local Q = Questicus
 Q.Changelog = {
-  { v = "next",
-    changed = {
-      "Escort steps have their own icon (a shield) in the guide and on the map, and no \"On the way\" objectives - you stay with the one you're escorting.",
-    },
-  },
+  { v = "next" },
   { v = "0.9.031",
     added = {
       "Escort quests stand out on the route: the step is green with an \"ESCORT QUEST\" tab, and before an escort starts Questicus asks (Start escort / Not now), even with auto-accept on.",
