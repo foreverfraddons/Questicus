@@ -135,8 +135,8 @@ local function build()
   group(p, "Quest givers")
   check(p, "Accept route quests automatically", function() return pr().autoAccept end, function(v) pr().autoAccept = v end)
   check(p, "Hand in quests automatically", function() return pr().autoTurnIn end, function(v) pr().autoTurnIn = v end)
-  check(p, "Pick the best reward automatically", function() return pr().autoReward end, function(v) pr().autoReward = v end,
-    "The reward that's the biggest upgrade for you (or sells for the most).")
+  check(p, "Suggest the best reward", function() return pr().autoReward end, function(v) pr().autoReward = v end,
+    "The reward that's the biggest upgrade for you (or sells for the most) - you confirm it before the quest is handed in.")
   group(p, "Travel")
   check(p, "Use flight paths in the route", function() return Q.prefs.flights ~= false end,
     function(v) Q.prefs.flights = v; Q.Planner:Build() end, "Flies when it beats running, with the flight masters you know. Unknown ones nearby become a step.")

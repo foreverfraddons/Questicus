@@ -153,7 +153,7 @@ local function pageGear(p)
     { "onway", "Only on the way", "Show upgrades, but never detour for them." },
     { "off", "Don't bother" } }, getter("gear"), setter("gear"), 140)
   w[2]:SetPoint("TOPLEFT", 24, -166)
-  w[3] = T.Check(p, "Pick the best quest reward for me automatically", getter("autoReward"), setter("autoReward"),
+  w[3] = T.Check(p, "Suggest the best quest reward (I confirm it)", getter("autoReward"), setter("autoReward"),
     "Takes the biggest upgrade, or the reward that sells for the most if none is an upgrade. Hold Shift to choose yourself.")
   w[3]:SetPoint("TOPLEFT", 24, -212); w[3]:SetWidth(500)
   local sp = T.Text(p, 11, T.c.dim)

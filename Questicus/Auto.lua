@@ -159,14 +159,63 @@ Q:On("QUEST_COMPLETE", function()
   end
   local i, isUpgrade, pct = G:BestChoice()
   if not i then return end
-  local link = GetQuestItemLink("choice", i)
-  if isUpgrade then
-    Q:Print(("took %s - an upgrade (+%d%%)"):format(link or "the reward", math.floor(pct)))
-  else
-    Q:Print(("took %s - no upgrade among the rewards, this one sells for the most"):format(link or "the reward"))
-  end
-  after(function() GetQuestReward(i) end)
+  -- never handed in on its own: you confirm the pick (or choose another in the quest window)
+  Q.ConfirmReward(i, isUpgrade, pct)
 end)
+
+-- ------------------------------------------------------------------ confirm the reward
+-- A small card beside the quest window: the reward Questicus would pick, why, and two buttons.
+-- "Take it" hands the quest in with it; "I'll choose" leaves the quest window to you.
+local confirm
+function Q.ConfirmReward(i, isUpgrade, pct)
+  local T = Q.T
+  if not confirm then
+    confirm = T.Window("QuesticusRewardConfirm", 300, 118, "Quest reward", nil)
+    confirm:SetFrameStrata("DIALOG")
+    confirm.item = CreateFrame("Button", nil, confirm)
+    confirm.item:SetSize(34, 34)
+    confirm.item:SetPoint("TOPLEFT", 14, -34)
+    confirm.item.tex = confirm.item:CreateTexture(nil, "ARTWORK")
+    confirm.item.tex:SetAllPoints()
+    confirm.item:SetScript("OnEnter", function(self)
+      GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+      if GameTooltip.SetQuestItem then GameTooltip:SetQuestItem("choice", confirm.index) end
+      GameTooltip:Show()
+    end)
+    confirm.item:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    confirm.text = T.Text(confirm, 12, T.c.text)
+    confirm.text:SetPoint("TOPLEFT", confirm.item, "TOPRIGHT", 8, 0)
+    confirm.text:SetPoint("RIGHT", -14, 0)
+    confirm.text:SetJustifyH("LEFT")
+    confirm.take = T.Button(confirm, "Take it", 96, 22)
+    confirm.take:SetPoint("BOTTOMLEFT", 14, 12)
+    confirm.take:SetScript("OnClick", function()
+      local idx = confirm.index
+      confirm:Hide()
+      if idx and QuestFrame and QuestFrame:IsShown() then GetQuestReward(idx) end
+    end)
+    confirm.mine = T.Button(confirm, "I'll choose", 96, 22)
+    confirm.mine:SetPoint("LEFT", confirm.take, "RIGHT", 8, 0)
+    confirm.mine:SetScript("OnClick", function() confirm:Hide() end)
+    -- (gone with the quest window)
+    confirm:RegisterEvent("QUEST_FINISHED")
+    confirm:SetScript("OnEvent", function(self) self:Hide() end)
+  end
+  confirm.index = i
+  local name, tex = GetQuestItemInfo("choice", i)
+  local link = GetQuestItemLink("choice", i)
+  confirm.item.tex:SetTexture(tex or 134400)
+  confirm.text:SetText((link or name or "This reward") .. "\n" ..
+    (isUpgrade and Q.Color("40ff40", ("An upgrade (+%d%%)"):format(math.floor(pct or 0)))
+      or Q.Color("c0c0c0", "No upgrade among the rewards - this one sells for the most")))
+  confirm:ClearAllPoints()
+  if QuestFrame and QuestFrame:IsShown() then
+    confirm:SetPoint("TOPLEFT", QuestFrame, "TOPRIGHT", 8, -40)
+  else
+    confirm:SetPoint("CENTER", 0, 120)
+  end
+  confirm:Show()
+end
 
 -- after a quest is accepted or handed in the NPC often still has more: carry on with the list
 Q:On("QUEST_FINISHED", function()
