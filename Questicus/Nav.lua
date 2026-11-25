@@ -852,6 +852,20 @@ local function fixedRoute(f, here, to)
   return out
 end
 N.FixedRoute = fixedRoute
+-- within r yards of a fixed path's line?
+function N.OnFixed(f, pos, r)
+  local n = f.n
+  if f.i ~= pos.i or not n then return false end
+  if #n < 4 then return #n >= 2 and (n[1] - pos.x) ^ 2 + (n[2] - pos.y) ^ 2 <= r * r end
+  for j = 1, #n - 3, 2 do
+    local ax, ay, bx, by = n[j], n[j + 1], n[j + 2], n[j + 3]
+    local seg = (bx - ax) ^ 2 + (by - ay) ^ 2
+    local t = seg > 0 and math.max(0, math.min(1, ((pos.x - ax) * (bx - ax) + (pos.y - ay) * (by - ay)) / seg)) or 0
+    local px, py = ax + (bx - ax) * t, ay + (by - ay) * t
+    if (pos.x - px) ^ 2 + (pos.y - py) ^ 2 <= r * r then return true end
+  end
+  return false
+end
 -- near a fixed path (its walk isn't learned or recorded any more)?
 function N.NearFixed(pos, r)
   r = r or 30
@@ -879,6 +893,9 @@ function N:Route(here, to)
   if airborne() then return { to } end
   -- a path set by hand for this walk: that, as it is
   local f = here.i == to.i and fixedFor(to)
+  -- (only once you're on it or close: a path drawn for another walk to the same person - from
+  -- somewhere else - would otherwise be a straight line from you to its end, over every wall)
+  if f and not N.OnFixed(f, here, 200) then f = nil end
   if f then
     local p = fixedRoute(f, here, to)
     local reach = N.precise and 8 or 15
