@@ -6,7 +6,8 @@
 -- update goes out once "next" holds 10 lines (release.yml, MIN_CHANGES).
 local Q = Questicus
 Q.Changelog = {
-  { v = "next",
+  { v = "next" },
+  { v = "0.9.030",
     changed = {
       "With Command Center installed, the Questicus icon in its dock, border bar, home page and Tools list takes the theme colour like the other tools; on its own Questicus keeps its own icon.",
     },
