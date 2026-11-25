@@ -83,7 +83,7 @@ local function style(b, tex, size, r, g, bl, a, num)
 end
 
 -- position of a point on map `mapID` (0-1), or nil
-local function onMap(pt, mapID)
+local function onMap(pt, mapID, loose)    -- loose: a little past the map's edge too (route corners)
   -- Questicus Maps' stitched world map: the canvas shows past its own map, place by world position
   local OM = PN.openMap and (_G.QuesticusMapAPI or _G.OpenMapAPI)
   if OM and pt.i and pt.x and OM.IsStitched() then
@@ -98,7 +98,8 @@ local function onMap(pt, mapID)
   if ok and m2 == mapID and pos then
     local px, py = pos.x, pos.y
     if pos.GetXY then px, py = pos:GetXY() end
-    if px and px >= 0 and px <= 1 and py >= 0 and py <= 1 then return px, py end
+    local lo, hi = loose and -0.6 or 0, loose and 1.6 or 1
+    if px and px >= lo and px <= hi and py >= lo and py <= hi then return px, py end
   end
 end
 
@@ -415,7 +416,7 @@ function PN:RefreshWorld(force)
         if zp then
           legs = {}
           for _, wpt in ipairs(zp) do
-            local wx, wy = onMap(wpt, mapID)
+            local wx, wy = onMap(wpt, mapID, true)
             if wx then legs[#legs + 1] = { wx, wy } end
           end
           legs[#legs + 1] = { x, y }
@@ -425,7 +426,7 @@ function PN:RefreshWorld(force)
           if path and #path > 1 then
             legs = {}
             for _, wpt in ipairs(path) do
-              local wx, wy = onMap(wpt, mapID)
+              local wx, wy = onMap(wpt, mapID, true)
               if wx then legs[#legs + 1] = { wx, wy } end
             end
           end
@@ -578,7 +579,9 @@ function PN:DrawLeg()
           path = PN.SmoothPath(here, path)
           legs = {}
           for _, wpt in ipairs(path) do
-            local wx, wy = onMap(wpt, L.mapID)
+            -- (a corner just past the map's edge - round a wall's far end - still drawn, or the line
+            -- would skip it and cut straight over the walls)
+            local wx, wy = onMap(wpt, L.mapID, true)
             if wx then legs[#legs + 1] = { wx, wy } end
           end
         end
