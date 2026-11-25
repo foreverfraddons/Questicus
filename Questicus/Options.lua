@@ -142,6 +142,8 @@ local function build()
     function(v) Q.prefs.flights = v; Q.Planner:Build() end, "Flies when it beats running, with the flight masters you know. Unknown ones nearby become a step.")
   check(p, "Take the flight automatically", function() return Q.prefs.autoFly ~= false end,
     function(v) Q.prefs.autoFly = v end, "Talking to the flight master of a fly step takes the flight. Hold Shift to choose yourself.")
+  check(p, "Use my hearthstone in the route", function() return Q.prefs.hearth ~= false end,
+    function(v) Q.prefs.hearth = v; Q.Planner:Build() end, "Hearths when it's ready and gets you to the next step faster (Hearthstone button on the step).")
   group(p, "Route")
   check(p, "Include PvP and battleground quests", function() return Q.prefs.pvp == true end,
     function(v) Q.prefs.pvp = v; Q:Send("QC_PREFS_CHANGED") end, "Off: Warsong Gulch, Arathi Basin, Alterac Valley, Darkspear Islands and other PvP quests are left out.")

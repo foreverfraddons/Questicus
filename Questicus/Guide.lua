@@ -15,6 +15,7 @@ local ICON = {
   explore = "Interface\\Icons\\INV_Misc_Map_01",
   buy = "Interface\\Icons\\INV_Misc_Coin_02",
   fly = "Interface\\Icons\\Ability_Mount_Wyvern_01",
+  hearth = "Interface\\Icons\\INV_Misc_Rune_01",
   fp = "Interface\\Icons\\INV_Misc_Map02",
   boat = "Interface\\Icons\\INV_Misc_Spyglass_03",
   zeppelin = "Interface\\Icons\\INV_Misc_Spyglass_03",
@@ -64,6 +65,8 @@ function GD.StepText(s, short)
     return "Buy " .. itemText(s.item) .. " from " .. c(white, s.npc) .. c(good, (" +%d%%"):format(math.floor(s.pct or 0)))
   elseif s.type == "fly" then
     return "Fly to " .. c(gold, s.to.name) .. (short and "" or (" from " .. c(white, s.from.name)))
+  elseif s.type == "hearth" then
+    return "Hearth to " .. c(gold, (s.to and s.to.name) or "your inn")
   elseif s.type == "fp" then
     return "Get the flight path at " .. c(gold, s.node.name)
   elseif s.type == "explore" then
@@ -386,6 +389,15 @@ local function menuItems(index)
       GD.focus = 1; P:SkipQuest(ids[1])
       Q:Print("removed from the route: " .. (s.title or (s.titles and table.concat(s.titles, ", ")) or ""))
     end)
+  elseif s.type == "hearth" then
+    add("Don't hearth this time", "Leave the hearthstone out of the route for 30 minutes", function()
+      Q.Flight.noHearthUntil = (GetTime and GetTime() or 0) + 1800
+      GD.focus = 1; P:Build()
+    end)
+    add("Never hearth in routes", "Turn the hearthstone off in the route (Options to turn back on)", function()
+      Q.prefs.hearth = false
+      GD.focus = 1; P:Build()
+    end)
   elseif s.type == "fly" then
     add("Don't fly this time", "Run instead for the next 10 minutes", function()
       Q.Flight.noFlyUntil = (GetTime and GetTime() or 0) + 600
@@ -682,6 +694,14 @@ local function build()
   cur.lfg.tip = "Open the game's group finder to look for or list a group for this dungeon"
   if Q.LFG and Q.LFG.Overlay then Q.LFG.Overlay(cur.lfg) end
   cur.lfg:Hide()
+  -- a hearth step: use the hearthstone (a secure button: only a real click may use an item)
+  cur.hs = T.Button(cur, "Hearthstone", 90, 18)
+  cur.hs.tip = "Use your Hearthstone"
+  if Q.SecureOverlay then
+    Q.SecureOverlay(cur.hs, "QuesticusHearthButton", function() return "/use item:" .. (Q.Flight.HS_ITEM or 6948) end,
+      "Can't use it from here in combat - use your Hearthstone from your bags.")
+  end
+  cur.hs:Hide()
   -- a dungeon run folds away to one line; this opens / closes the quest list under it
   cur.fold = T.Button(cur, "Expand", 64, 18)
   cur.fold.tip = "Show or hide the dungeon's quests and what's left of each"
@@ -986,6 +1006,10 @@ function GD:Refresh()
   cur:SetHeight(h + 18)
   cur.map:SetPoint("BOTTOMRIGHT", -6, 5)
   cur.skip:SetPoint("RIGHT", cur.map, "LEFT", -4, 0)
+  local fs = steps[GD.focus]
+  cur.hs:SetShown(fs ~= nil and fs.type == "hearth")
+  cur.hs:ClearAllPoints()
+  cur.hs:SetPoint("RIGHT", cur.skip, "LEFT", -4, 0)
   local runStep = steps[GD.focus] and GD.DungeonOf(steps[GD.focus])
   cur.lfg:SetShown(runStep ~= nil and Q.LFG ~= nil)
   cur.lfg:ClearAllPoints()

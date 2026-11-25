@@ -473,3 +473,90 @@ Q:Command("flights", "flight masters this character knows", function()
   table.sort(t)
   Q:Print(#t == 0 and "no flight paths known yet - open a flight master's map once" or (#t .. " known: " .. table.concat(t, ", ")))
 end)
+
+-- ------------------------------------------------------------------ hearthstone
+-- The route can hearth when that gets you to the next step faster (Planner.lua adds a "hearth" step).
+-- Where it takes you: learned when you set it at an innkeeper (HEARTHSTONE_BOUND) and every time you
+-- use it (where you land). Until then a guess: the innkeeper in the place GetBindLocation() names.
+local HS_ITEM, HS_SPELL = 6948, 8690
+F.HS_ITEM = HS_ITEM
+local function bindName() return GetBindLocation and GetBindLocation() or nil end
+local function innkeeperIn(name)
+  if not name or not (D.db and D.db.npc) then return end
+  local here = D:PlayerPos()
+  local best, bd
+  for id, n in pairs(D.db.npc) do
+    if n[2] == "Innkeeper" then
+      for _, p in ipairs(D:Points("c" .. id) or {}) do
+        local sz = D.SubZoneAt and D:SubZoneAt(p.i, p.x, p.y)
+        local z = D.ZoneAt and D:ZoneAt(p.i, p.x, p.y)
+        local function nm(a) return a and C_Map and C_Map.GetAreaInfo and C_Map.GetAreaInfo(a) end
+        if nm(sz) == name or nm(z) == name then
+          local d = here and here.i == p.i and D.Dist(here, p) or 1e6
+          if not bd or d < bd then best, bd = { i = p.i, x = p.x, y = p.y, name = name, guess = true }, d end
+        end
+      end
+    end
+  end
+  return best
+end
+-- where the hearthstone takes you ({i, x, y, name}) or nil
+function F:Hearth()
+  local name = bindName()
+  local h = Q.char and Q.char.hearth
+  if h and (not name or h.name == name) then return h end
+  if not name then return nil end
+  F.hsGuess = F.hsGuess or {}
+  if F.hsGuess[name] == nil then F.hsGuess[name] = innkeeperIn(name) or false end
+  return F.hsGuess[name] or nil
+end
+-- seconds until it's ready (0 = now); nil if you don't have one
+function F:HearthCooldown()
+  if GetItemCount and GetItemCount(HS_ITEM) == 0 then return nil end
+  local cd = (C_Container and C_Container.GetItemCooldown) or GetItemCooldown
+  if not cd then return 0 end
+  local start, dur = cd(HS_ITEM)
+  if not start or start == 0 or not dur then return 0 end
+  return math.max(0, start + dur - (GetTime and GetTime() or 0))
+end
+-- the time a hearth takes: the cast and the loading screen
+F.HEARTH_T = 25
+local function setHearth(p)
+  if not (p and Q.char) then return end
+  Q.char.hearth = { i = p.i, x = p.x, y = p.y, name = bindName(), t = time and time() }
+end
+Q:On("HEARTHSTONE_BOUND", function()
+  Q.After(0.5, function() setHearth(D:PlayerPos()); if Q.Planner then Q.Planner:Replan(1) end end)
+end)
+local hsCast
+Q:On("UNIT_SPELLCAST_SUCCEEDED", function(unit, _, spell)
+  if unit ~= "player" or spell ~= HS_SPELL then return end
+  hsCast = GetTime and GetTime() or 0
+end)
+-- landed: that's where it takes you; the hearth step is done, replan from here
+Q:On("PLAYER_ENTERING_WORLD", function()
+  if not hsCast then return end
+  Q.After(1, function()
+    if hsCast and (GetTime() - hsCast) < 60 then setHearth(D:PlayerPos()) end
+    hsCast = nil
+    if Q.Planner then Q.Planner:Replan(0.5) end
+  end)
+end)
+-- (no loading screen for a short hop: a big jump in position just after the cast counts too)
+do
+  local last
+  local f = CreateFrame("Frame")
+  local acc = 0
+  f:SetScript("OnUpdate", function(_, el)
+    acc = acc + (el or 0)
+    if acc < 0.5 then return end
+    acc = 0
+    local p = D:PlayerPos()
+    if hsCast and p and last and (p.i ~= last.i or D.Dist(p, last) > 200) and GetTime() - hsCast < 30 then
+      setHearth(p)
+      hsCast = nil
+      if Q.Planner then Q.Planner:Replan(0.5) end
+    end
+    last = p
+  end)
+end

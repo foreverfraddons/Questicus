@@ -341,3 +341,41 @@ function LF.Overlay(btn)
   -- (in combat the overlay is hidden; a click then lands on the button itself)
   btn:SetScript("OnClick", function() Q:Print("The group finder can't be opened by Questicus in combat - try after the fight.") end)
 end
+
+-- ------------------------------------------------------------------ any secure button over one of ours
+-- Q.SecureOverlay(btn, name, macroFn, combatMsg): an invisible secure button lies over btn and runs the
+-- macro text macroFn() returns (e.g. "/use item:6948") - things only a real click may do. Placed
+-- and hidden only out of combat; in combat a click lands on btn itself and prints combatMsg.
+function Q.SecureOverlay(btn, name, macroFn, combatMsg)
+  if btn.qcOverlay then return btn.qcOverlay end
+  local o = CreateFrame("Button", name, UIParent, "SecureActionButtonTemplate")
+  btn.qcOverlay = o
+  o:RegisterForClicks("AnyUp", "AnyDown")
+  o:SetAttribute("type", "macro")
+  o:Hide()
+  o:SetScript("PreClick", function(self, _, down)
+    if InCombatLockdown and InCombatLockdown() then return end
+    local keyDown = GetCVarBool and GetCVarBool("ActionButtonUseKeyDown")
+    local mine = (down and true or false) == (keyDown and true or false)
+    self:SetAttribute("macrotext", mine and (macroFn() or "") or "")
+  end)
+  o:SetScript("OnEnter", function() local f = btn:GetScript("OnEnter"); if f then f(btn) end end)
+  o:SetScript("OnLeave", function() local f = btn:GetScript("OnLeave"); if f then f(btn) end end)
+  local function place()
+    if InCombatLockdown and InCombatLockdown() then return end
+    if not btn:IsVisible() then if o:IsShown() then o:Hide() end; return end
+    local l, b, w, h = btn:GetLeft(), btn:GetBottom(), btn:GetWidth(), btn:GetHeight()
+    if not l then return end
+    local s = btn:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    o:ClearAllPoints()
+    o:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", l * s, b * s)
+    o:SetSize(w * s, h * s)
+    if o:GetFrameStrata() ~= btn:GetFrameStrata() then o:SetFrameStrata(btn:GetFrameStrata()) end
+    if o:GetFrameLevel() <= btn:GetFrameLevel() then o:SetFrameLevel(btn:GetFrameLevel() + 5) end
+    if not o:IsShown() then o:Show() end
+  end
+  btn:HookScript("OnUpdate", place)
+  btn:HookScript("OnHide", function() if not (InCombatLockdown and InCombatLockdown()) then o:Hide() end end)
+  btn:SetScript("OnClick", function() Q:Print(combatMsg or "Not in combat - try after the fight.") end)
+  return o
+end

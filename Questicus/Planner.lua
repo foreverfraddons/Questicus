@@ -1781,12 +1781,30 @@ function P:Build()
   local steps = {}
   local cands = effCut(candidates(st), st)
   local lastLevel = st.level
+  -- the hearthstone: once per route, when it's ready by then and gets you to the step faster
+  local F = Q.Flight
+  local hs = Q.prefs.hearth ~= false and F and F.Hearth and not (F.noHearthUntil and (GetTime and GetTime() or 0) < F.noHearthUntil)
+    and F:Hearth()
+  local hsReady = hs and F:HearthCooldown()
+  local elapsed = 0
   for n = 1, P.MAX_STEPS do
     maybeYield()
     P.stick = (n == 1)
     local a, alt = bestAction(st, cands)
     P.stick = false
     if not a then break end
+    if hs and hsReady and elapsed >= hsReady and a.point and st.pos and #steps < P.MAX_STEPS - 1
+      and D.Dist(st.pos, hs) > 150 then
+      local normal = travel(st.pos, a.point, st.level)
+      local via = F.HEARTH_T + travel(hs, a.point, st.level)
+      if via < normal - 90 then
+        steps[#steps + 1] = { type = "hearth", point = st.pos, to = hs, level = st.level, quests = {}, t = F.HEARTH_T,
+          key = "hearth", why = { ("Hearthing to %s saves about %s (%s instead of %s)"):format(hs.name or "your inn",
+            mins(normal - via), mins(via), mins(normal)) } }
+        st.pos = { i = hs.i, x = hs.x, y = hs.y }
+        hs = nil
+      end
+    end
     -- another continent: get to the dock (flying if faster), take the boat / zeppelin
     local sp = speed(st.level)
     local cross = Q.Flight and a.point and st.pos and a.point.i ~= st.pos.i and Q.Flight:Cross(st.pos, a.point, sp, P.dset ~= nil)
@@ -1811,6 +1829,7 @@ function P:Build()
         why = { ("Flying saves about %s over running (%s instead of %s)"):format(mins(leg.walk - leg.t), mins(leg.t), mins(leg.walk)) } }
     end
     steps[#steps + 1] = makeStep(a, st, alt)
+    for k = #steps, 1, -1 do if steps[k].counted then break end; elapsed = elapsed + (steps[k].t or 0); steps[k].counted = true end
     apply(st, a)
     if a.type == "turnin" or st.level ~= lastLevel then
       cands = effCut(candidates(st), st)       -- new quests unlocked / new level window
@@ -1821,7 +1840,7 @@ function P:Build()
   end
   -- the step that just dropped off the top was done: keep it (the guide shows it, for notes)
   local old = P.steps and P.steps[1]
-  if old and old.key and old.type ~= "fly" then
+  if old and old.key and old.type ~= "fly" and old.type ~= "hearth" then
     local still = false
     for _, ns in ipairs(steps) do if ns.key == old.key then still = true; break end end
     if not still then P.prevStep = old end
@@ -1842,7 +1861,7 @@ end
 function P:LogFirst(steps)
   local s = steps[1]
   local real = s
-  if s and s.type == "fly" then real = steps[2] or s end
+  if s and (s.type == "fly" or s.type == "hearth") then real = steps[2] or s end
   local key = s and (s.type == "fly" and ("fly:" .. s.to.id) or s.key) or nil
   P.stickKey = real and ((real.type == "fp" or real.type == "explore") and real.key or (real.type .. ":" .. ((real.quests and real.quests[1]) or real.item or 0))) or nil
   if key == P.lastFirst then return end
