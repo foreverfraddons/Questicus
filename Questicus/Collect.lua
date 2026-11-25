@@ -152,7 +152,7 @@ local function noteNPC(field)
   local c = db()
   local q = c.qst[id]
   if not q then q = {}; c.qst[id] = q end
-  q.n = q.n or (GetTitleText and GetTitleText()) or nil
+  if Q.ENGLISH then q.n = q.n or (GetTitleText and GetTitleText()) or nil end
   q[field] = q[field] or {}
   local have = false
   for _, k in ipairs(q[field]) do if k == key then have = true end end

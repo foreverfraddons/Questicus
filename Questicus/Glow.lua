@@ -344,10 +344,16 @@ function G.Classify()
       for _, w in ipairs(CHEST_WORDS) do if ln:find(w, 1, true) then cat = "chest" break end end
     end
     if not cat or cat == "other" then
+      -- (the game's own words too, for clients in another language)
+      local function has(l, en, g)
+        if l:find(en, 1, true) then return true end
+        local w = _G[g]
+        return type(w) == "string" and w ~= "" and not Q.Secret(w) and l:find(w, 1, true) ~= nil
+      end
       for _, l in ipairs(tooltipLines()) do
-        if l:find("Herbalism", 1, true) then cat = "herb" break end
-        if l:find("Mining", 1, true) then cat = "ore" break end
-        if l:find("Lockpicking", 1, true) or l:find("Locked", 1, true) then cat = "chest" break end
+        if has(l, "Herbalism", "UNIT_SKINNABLE_HERB") then cat = "herb" break end
+        if has(l, "Mining", "UNIT_SKINNABLE_ROCK") then cat = "ore" break end
+        if l:find("Lockpicking", 1, true) or has(l, "Locked", "LOCKED") then cat = "chest" break end
       end
     end
   end

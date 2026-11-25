@@ -6,7 +6,11 @@
 -- update goes out once "next" holds 10 lines (release.yml, MIN_CHANGES).
 local Q = Questicus
 Q.Changelog = {
-  { v = "next" },
+  { v = "next",
+    fixed = {
+      "Game clients in other languages (German, French, Spanish ...): quest objectives in your log are recognised (by name in your language, else by kind and order), so finished objectives drop out of the route and progress shows; quest, NPC and item names show in your language where the game knows them.",
+    },
+  },
   { v = "0.9.029",
     added = {
       "Hearthstone in routes: when it's ready and your inn gets you to the next step faster, the route has a \"Hearth to <inn>\" step with a Hearthstone button. Questicus learns where your hearthstone takes you when you set it at an innkeeper or use it. Options > Use my hearthstone in the route.",

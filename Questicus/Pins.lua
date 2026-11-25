@@ -762,9 +762,8 @@ function PN:Objectives(mapID, size, place)
           local l = m.lines[li]
           local placed = {}
           local prog
-          for _, o in ipairs(e.objectives or {}) do
-            if l and l.name and (o.text or ""):lower():find(l.name:lower(), 1, true) then prog = o.text end
-          end
+          local byLine = P.MatchObjectives(id, m, e)
+          prog = byLine[li] and byLine[li].text
           for _, pt in ipairs(m.lp[li] or {}) do
             if #placed >= OBJ_MAX then break end
             local x, y = onMap(pt, mapID)

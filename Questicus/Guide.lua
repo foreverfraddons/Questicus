@@ -129,6 +129,21 @@ end
 local function sourceHint(id, text)
   local m = P.Meta(id)
   if not (m and m.lines and type(text) == "string") then return "" end
+  -- the line this objective is (by name, or by kind in another language)
+  local e = QS.log[id]
+  if e and e.objectives then
+    local _, byObj = P.MatchObjectives(id, m, e)
+    for oi, o in ipairs(e.objectives) do
+      local l = o.text == text and byObj[oi] and m.lines[byObj[oi]]
+      if l and l.from then
+        local who = D:Name(l.from)
+        if who and who ~= "" then
+          if l.kind == "buy" then return c(dim, " (sold by " .. who .. ")") end
+          return c(dim, (l.from:sub(1, 1) == "o" and " (from " or " (drops from ") .. who .. ")")
+        end
+      end
+    end
+  end
   local t = text:lower()
   for _, l in ipairs(m.lines) do
     if l.name and l.from and t:find(tostring(l.name):lower(), 1, true) then

@@ -48,7 +48,10 @@ local function gossip()
   -- learn which route quests this NPC does NOT offer (missing prerequisites in the data)
   if C_GossipInfo.GetAvailableQuests then
     local offered = {}
-    for _, q in ipairs(C_GossipInfo.GetAvailableQuests() or {}) do offered[q.questID] = true end
+    for _, q in ipairs(C_GossipInfo.GetAvailableQuests() or {}) do
+      offered[q.questID] = true
+      if not Q.ENGLISH then Q.Data.LearnName("q", q.questID, q.title) end
+    end
     QS:NotOffered(npcKey(), offered)
   end
   if pr.autoTurnIn and C_GossipInfo.GetActiveQuests then

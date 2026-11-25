@@ -160,6 +160,16 @@ function QS:ReadLog()
     end
   end
   QS.log, QS.logCount = log, n
+  -- another language: the titles in your log are the quest names to show (and to search by)
+  if not D.ENGLISH then
+    for id, e in pairs(log) do
+      if type(e.title) == "string" and not Q.Secret(e.title) then
+        D.LearnName("q", id, e.title)
+        local c = QS.cache[id]
+        if c then c.title = e.title end
+      end
+    end
+  end
 end
 
 function QS.MaxLog()
@@ -184,7 +194,9 @@ function QS:Info(id)
   if not q then return end
   local x = D:QuestExtra(id) or {}
   local p, pr = Q.player, Q.prefs
-  local info = { id = id, title = q[1] or ("Quest " .. id), level = q[2] or q[3] or 1, min = q[3] or 1, x = x }
+  -- title: in the client's language when known (the quest log, the game's quest cache); etitle: English
+  local info = { id = id, title = (not D.ENGLISH and D:LocalName("q" .. id)) or q[1] or ("Quest " .. id),
+    etitle = q[1], level = q[2] or q[3] or 1, min = q[3] or 1, x = x }
   -- race / class
   local races = QS.RACE_FIX[id]
   if races == nil then races = x[1] end

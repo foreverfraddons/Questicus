@@ -177,14 +177,17 @@ Q:On("QC_QUESTS_CHANGED", function()
   local c = acct()
   for id, e in pairs(QS.log) do
     local m = P.Meta(id)
-    for _, o in ipairs(e.objectives or {}) do
-      if o.numRequired and o.numRequired > 0 and o.text and m then
-        local txt = o.text:lower()
-        for _, l in ipairs(m.lines or {}) do
-          if l.name and txt:find(l.name:lower(), 1, true) then
-            c.qn[id] = c.qn[id] or {}
-            c.qn[id][l.name] = o.numRequired
-          end
+    -- (kept under the English name, whatever the client's language)
+    local byObj = {}
+    if m then byObj = select(2, Q.Planner.MatchObjectives(id, m, e)) end
+    for oi, o in ipairs(e.objectives or {}) do
+      local li = byObj[oi]
+      local l = li and m.lines[li]
+      if o.numRequired and o.numRequired > 0 and l then
+        local key = (l.key and Q.Data:EName(l.key)) or l.name
+        if key then
+          c.qn[id] = c.qn[id] or {}
+          c.qn[id][key] = o.numRequired
         end
       end
     end

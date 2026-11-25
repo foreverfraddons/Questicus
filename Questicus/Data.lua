@@ -66,10 +66,81 @@ function D:Faction(npcID) return DB.nfac and DB.nfac[npcID] end
 function D:Note(key) return key and DB.note and DB.note[(key:gsub(":", ""))] end   -- hand-written tip
 function D:Vendors(item) return DB.vend and DB.vend[item] end
 
+-- ------------------------------------------------------------------ the client's language
+-- ForeverDB is in English. On a client in another language (German, French, ...) the quest log, the
+-- names on screen and the quest window are in that language: names are looked up in it by id
+-- (items: the game knows them; NPCs: a tooltip of the creature; quests: the quest log / the game's
+-- quest cache; objects: learned when you see them) and kept in QuesticusDB.loc[locale].
+local LOCALE = GetLocale and GetLocale() or "enUS"
+D.LOCALE = LOCALE
+D.ENGLISH = LOCALE == "enUS" or LOCALE == "enGB"
+Q.ENGLISH = D.ENGLISH
+local function str(v) return type(v) == "string" and not Q.Secret(v) and v ~= "" and v or nil end
+function D.Loc()
+  if D.ENGLISH or not QuesticusDB then return nil end
+  QuesticusDB.loc = QuesticusDB.loc or {}
+  local l = QuesticusDB.loc[LOCALE]
+  if not l then l = { c = {}, o = {}, q = {} }; QuesticusDB.loc[LOCALE] = l end
+  return l
+end
+-- remember a name seen in the client's language: kind "c" / "o" / "q"
+function D.LearnName(kind, id, name)
+  local l = D.Loc()
+  name = str(name)
+  if not (l and l[kind] and id and name) then return end
+  if name == UNKNOWNOBJECT or name == UNKNOWN then return end
+  l[kind][id] = name
+end
+local tipTried = {}
+-- the name in the client's language (nil on an English client, or not known yet)
+function D:LocalName(key)
+  if D.ENGLISH or type(key) ~= "string" then return nil end
+  local kind, id = key:sub(1, 1), tonumber(key:sub(2))
+  if not id then return nil end
+  local l = D.Loc()
+  if kind == "i" then
+    local n = C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(id)
+    if not str(n) and GetItemInfo then n = GetItemInfo(id) end
+    return str(n)
+  elseif kind == "c" then
+    if l and l.c[id] then return l.c[id] end
+    -- the creature's tooltip has its name in the client's language (asked once per session)
+    if not tipTried[id] and C_TooltipInfo and C_TooltipInfo.GetHyperlink then
+      tipTried[id] = true
+      local ok, data = pcall(C_TooltipInfo.GetHyperlink, ("unit:Creature-0-0-0-0-%d-0000000000"):format(id))
+      local line = ok and data and data.lines and data.lines[1]
+      local n = line and str(line.leftText)
+      if n then D.LearnName("c", id, n); return n end
+    end
+  elseif kind == "o" then
+    return l and l.o[id]
+  elseif kind == "q" then
+    if l and l.q[id] then return l.q[id] end
+    local n = C_QuestLog and C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(id)
+    if str(n) then D.LearnName("q", id, n); return n end
+    if C_QuestLog and C_QuestLog.RequestLoadQuestByID then pcall(C_QuestLog.RequestLoadQuestByID, id) end
+  end
+  return nil
+end
+Q:On("QUEST_DATA_LOAD_RESULT", function(id, ok)
+  if ok and id and not D.ENGLISH then D:LocalName("q" .. id) end
+end)
+
+-- the English name from ForeverDB (for matching against the database's own text)
+function D:EName(key)
+  local kind, id = key:sub(1, 1), tonumber(key:sub(2))
+  if kind == "c" then local n = DB.npc[id]; return n and n[1] end
+  if kind == "o" then local o = DB.obj[id]; return o and o[1] end
+  if kind == "i" then local it = DB.item[id]; return it and it[1] end
+end
 function D:Name(key)
   if key:sub(1, 4) == "taxi" then
     local n = Q.Flight and Q.Flight:Node(tonumber(key:sub(5)))
     return n and (n.name .. " (flight master)") or "Flight master"
+  end
+  if not D.ENGLISH then
+    local ln = D:LocalName(key)
+    if ln then return ln end
   end
   local kind, id = key:sub(1, 1), tonumber(key:sub(2))
   if kind == "c" then local n = DB.npc[id]; return n and n[1] or ("NPC " .. id) end

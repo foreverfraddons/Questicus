@@ -324,7 +324,9 @@ end
 Q:On("CHAT_MSG_SYSTEM", function(text)
   text = plain(text)
   local cur = R:Current()
-  if type(text) == "string" and cur and text:find(cur.name, 1, true) and (text:find("reset") or text:find("Reset")) then
+  local resetPat = type(INSTANCE_RESET_SUCCESS) == "string" and INSTANCE_RESET_SUCCESS:gsub("%.", "%%."):gsub("%%s", "(.+)")
+  local isReset = type(text) == "string" and ((text:find("reset") or text:find("Reset")) or (resetPat and text:match(resetPat)))
+  if type(text) == "string" and cur and text:find(cur.name, 1, true) and isReset then
     R:Finish(cur)
   end
 end)

@@ -88,14 +88,20 @@ end
 -- How many of a thing an objective needs: the live quest log, what was seen before (any character),
 -- else a typical number.
 local DEFAULT_N = { kill = 8, loot = 6, use = 3, buy = 1, explore = 1 }
-function P.Count(id, name, kind)
+function P.Count(id, name, kind, key)
   local e = QS.log[id]
+  local en = key and D:EName(key)
+  local ln = key and D:LocalName(key)
   for _, o in ipairs(e and e.objectives or {}) do
-    if o.text and name and o.numRequired and o.numRequired > 0 and o.text:lower():find(name:lower(), 1, true) then
-      return o.numRequired
+    local txt = type(o.text) == "string" and not Q.Secret(o.text) and o.text:lower()
+    if txt and o.numRequired and o.numRequired > 0 then
+      for _, n in ipairs({ name, en, ln }) do
+        if n and n ~= "" and txt:find(n:lower(), 1, true) then return o.numRequired end
+      end
     end
   end
   local seen = QuesticusCollect and QuesticusCollect.qn and QuesticusCollect.qn[id]
+  if seen and (en or name) and seen[en or name] then return seen[en or name] end
   if seen and name and seen[name] then return seen[name] end
   return DEFAULT_N[kind] or 1
 end
@@ -161,6 +167,57 @@ function P.QuestKills(m, lv)
   if m.dungeon then k = k + 30 * QS.KillXP(m.info.level, lv) end
   return k
 end
+-- ------------------------------------------------------------------ quest log objectives <-> lines
+-- Which objective in your quest log is which line of the quest. By name: the English name from
+-- ForeverDB, or the name in the client's language (German, French ...: D:LocalName). What's still
+-- unmatched is paired by kind (monster - kill, item - loot / buy, object - use) in order, so a
+-- quest in a language whose names aren't known yet is still followed.
+-- Returns byLine[li] = objective, byObj[oi] = li.
+local TYPE_KIND = { monster = { kill = true }, item = { loot = true, buy = true }, object = { use = true } }
+local matchCache = setmetatable({}, { __mode = "k" })
+function P.MatchObjectives(id, m, e)
+  e = e or QS.log[id]
+  local objs = e and e.objectives
+  if not (objs and m and m.lines) then return {}, {} end
+  local c = matchCache[objs]
+  if c and c.m == m then return c.byLine, c.byObj end
+  local byLine, byObj = {}, {}
+  local function names(l)
+    local t = {}
+    if l.name then t[#t + 1] = l.name:lower() end
+    if l.key then
+      local en = D:EName(l.key); if en then t[#t + 1] = en:lower() end
+      local ln = D:LocalName(l.key); if ln then t[#t + 1] = ln:lower() end
+    end
+    return t
+  end
+  for oi, o in ipairs(objs) do
+    local txt = type(o.text) == "string" and not Q.Secret(o.text) and o.text:lower() or ""
+    for li, l in ipairs(m.lines) do
+      if not byLine[li] and not l.part then
+        for _, n in ipairs(names(l)) do
+          if n ~= "" and txt:find(n, 1, true) then byLine[li], byObj[oi] = o, li; break end
+        end
+        if byObj[oi] then break end
+      end
+    end
+  end
+  -- not matched by name (another language, names not known yet): by kind, in order
+  for oi, o in ipairs(objs) do
+    if not byObj[oi] then
+      local want = TYPE_KIND[o.type or ""]
+      for li, l in ipairs(m.lines) do
+        if not byLine[li] and not l.part and (not want or want[l.kind]) then
+          byLine[li], byObj[oi] = o, li
+          break
+        end
+      end
+    end
+  end
+  matchCache[objs] = { m = m, byLine = byLine, byObj = byObj }
+  return byLine, byObj
+end
+
 -- what's left of a quest in your log: [line] = share still to do (0 = the quest's general spots)
 function P.OpenLines(id, m)
   local e = QS.log[id]
@@ -168,19 +225,15 @@ function P.OpenLines(id, m)
   if e and e.complete then return open end
   local matched, remainOf = {}, {}
   if e and e.objectives and #e.objectives > 0 then
-    for _, o in ipairs(e.objectives) do
-      local txt = (o.text or ""):lower()
-      for li, l in ipairs(m.lines) do
-        if not matched[li] and l.name and txt:find(l.name:lower(), 1, true) then
-          matched[li] = true
-          if not o.finished then
-            local have, need = o.numFulfilled, o.numRequired
-            if not need then have, need = txt:match("(%d+)%s*/%s*(%d+)") ; have, need = tonumber(have), tonumber(need) end
-            open[li] = (need and need > 0 and have) and math.max(0.1, (need - have) / need) or 1
-            if need and have then remainOf[li] = need - have end
-          end
-          break
-        end
+    local byLine = P.MatchObjectives(id, m, e)
+    for li, o in pairs(byLine) do
+      matched[li] = true
+      if not o.finished then
+        local txt = type(o.text) == "string" and not Q.Secret(o.text) and o.text or ""
+        local have, need = o.numFulfilled, o.numRequired
+        if not need then have, need = txt:match("(%d+)%s*/%s*(%d+)") ; have, need = tonumber(have), tonumber(need) end
+        open[li] = (need and need > 0 and have) and math.max(0.1, (need - have) / need) or 1
+        if need and have then remainOf[li] = need - have end
       end
     end
   end
@@ -297,13 +350,13 @@ local function questMeta(id)
   local function newLine(l)
     lines[#lines + 1] = l
     cur = #lines
-    l.n = P.Count(id, l.name, l.kind)
+    l.n = P.Count(id, l.name, l.kind, l.key)
     return l
   end
   for _, c in ipairs(x[8] or {}) do
     local key = "c" .. c
     local n = D:NPC(c)
-    newLine({ kind = "kill", key = key, name = n and n[1] or key, mlvl = n and n[4] or info.level })
+    newLine({ kind = "kill", key = key, name = D:Name(key), mlvl = n and n[4] or info.level })
     addPts(D:Points(key), key)
   end
   for _, o in ipairs(x[9] or {}) do
@@ -342,7 +395,7 @@ local function questMeta(id)
     end
     -- no known source: an item named after its owner ("Old Rot-Chum's Head") comes from that npc
     if not best then
-      local owner = D:Name("i" .. it):match("^(.-)'s ")
+      local owner = (D:EName("i" .. it) or ""):match("^(.-)'s ")
       local ids = owner and D:NPCByName(owner)
       if ids then
         best = { key = "c" .. ids[1], chance = 1 }
@@ -472,7 +525,7 @@ local function questMeta(id)
   end
   -- "WANTED: Name" quests: the wanted npc
   if #objPts == 0 then
-    local wanted = info.title:match("^[Ww][Aa][Nn][Tt][Ee][Dd]:%s*(.+)$")
+    local wanted = (info.etitle or info.title):match("^[Ww][Aa][Nn][Tt][Ee][Dd]:%s*(.+)$")
     for _, nid in ipairs(wanted and D:NPCByName(wanted) or {}) do addPts(D:Points("c" .. nid), "c" .. nid) end
     if #objPts > 0 then extraT = math.max(extraT, 90) end
   end
@@ -689,13 +742,13 @@ function P.StaticKind(id)
   -- and other PvP quests
   local zone = x[11]
   if zone == 3277 or zone == 3358 or zone == 2597 or zone == 16606 then return "pvp" end
-  local tl = (info and info.title or ""):lower()
+  local tl = (info and (info.etitle or info.title) or ""):lower()
   if tl:find("warsong", 1, true) or tl:find("arathi basin", 1, true) or tl:find("alterac valley", 1, true)
     or tl:find("darkspear islands", 1, true)
     or tl:find("battleground", 1, true) or tl:find("pvp", 1, true) then return "pvp" end
   if hasBit(x[12], 2) and hasBit(x[13], 2) then return "escort" end
   -- WoW Forever's own quests have no flags: go by the usual escort titles
-  local t = (info and info.title or ""):lower()
+  local t = (info and (info.etitle or info.title) or ""):lower()
   if t:find("escort", 1, true) or t:find("'s escape$") or t == "the escape" then return "escort" end
   local skill = x[14]
   if (type(skill) == "table" and skill[1] == 185) or skill == 185 or x[11] == -304 then return "cooking" end

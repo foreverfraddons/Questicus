@@ -407,7 +407,8 @@ do
 end
 -- "New flight path discovered!"
 Q:On("UI_INFO_MESSAGE", function(_, msg)
-  if type(msg) == "string" and not Q.Secret(msg) and msg:lower():find("flight path") then
+  if type(msg) == "string" and not Q.Secret(msg) and (msg:lower():find("flight path")
+    or (type(ERR_NEWTAXIPATH) == "string" and msg == ERR_NEWTAXIPATH)) then
     local here = D:PlayerPos()
     local n, d = nil, nil
     for _, x in ipairs(load()) do

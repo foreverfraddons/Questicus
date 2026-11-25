@@ -110,7 +110,7 @@ local function noteItem(link)
   if type(link) ~= "string" then return end
   local id = tonumber(link:match("item:(%d+)"))
   if not id then return end
-  if not ccRecords() then
+  if not ccRecords() and Q.ENGLISH then
     local name = link:match("%[(.-)%]")
     if name and name ~= "" then
       local e = db().item[id]
@@ -147,8 +147,15 @@ local function noteUnit(unit)
       end
     end
   end
-  if ccRecords() then return id end
   local name, lvl = clean(UnitName(unit)), clean(UnitLevel(unit))
+  -- another language: the name is learned for this client (D.LearnName), never put in the database
+  -- (ForeverDB is English); only levels and the like are recorded, for an NPC it already has
+  if not Q.ENGLISH then
+    D.LearnName("c", id, name)
+    if ccRecords() or not c.npc[id] then return id end
+    name = c.npc[id][1]
+  end
+  if ccRecords() then return id end
   if not name or name == "" or name == UNKNOWNOBJECT then return id end
   local e = c.npc[id] or {}
   e[1] = name
@@ -295,7 +302,7 @@ local function npcId(unit)
   if kind == "c" then return id end
 end
 Q:On("TAXIMAP_OPENED", function()
-  if not on() or not NumTaxiNodes then return end
+  if not on() or not NumTaxiNodes or not Q.ENGLISH then return end   -- (kept by the nodes' English names)
   pcall(function()
     local id = npcId("npc")
     if not id then return end
@@ -319,7 +326,7 @@ end)
 -- you can't learn yet / already know: show them all while reading, then put the filters back
 local ignoreUntil = 0
 local function readTrainer()
-  if not on() or not GetNumTrainerServices then return end
+  if not on() or not GetNumTrainerServices or not Q.ENGLISH then return end   -- (kept by English names)
   local restore = {}
   if GetTrainerServiceTypeFilter and SetTrainerServiceTypeFilter then
     for _, k in ipairs({ "available", "unavailable", "used" }) do
@@ -490,6 +497,7 @@ local function generic(text)
   return text
 end
 local function saveText(field, text)
+  if not Q.ENGLISH then return end            -- ForeverDB's quest text is English
   local qid = clean(GetQuestID and GetQuestID())
   text = generic(text)
   if not qid or qid == 0 or not text then return end
@@ -501,6 +509,7 @@ local function saveText(field, text)
   end
 end
 local function saveGreeting(text)
+  if not Q.ENGLISH then return end
   text = generic(text)
   local kind, id = kindId(UnitGUID and UnitGUID("npc"))
   if not text or not id or (kind ~= "c" and kind ~= "o") then return end
@@ -606,7 +615,7 @@ Q:On("QUEST_DETAIL", function()
     local qid = fromWindow()
     if not qid then return end
     local e = db().qinfo[qid] or {}
-    local o = clean(GetObjectiveText and GetObjectiveText())
+    local o = Q.ENGLISH and clean(GetObjectiveText and GetObjectiveText())
     if o and o ~= "" then e.o = o end
     local g = clean(GetSuggestedGroupNum and GetSuggestedGroupNum()); if g and g > 0 then e.grp = g end
     local l = lvl()
@@ -742,6 +751,7 @@ objFrame:SetScript("OnUpdate", function(_, el)
     if inR then noteSpot("o:" .. oid) end              -- within reach: close enough for a spot
     local c = db()
     local name = clean(UnitName(unit))
+    if not Q.ENGLISH then D.LearnName("o", oid, name); name = nil end
     if name and name ~= "" and not ccRecords() then c.obj[oid] = { name } end
     if not c.oskill[oid] and C_TooltipInfo and C_TooltipInfo.GetUnit then
       local ok, data = pcall(C_TooltipInfo.GetUnit, unit)
