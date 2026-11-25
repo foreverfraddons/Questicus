@@ -7,11 +7,7 @@
 local Q = Questicus
 Q.Changelog = {
   { v = "next" },
-  { v = "0.9.032",
-    changed = {
-      "Small fixes and improvements.",
-    },
-  },
+  { v = "0.9.032" },
   { v = "0.9.031",
     added = {
       "Escort quests stand out on the route: the step is green with an \"ESCORT QUEST\" tab, and before an escort starts Questicus asks (Start escort / Not now), even with auto-accept on.",

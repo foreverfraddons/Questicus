@@ -12,6 +12,10 @@ on:
         description: "Release now (even with fewer than MIN_CHANGES changes, or none)"
         type: boolean
         default: false
+      silent:
+        description: "Silent: nothing in the in-game What's new (no filler line when the notes are empty)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -84,7 +88,9 @@ jobs:
           # patch notes: the "next" entry becomes this version (a maps-only release gets a map line)
           MAPS=""
           if [ -n "$LASTFULL" ] && ! git diff --quiet "$LASTFULL" HEAD -- upstream.json 2>/dev/null; then MAPS="--maps"; fi
-          python3 tools/changelog.py stamp "$NEW" $MAPS
+          SILENT=""
+          if [ "${{ inputs.silent }}" = "true" ]; then SILENT="--silent"; fi
+          python3 tools/changelog.py stamp "$NEW" $MAPS $SILENT
           git config user.name "questicus bot"
           git config user.email "actions@users.noreply.github.com"
           git commit -am "Release v$NEW" || true

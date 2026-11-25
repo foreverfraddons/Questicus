@@ -2,7 +2,8 @@
 """Patch notes (Questicus/Changelog.lua) for the release workflow.
 
   changelog.py stamp <version> [--maps]   the "next" entry becomes <version>; a fresh empty "next" goes on top.
-                                          An empty "next" gets a short line (--maps: the world map was updated).
+                                          An empty "next" gets a short line (--maps: the world map was updated;
+                                          --silent: no line, nothing in the in-game What's new).
   changelog.py md <version>               CHANGELOG.md text for CurseForge: that version's notes.
   changelog.py count [--maps]             how many changes the "next" entry holds (--maps: +1, the map was updated).
   changelog.py check                      the file parses and has a "next" entry.
@@ -68,6 +69,8 @@ def main():
             block = ""
         if any(sections(block).values()):
             new = block.replace('{ v = "next"', '{ v = "%s"' % ver, 1)
+        elif "--silent" in sys.argv:
+            new = '  { v = "%s" },\n' % ver          # nothing in the in-game What's new
         else:
             line = ("The world map (Questicus Maps) was updated with the latest map data."
                     if "--maps" in sys.argv else "Small fixes and improvements.")
