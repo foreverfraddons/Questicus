@@ -7,6 +7,9 @@
 local Q = Questicus
 Q.Changelog = {
   { v = "next",
+    changed = {
+      "With Command Center installed, the Questicus icon in its dock, border bar, home page and Tools list takes the theme colour like the other tools; on its own Questicus keeps its own icon.",
+    },
     fixed = {
       "Game clients in other languages (German, French, Spanish ...): quest objectives in your log are recognised (by name in your language, else by kind and order), so finished objectives drop out of the route and progress shows; quest, NPC and item names show in your language where the game knows them.",
     },

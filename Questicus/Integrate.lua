@@ -1,6 +1,8 @@
 -- Questicus + Command Center: when Command Center is installed, Questicus uses its theme colours
 -- and shows up as one of its tools (home tile, Tools window, dock, Button Box). Without Command
 -- Center, Questicus runs on its own (its own minimap button, the same look).
+-- Inside Command Center it wears the theme: a white glyph (Media\i_questicus) tinted gold like every
+-- Command Center tool. On its own it keeps its personal icon (Media\icon).
 local Q = Questicus
 local T = Q.T
 
@@ -11,8 +13,8 @@ local function register()
   registered = CC:RegisterTool({
     label = "Questicus",
     desc = "Step-by-step questing: route, arrow, map pins and gear upgrades",
-    icon = Q.MEDIA .. "icon",
-    tint = false,
+    icon = Q.MEDIA .. "i_questicus",
+    tint = true,
     window = "QuesticusGuide",
     available = function() return true end,
     isOn = function() local f = Q.Guide.Frame(); return f and f:IsShown() or false end,
