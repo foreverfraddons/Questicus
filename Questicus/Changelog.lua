@@ -6,7 +6,15 @@
 -- update goes out once "next" holds 10 lines (release.yml, MIN_CHANGES).
 local Q = Questicus
 Q.Changelog = {
-  { v = "next" },
+  { v = "next",
+    added = {
+      "Escort quests stand out on the route: the step is green with an \"ESCORT QUEST\" tab, and before an escort starts Questicus asks (Start escort / Not now), even with auto-accept on.",
+      "Options > Automation: every setting where Questicus does something on its own - accepting and handing in quests, suggesting rewards, taking flights, pinning the next objective.",
+    },
+    changed = {
+      "Accepting quests, handing them in and suggesting rewards are off until you turn them on (first-time setup or Options > Automation). They were on by default; after this update they're off once, so turn them back on if you want them.",
+    },
+  },
   { v = "0.9.030",
     changed = {
       "With Command Center installed, the Questicus icon in its dock, border bar, home page and Tools list takes the theme colour like the other tools; on its own Questicus keeps its own icon.",

@@ -113,9 +113,10 @@ local DEFAULT_PREFS = {
   gold = 2,                 -- 1 low ... 3 high: how much gold rewards count
   xp = 3,                   -- 1 low ... 3 high
   hearth = true,            -- use the hearthstone in routes
-  autoAccept = true,
-  autoTurnIn = true,
-  autoReward = true,        -- pick the best reward for your spec
+  -- automation is off until you turn it on (first-time setup or Options > Automation)
+  autoAccept = false,
+  autoTurnIn = false,
+  autoReward = false,       -- suggest the best reward for your spec (you confirm it)
   role = nil,               -- tank | heal | melee | ranged | caster (from the survey)
   spec = nil,
 }
@@ -138,6 +139,11 @@ function Q:InitDB()
   QuesticusChar = QuesticusChar or {}
   local c = QuesticusChar
   c.prefs = fill(c.prefs or {}, DEFAULT_PREFS)
+  -- (once: automation used to start on - now it's opt-in, so it goes off until you turn it on)
+  if not c.prefs.autoOptIn then
+    c.prefs.autoOptIn = true
+    c.prefs.autoAccept, c.prefs.autoTurnIn, c.prefs.autoReward = false, false, false
+  end
   c.skipped = c.skipped or {}     -- [questID] = true: never route this quest
   c.stepDone = c.stepDone or {}   -- [stepKey] = true: manual "done" for steps the game can't see
   c.surveyDone = c.surveyDone or false

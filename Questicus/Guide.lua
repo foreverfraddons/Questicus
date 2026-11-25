@@ -35,6 +35,13 @@ local function itemText(id)
 end
 
 -- the dungeon a step takes you into (a "Do ... in <dungeon>" step), or nil
+-- the escort quest a step is about (accepting it, or doing it), or nil
+function GD.EscortOf(s)
+  if not s or (s.type ~= "accept" and s.type ~= "complete") then return nil end
+  for _, id in ipairs(s.quests or {}) do
+    if P.Kind and P.Kind(id) == "escort" then return id end
+  end
+end
 function GD.DungeonOf(s)
   if not (s and s.type == "complete") then return end
   for _, id in ipairs(s.quests or {}) do
@@ -670,6 +677,15 @@ local function build()
   cur.banner.text = T.Text(cur.banner, 10, { 1, 0.92, 0.7, 1 }, "OUTLINE")
   cur.banner.text:SetPoint("CENTER", 0, 0)
   cur.banner:Hide()
+  -- an escort step: the same tab, green
+  cur.ebanner = CreateFrame("Frame", nil, cur)
+  cur.ebanner:SetHeight(16)
+  cur.ebanner:SetPoint("BOTTOM", cur, "TOP", 0, -8)
+  cur.ebanner:SetFrameLevel(cur:GetFrameLevel() + 6)
+  T.RFill(cur.ebanner, { 0.16, 0.48, 0.22, 1 }, 5)
+  cur.ebanner.text = T.Text(cur.ebanner, 10, { 0.9, 1, 0.85, 1 }, "OUTLINE")
+  cur.ebanner.text:SetPoint("CENTER", 0, 0)
+  cur.ebanner:Hide()
   local pulse = 0
   cur:HookScript("OnUpdate", function(_, el)
     if not cur.glow:IsShown() then return end
@@ -947,15 +963,30 @@ function GD:Refresh()
     cur.num:SetText(GD.focus == 1 and "NOW" or ("#" .. GD.focus))
     cur.text:SetText(GD.StepText(s))
     local dArea, dName = GD.DungeonOf(s)
+    local esc = not dArea and GD.EscortOf(s)
     local open = Q.db.guide.dunOpen
     local lines = s.type == "complete" and (dArea and (open and dungeonLines(s) or {}) or objectiveLines(s)) or {}
     -- (the DUNGEON label under the icon is wider than it: move the step text clear of it)
     -- (the icon moves in so the label stays inside the box; the text stays where it was)
     cur.icon:SetPoint("TOPLEFT", dArea and 18 or 8, -8)
     cur.text:SetPoint("TOPLEFT", cur.icon, "TOPRIGHT", dArea and 12 or 8, 0)
-    cur.glow:SetShown(dArea ~= nil)
+    cur.glow:SetShown(dArea ~= nil or esc ~= nil)
     cur.banner:SetShown(dArea ~= nil)
-    if dArea then
+    cur.ebanner:SetShown(esc ~= nil)
+    if esc then
+      -- an escort: green, and it asks before it starts (Auto.lua)
+      cur.glow:SetVertexColor(0.35, 0.95, 0.45, 0.8)
+      cur.icon:SetVertexColor(0.7, 1, 0.7, 1)
+      cur.num:SetText(c("5cff6a", "ESCORT"))
+      T.SetBorderColor(cur, 0.35, 0.9, 0.45, 1)
+      local info = QS:Info(esc)
+      cur.ebanner.text:SetText("ESCORT QUEST - " .. ((info and info.title) or "escort"):upper())
+      cur.ebanner:SetWidth(math.min((cur.ebanner.text:GetStringWidth() or 200) + 24, math.max(120, (cur:GetWidth() or 300) - 12)))
+      lines[#lines + 1] = c("5cff6a", "  Escort: ") .. c(dim, s.type == "accept"
+        and "it starts when you accept it - be ready to follow and keep them alive. Questicus asks first."
+        or "stay close and keep them alive until they're safe.")
+    elseif dArea then
+      cur.glow:SetVertexColor(0.75, 0.45, 1, 0.8)
       cur.icon:SetVertexColor(0.85, 0.65, 1, 1)
       cur.num:SetText(c("c08cff", "DUNGEON"))
       T.SetBorderColor(cur, 0.75, 0.45, 1, 1)

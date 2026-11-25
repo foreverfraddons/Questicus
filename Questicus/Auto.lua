@@ -94,17 +94,64 @@ end
 Q:On("GOSSIP_SHOW", function() if not paused() then after(gossip) end end)
 Q:On("QUEST_GREETING", function() if not paused() then after(greeting) end end)
 
+-- an escort: the NPC sets off as soon as it's accepted
+local function isEscort(id)
+  local P = Q.Planner
+  if id and P and P.Kind and P.Kind(id) == "escort" then return true end
+  local o = GetObjectiveText and GetObjectiveText()
+  return Q.ENGLISH and type(o) == "string" and not Q.Secret(o) and o:lower():find("escort", 1, true) ~= nil
+end
+
 Q:On("QUEST_DETAIL", function()
-  if paused() or not Q.prefs.autoAccept then return end
   local id = GetQuestID and GetQuestID()
+  -- an escort is never accepted on its own: a card beside the quest window asks first
+  if id and isEscort(id) then
+    Q.After(0.05, function() Q.ConfirmEscort(id) end)
+    return
+  end
+  if paused() or not Q.prefs.autoAccept then return end
   if wanted(id) then after(function() AcceptQuest() end) end
 end)
 
--- escort / shared quests ask to confirm
-Q:On("QUEST_ACCEPT_CONFIRM", function()
-  if paused() or not Q.prefs.autoAccept then return end
-  if ConfirmAcceptQuest then ConfirmAcceptQuest() end
-end)
+-- (an escort a group member started: the game asks you itself - Questicus never confirms it for you)
+
+-- ------------------------------------------------------------------ confirm an escort
+local escCard
+function Q.ConfirmEscort(id)
+  local T = Q.T
+  if not escCard then
+    escCard = T.Window("QuesticusEscortConfirm", 300, 124, "Escort quest", nil)
+    escCard:SetFrameStrata("DIALOG")
+    escCard.text = T.Text(escCard, 12, T.c.text)
+    escCard.text:SetPoint("TOPLEFT", 14, -32)
+    escCard.text:SetPoint("RIGHT", -14, 0)
+    escCard.text:SetJustifyH("LEFT")
+    escCard.go = T.Button(escCard, "Start escort", 104, 22)
+    escCard.go:SetPoint("BOTTOMLEFT", 14, 12)
+    escCard.go:SetScript("OnClick", function()
+      escCard:Hide()
+      if QuestFrame and QuestFrame:IsShown() and AcceptQuest then AcceptQuest() end
+    end)
+    escCard.no = T.Button(escCard, "Not now", 90, 22)
+    escCard.no:SetPoint("LEFT", escCard.go, "RIGHT", 8, 0)
+    escCard.no:SetScript("OnClick", function()
+      escCard:Hide()
+      if DeclineQuest then DeclineQuest() end
+    end)
+    escCard:RegisterEvent("QUEST_FINISHED")
+    escCard:SetScript("OnEvent", function(self) self:Hide() end)
+  end
+  local info = QS:Info(id)
+  escCard.text:SetText(Q.Color("5cff6a", (info and info.title) or "This escort") .. "\n" ..
+    Q.Color("c0c0c0", "Starts as soon as you accept: follow them and keep them alive. Ready?"))
+  escCard:ClearAllPoints()
+  if QuestFrame and QuestFrame:IsShown() then
+    escCard:SetPoint("TOPLEFT", QuestFrame, "TOPRIGHT", 8, -40)
+  else
+    escCard:SetPoint("CENTER", 0, 120)
+  end
+  escCard:Show()
+end
 
 Q:On("QUEST_PROGRESS", function()
   if paused() or not Q.prefs.autoTurnIn then return end

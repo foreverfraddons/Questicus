@@ -8,14 +8,14 @@ Q.Survey = SV
 local W, H = 660, 470
 local PRESETS = {
   speed = { escort = false, cooking = false, levelRange = 3, gray = false, breadcrumbs = "useful", allInZone = false, repeatable = false, rep = false,
-    elite = "some", dungeons = false, gear = "onway", xp = 3, gold = 1, autoAccept = true, autoTurnIn = true,
-    autoReward = true, collectibles = false },
+    elite = "some", dungeons = false, gear = "onway", xp = 3, gold = 1,
+    collectibles = false },
   balanced = { levelRange = 2, gray = false, breadcrumbs = "useful", allInZone = false, repeatable = false, rep = false,
-    elite = "solo", dungeons = false, gear = "route", xp = 3, gold = 2, autoAccept = true, autoTurnIn = true,
-    autoReward = true, collectibles = false },
+    elite = "solo", dungeons = false, gear = "route", xp = 3, gold = 2,
+    collectibles = false },
   complete = { levelRange = 2, gray = true, breadcrumbs = "all", allInZone = true, repeatable = true, rep = true,
-    elite = "some", dungeons = true, gear = "route", xp = 2, gold = 2, autoAccept = true, autoTurnIn = true,
-    autoReward = true, collectibles = true, profQuests = true, seasonal = true, pvp = true },
+    elite = "some", dungeons = true, gear = "route", xp = 2, gold = 2,
+    collectibles = true, profQuests = true, seasonal = true, pvp = true },
 }
 SV.PRESETS = PRESETS
 
@@ -49,7 +49,7 @@ local function pageStyle(p)
   local cards = {}
   local opts = {
     { "speed", "Interface\\Icons\\Ability_Rogue_Sprint", "Speedrun",
-      "Fastest way to max level. Only the quests worth the walk, everything automatic." },
+      "Fastest way to max level. Only the quests worth the walk." },
     { "balanced", "Interface\\Icons\\INV_Misc_Map_01", "Balanced",
       "Efficient levelling that keeps your gear and gold up as you go." },
     { "complete", "Interface\\Icons\\INV_Misc_Book_09", "Completionist",
@@ -284,7 +284,7 @@ local function pageHelpers(p)
   header(p, "Helpers", "Things Questicus can do for you while you play.")
   local w = {}
   local list = {
-    { pr, "autoAccept", "Accept route quests automatically", "Hold Shift when talking to skip it once." },
+    { pr, "autoAccept", "Accept route quests automatically", "Hold Shift when talking to skip it once. Escort quests always ask first." },
     { pr, "autoTurnIn", "Turn in finished quests automatically" },
     { function() return Q.db.guide end, "shown", "Step-by-step guide window" },
     { function() return Q.db.arrow end, "shown", "Waypoint arrow" },

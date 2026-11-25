@@ -130,28 +130,37 @@ local function build()
     { "Unskip all", 90, function() SlashCmdList.QUESTICUS("unskip") end, "Brings back every quest and step you skipped." },
   })
 
-  -- 2. Questing
-  p = page("Questing", "What Questicus does for you at quest givers and flight masters.")
+  -- 2. Automation: everything Questicus does on its own (all of it off until you turn it on)
+  p = page("Automation", "What Questicus does for you on its own. Hold Shift while talking to someone to do it yourself once.")
   group(p, "Quest givers")
-  check(p, "Accept route quests automatically", function() return pr().autoAccept end, function(v) pr().autoAccept = v end)
-  check(p, "Hand in quests automatically", function() return pr().autoTurnIn end, function(v) pr().autoTurnIn = v end)
+  check(p, "Accept route quests automatically", function() return pr().autoAccept end, function(v) pr().autoAccept = v end,
+    "Quests on your route are accepted when you talk to the quest giver. Escort quests always ask first.")
+  check(p, "Hand in quests automatically", function() return pr().autoTurnIn end, function(v) pr().autoTurnIn = v end,
+    "Finished quests are handed in when you talk to the quest giver.")
   check(p, "Suggest the best reward", function() return pr().autoReward end, function(v) pr().autoReward = v end,
     "The reward that's the biggest upgrade for you (or sells for the most) - you confirm it before the quest is handed in.")
   group(p, "Travel")
-  check(p, "Use flight paths in the route", function() return Q.prefs.flights ~= false end,
-    function(v) Q.prefs.flights = v; Q.Planner:Build() end, "Flies when it beats running, with the flight masters you know. Unknown ones nearby become a step.")
   check(p, "Take the flight automatically", function() return Q.prefs.autoFly ~= false end,
     function(v) Q.prefs.autoFly = v end, "Talking to the flight master of a fly step takes the flight. Hold Shift to choose yourself.")
-  check(p, "Use my hearthstone in the route", function() return Q.prefs.hearth ~= false end,
-    function(v) Q.prefs.hearth = v; Q.Planner:Build() end, "Hearths when it's ready and gets you to the next step faster (Hearthstone button on the step).")
-  group(p, "Route")
-  check(p, "Include PvP and battleground quests", function() return Q.prefs.pvp == true end,
-    function(v) Q.prefs.pvp = v; Q:Send("QC_PREFS_CHANGED") end, "Off: Warsong Gulch, Arathi Basin, Alterac Valley, Darkspear Islands and other PvP quests are left out.")
+  group(p, "Map")
   check(p, "Pin the next objective on the map automatically", function() return db.pins.autoPin ~= false end,
     function(v) db.pins.autoPin = v; if v then Q.Waypoint:Follow() else Q.Waypoint:Clear() end end,
     "Puts the game's waypoint on the step you're on, so the game's own arrow and the minimap point there too.")
 
-  -- 3. Map
+  -- 3. Questing
+  p = page("Questing", "Which quests and travel the route uses.")
+  group(p, "Travel")
+  check(p, "Use flight paths in the route", function() return Q.prefs.flights ~= false end,
+    function(v) Q.prefs.flights = v; Q.Planner:Build() end, "Flies when it beats running, with the flight masters you know. Unknown ones nearby become a step.")
+  check(p, "Use my hearthstone in the route", function() return Q.prefs.hearth ~= false end,
+    function(v) Q.prefs.hearth = v; Q.Planner:Build() end, "Hearths when it's ready and gets you to the next step faster (Hearthstone button on the step).")
+  group(p, "Route")
+  check(p, "Include escort quests", function() return Q.prefs.escort ~= false end,
+    function(v) Q.prefs.escort = v; Q:Send("QC_PREFS_CHANGED") end, "Escort quests are marked green on the route and always ask before they start.")
+  check(p, "Include PvP and battleground quests", function() return Q.prefs.pvp == true end,
+    function(v) Q.prefs.pvp = v; Q:Send("QC_PREFS_CHANGED") end, "Off: Warsong Gulch, Arathi Basin, Alterac Valley, Darkspear Islands and other PvP quests are left out.")
+
+  -- 4. Map
   p = page("Map & minimap", "What Questicus draws on the world map and the minimap.")
   group(p, "World map")
   check(p, "Show the route on the map", function() return db.pins.world end, function(v) db.pins.world = v; Q.Pins:RefreshWorld() end)
