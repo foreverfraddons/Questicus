@@ -2,6 +2,7 @@
 -- of the zones with quests for your level; untick one and its quests stay off the route (quests you
 -- already have there still get handed in). Kept per character (Q.char.zoneOff[uiMap] = true).
 local Q = Questicus
+local L = Q.L
 local T, D, QS, P = Q.T, Q.Data, Q.Quests, Q.Planner
 local Z = {}
 Q.Zones = Z
@@ -112,7 +113,7 @@ function Z:Refresh()
     r.box:SetVertexColor(0.12, 0.1, 0.08, 1)
     r.tick:SetShown(on)
     local lvl = z.lo and Q.Color(T.HEX.dim, (" %d-%d"):format(z.lo, z.hi)) or ""
-    local nm = z.name .. (z.new and Q.Color(T.HEX.good, " new") or "")
+    local nm = z.name .. (z.new and Q.Color(T.HEX.good, L[" new"]) or "")
     r.name:SetText((on and (z.fits and nm or Q.Color(T.HEX.dim, z.name)) or Q.Color(T.HEX.dim, z.name .. "  (off)")) .. lvl)
     r.n:SetText((z.n > 0 and (z.n .. " quest" .. (z.n == 1 and "" or "s")) or "") .. (z.log > 0 and ("  - " .. z.log .. " in your log") or ""))
     if i > 1 and list[i - 1].fits and not z.fits then y = y + 14 end     -- a gap before the zones for other levels
@@ -131,7 +132,7 @@ function Z:Show()
     win.note = T.Text(win, 11, T.c.dim)
     win.note:SetPoint("TOPLEFT", 14, -32)
     win.note:SetPoint("RIGHT", -14, 0)
-    win.note:SetText("Untick a zone to keep its quests off your route. Zones for your level first.")
+    win.note:SetText(L["Untick a zone to keep its quests off your route. Zones for your level first."])
     win.scroll = CreateFrame("ScrollFrame", nil, win)
     win.scroll:SetPoint("TOPLEFT", 8, -52)
     win.scroll:SetPoint("BOTTOMRIGHT", -8, 38)

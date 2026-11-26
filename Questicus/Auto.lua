@@ -1,6 +1,7 @@
 -- Questicus helpers at quest NPCs: turn in every finished quest, accept the quests on your route, take the best reward, and keep going until the NPC has nothing left.
 -- Hold Shift while talking to an NPC to do it yourself.
 local Q = Questicus
+local L = Q.L
 local QS, G = Q.Quests, Q.Gear
 
 local function paused() return (IsShiftKeyDown and IsShiftKeyDown()) or (Q.CollectOnly and Q.CollectOnly()) end
@@ -143,7 +144,7 @@ function Q.ConfirmEscort(id)
   end
   local info = QS:Info(id)
   escCard.text:SetText(Q.Color("5cff6a", (info and info.title) or "This escort") .. "\n" ..
-    Q.Color("c0c0c0", "Starts as soon as you accept: follow them and keep them alive. Ready?"))
+    Q.Color("c0c0c0", L["Starts as soon as you accept: follow them and keep them alive. Ready?"]))
   escCard:ClearAllPoints()
   if QuestFrame and QuestFrame:IsShown() then
     escCard:SetPoint("TOPLEFT", QuestFrame, "TOPRIGHT", 8, -40)
@@ -204,7 +205,7 @@ Q:On("QUEST_COMPLETE", function()
   -- a choice of professions (Forever's starting quests: "Mining for Dummies", "Herbalism for
   -- Dummies" ...): yours to pick, never picked for you
   if Q.ProfessionChoice and Q.ProfessionChoice(n) then
-    Q:Print("pick the profession you want from the rewards - Questicus leaves that choice to you")
+    Q:Print(L["pick the profession you want from the rewards - Questicus leaves that choice to you"])
     return
   end
   local i, isUpgrade, pct = G:BestChoice()
@@ -257,7 +258,7 @@ function Q.ConfirmReward(i, isUpgrade, pct)
   confirm.item.tex:SetTexture(tex or 134400)
   confirm.text:SetText((link or name or "This reward") .. "\n" ..
     (isUpgrade and Q.Color("40ff40", ("An upgrade (+%d%%)"):format(math.floor(pct or 0)))
-      or Q.Color("c0c0c0", "No upgrade among the rewards - this one sells for the most")))
+      or Q.Color("c0c0c0", L["No upgrade among the rewards - this one sells for the most"])))
   confirm:ClearAllPoints()
   if QuestFrame and QuestFrame:IsShown() then
     confirm:SetPoint("TOPLEFT", QuestFrame, "TOPRIGHT", 8, -40)

@@ -3,6 +3,7 @@
 -- haven't seen yet. Addons can't reach the internet, so a new version is found the way DBM / BigWigs
 -- do it: Questicus users in your guild and group tell each other which version they run.
 local Q = Questicus
+local L = Q.L
 local T = Q.T
 local N = {}
 Q.News = N
@@ -51,7 +52,7 @@ function N.Text(entries)
   local lines = {}
   for i, it in ipairs(entries) do
     if i > 1 then lines[#lines + 1] = " " end
-    lines[#lines + 1] = Q.Color(T.HEX.accent, "Version " .. it.v)
+    lines[#lines + 1] = Q.Color(T.HEX.accent, L["Version "] .. it.v)
     for _, s in ipairs(SECTIONS) do
       local list = it.e[s[1]]
       if list and #list > 0 then
@@ -143,7 +144,7 @@ local told = false
 local function tell(v)
   if told then return end
   told = true
-  Q:Print(Q.Color(T.HEX.gold, "A new version of Questicus is out: " .. v .. " (you have " .. Q.version .. ").")
+  Q:Print(Q.Color(T.HEX.gold, L["A new version of Questicus is out: "] .. v .. " (you have " .. Q.version .. ").")
     .. " Update it on CurseForge.")
   if UIErrorsFrame and UIErrorsFrame.AddMessage then
     pcall(UIErrorsFrame.AddMessage, UIErrorsFrame, "Questicus " .. v .. " is available - update on CurseForge", 0.88, 0.69, 0.29)
@@ -219,5 +220,5 @@ end)
 Q:Command("news", "what's new in this version (patch notes)", function() N:Show(nil) end)
 Q:Command("newsoff", "don't open the patch notes by themselves after an update (toggle)", function()
   Q.db.newsOff = not Q.db.newsOff
-  Q:Print("patch notes after an update: " .. (Q.db.newsOff and "off (type /qc news to read them)" or "on"))
+  Q:Print(L["patch notes after an update: "] .. (Q.db.newsOff and "off (type /qc news to read them)" or "on"))
 end)

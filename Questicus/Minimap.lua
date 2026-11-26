@@ -1,6 +1,7 @@
 -- Questicus minimap button: left-click the guide, shift-click the arrow, right-click options.
 -- Drag it around the minimap edge; the spot is saved in QuesticusDB.minimap.angle.
 local Q = Questicus
+local L = Q.L
 local MM = {}
 Q.Minimap = MM
 
@@ -63,10 +64,10 @@ local function build()
   btn:SetScript("OnEnter", function(s)
     GameTooltip:SetOwner(s, "ANCHOR_LEFT")
     GameTooltip:AddLine("Questicus", 0.25, 0.82, 0.79)
-    GameTooltip:AddLine("Left-click: show / hide the guide", 1, 1, 1)
-    GameTooltip:AddLine("Shift-click: show / hide the arrow", 1, 1, 1)
-    GameTooltip:AddLine("Right-click: options", 1, 1, 1)
-    GameTooltip:AddLine("Drag to move", 0.6, 0.6, 0.6)
+    GameTooltip:AddLine(L["Left-click: show / hide the guide"], 1, 1, 1)
+    GameTooltip:AddLine(L["Shift-click: show / hide the arrow"], 1, 1, 1)
+    GameTooltip:AddLine(L["Right-click: options"], 1, 1, 1)
+    GameTooltip:AddLine(L["Drag to move"], 0.6, 0.6, 0.6)
     GameTooltip:Show()
   end)
   btn:SetScript("OnLeave", function() GameTooltip:Hide() end)

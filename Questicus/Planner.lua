@@ -7,6 +7,7 @@
 -- and completionist bonuses. Because each step is re-planned from the real state, the route keeps
 -- itself up to date: the moment you accept, finish or turn in something, the guide moves on.
 local Q = Questicus
+local L = Q.L
 local P = {}
 Q.Planner = P
 local D, QS, G = Q.Data, Q.Quests, Q.Gear
@@ -1037,7 +1038,7 @@ function P.ExploreTargets(map)
 end
 Q:Command("explore", "completionist: map exploration in the route on / off", function()
   Q.char.noExplore = not Q.char.noExplore or nil
-  Q:Print("map exploration in completionist routes: " .. (Q.char.noExplore and "off" or "on"))
+  Q:Print(L["map exploration in completionist routes: "] .. (Q.char.noExplore and "off" or "on"))
   wipe(exploreCache); P:Build()
 end)
 Q:On("MAP_EXPLORATION_UPDATED", function() wipe(exploreCache); P:Replan(1) end)
@@ -1932,7 +1933,7 @@ function P:LogFirst(steps)
 end
 Q:Command("routelog", "the last changes of your first route step and why (helps when it sends you back and forth)", function()
   local log = Q.char.routeLog or {}
-  if #log == 0 then Q:Print("nothing logged yet") return end
+  if #log == 0 then Q:Print(L["nothing logged yet"]) return end
   for i = math.max(1, #log - 9), #log do
     local e = log[i]
     Q:Print(("%s  %s  - %s"):format(date and date("%H:%M:%S", e.t) or e.t, e.step, e.why2 or e.why or ""))
@@ -2071,5 +2072,5 @@ Q:Command("unskip", "bring back every quest you skipped", function()
   wipe(Q.char.skipped)
   QS:BuildPool()
   P:Build()
-  Q:Print("skipped quests are back in the route")
+  Q:Print(L["skipped quests are back in the route"])
 end)

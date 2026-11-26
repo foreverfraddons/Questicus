@@ -5,6 +5,7 @@
 -- chances, named elites) and bosses this account has fought (recorded, for WoW Forever's new
 -- dungeons until the data has them). The author can add fight notes ("boss:<name>").
 local Q = Questicus
+local L = Q.L
 local T, D, QS, P = Q.T, Q.Data, Q.Quests, Q.Planner
 local BT = {}
 Q.Bosses = BT
@@ -320,10 +321,10 @@ local function slot(i)
     local area = bar and bar.e and bar.e.area
     if area and BT:Killed(area, self.b.name) then
       local kt = BT:KillTime(area, self.b.name)
-      GameTooltip:AddLine("Killed" .. (kt and Q.Runs and (" at " .. Q.Runs.Clock(kt)) or ""), 0.5, 0.86, 0.35)
+      GameTooltip:AddLine(L["Killed"] .. (kt and Q.Runs and (" at " .. Q.Runs.Clock(kt)) or ""), 0.5, 0.86, 0.35)
       local got = Q.Runs and Q.Runs.LootOf and Q.Runs:LootOf(self.b.name) or {}
       if #got == 0 then
-        GameTooltip:AddLine("No loot recorded from it", 0.6, 0.6, 0.6)
+        GameTooltip:AddLine(L["No loot recorded from it"], 0.6, 0.6, 0.6)
       else
         for _, l in ipairs(got) do
           GameTooltip:AddDoubleLine((l.link or ("item " .. tostring(l.id))) .. ((l.n or 1) > 1 and (" x" .. l.n) or ""),
@@ -331,7 +332,7 @@ local function slot(i)
         end
       end
     end
-    GameTooltip:AddLine("Click: stats, fight and loot - right-click: tick off / undo", 0.7, 0.7, 0.7, true)
+    GameTooltip:AddLine(L["Click: stats, fight and loot - right-click: tick off / undo"], 0.7, 0.7, 0.7, true)
     GameTooltip:Show()
   end)
   s:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -492,7 +493,7 @@ local function lrow(i)
     if not b then return end
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:AddLine(b.name, 1, 1, 1)
-    GameTooltip:AddLine("Click: loot, stats and fight - right-click: tick off / undo", 0.7, 0.7, 0.7, true)
+    GameTooltip:AddLine(L["Click: loot, stats and fight - right-click: tick off / undo"], 0.7, 0.7, 0.7, true)
     GameTooltip:Show()
   end)
   r:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -505,7 +506,7 @@ function BT:Stats()
   if not (bar and bar.stats) then return end
   local cur = Q.Runs and Q.Runs:Current()
   if cur and bar.e and cur.area == bar.e.area and not cur.ended then
-    bar.stats:SetText((cur.done and c(T.HEX.good, "Cleared ") or "") .. Q.Runs:Summary(cur))
+    bar.stats:SetText((cur.done and c(T.HEX.good, L["Cleared "]) or "") .. Q.Runs:Summary(cur))
   else
     local av = Q.Runs and bar.e and Q.Runs:Averages(bar.e.area)
     bar.stats:SetText(av and c(DIM, ("avg %s  %s  %d XP"):format(av.time and Q.Runs.Clock(av.time) or "-", Q.Runs.Money(av.gold), math.floor(av.xp))) or "")
@@ -517,7 +518,7 @@ function BT:Refresh()
   if not (bar and bar:IsShown() and bar.e) then return end
   BT:Stats()
   local e, list = bar.e, bar.list or {}
-  bar.title:SetText(Q.Color(T.HEX.accent, "Bosses") .. Q.Color(DIM, " - " .. e.name))
+  bar.title:SetText(Q.Color(T.HEX.accent, L["Bosses"]) .. Q.Color(DIM, " - " .. e.name))
   if Q.db.bossLow then
     for _, s in ipairs(slots) do s:Hide() end
     local done, nextShown = 0, false
@@ -742,14 +743,14 @@ function BT:ShowBoss(e, b)
     card.face:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_8")
   end
   -- stats and the fight
-  local L = {}
-  local function add(s) L[#L + 1] = s end
-  if lo and hi and lo ~= hi then add(c(DIM, "Level ") .. lo .. "-" .. hi) end
+  local out = {}
+  local function add(s) out[#out + 1] = s end
+  if lo and hi and lo ~= hi then add(c(DIM, L["Level "]) .. lo .. "-" .. hi) end
   local hp = b.hp or (QuesticusCollect and QuesticusCollect.bhp and b.nid and QuesticusCollect.bhp[b.nid])
-  if hp then add(c(DIM, "Health: ") .. hp) end
+  if hp then add(c(DIM, L["Health: "]) .. hp) end
   if b.desc and b.desc ~= "" then add(c(DIM, b.desc:sub(1, 240))) end
-  if #L > 0 then add(" ") end
-  add(c(GOLD, "The fight"))
+  if #out > 0 then add(" ") end
+  add(c(GOLD, L["The fight"]))
   local note = Q.Author and Q.Author.BossNote and Q.Author:BossNote(b.name)
   if note then add(c(T.HEX.white, note)) end
   for i, a in ipairs(b.abilities or {}) do
@@ -757,10 +758,10 @@ function BT:ShowBoss(e, b)
     local pad = a.depth and a.depth > 1 and "    - " or "- "
     add(pad .. c(T.HEX.white, a.title) .. ((a.text and a.text ~= "") and c(DIM, ": " .. a.text:sub(1, 160)) or ""))
   end
-  if not note and #(b.abilities or {}) == 0 then add(c(DIM, "No fight notes yet.")) end
-  card.text:SetText(table.concat(L, "\n"))
+  if not note and #(b.abilities or {}) == 0 then add(c(DIM, L["No fight notes yet."])) end
+  card.text:SetText(table.concat(out, "\n"))
   local h = (card.text.GetStringHeight and card.text:GetStringHeight()) or 0
-  if type(h) ~= "number" or h < #L * 9 then h = #L * 15 end
+  if type(h) ~= "number" or h < #out * 9 then h = #out * 15 end
   -- loot: blue (rare) and better only, as item rows
   local items, seen = {}, {}
   local function quality(id)
@@ -854,7 +855,7 @@ function BT:ShowBoss(e, b)
   card.kill:SetScript("OnClick", function() BT:SetKilled(e.area, b.name, not BT:Killed(e.area, b.name)); BT:ShowBoss(e, b) end)
   card.b, card.e = b, e
   BT.Front(card)
-  return L, items
+  return out, items
 end
 
 -- the loot list: 4 rows at a time, the mouse wheel scrolls
@@ -1016,5 +1017,5 @@ Q:Command("bosses", "the boss tracker for the dungeon you're in (or the route's 
   if not e and Q.char.dmode and Q.Dungeons then
     for _, x in ipairs(Q.Dungeons:List()) do if x.area == Q.char.dmode then e = x end end
   end
-  if e then BT:Show(e) else Q:Print("not in a dungeon - open one from the dungeons panel") end
+  if e then BT:Show(e) else Q:Print(L["not in a dungeon - open one from the dungeons panel"]) end
 end)

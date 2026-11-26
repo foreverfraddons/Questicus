@@ -1,0 +1,9 @@
+## Interface: 16001, 120007
+## Title: Questicus - 한국어
+## Notes: Questicus 한국어
+## Author: Fatedfr
+## IconTexture: Interface\AddOns\Questicus\Media\icon
+## Version: @project-version@
+## X-Questicus-Language: koKR
+
+koKR.lua

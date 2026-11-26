@@ -1,6 +1,7 @@
 -- Questicus gear advisor: scores items for the character's class and role, finds upgrades among
 -- quest rewards and vendor items, and picks the best quest reward.
 local Q = Questicus
+local L = Q.L
 local G = {}
 Q.Gear = G
 local D = Q.Data
@@ -448,7 +449,7 @@ function G:Explain(item)
   local t = {}
   for i = 1, math.min(3, #parts) do
     local p = parts[i]
-    t[#t + 1] = ("%s %s"):format(p.k == "DPS" and ("%.1f"):format(p.v) or ("+" .. p.v), G.STAT_NAMES[p.k] or p.k)
+    t[#t + 1] = ("%s %s"):format(p.k == "DPS" and ("%.1f"):format(p.v) or ("+" .. p.v), Q.L[G.STAT_NAMES[p.k] or p.k])
   end
   if #t > 0 then out[#out + 1] = "Mostly from " .. table.concat(t, ", ") .. " (" .. (G.ROLE_NAMES[role] or role) .. ")" end
   local prio = Q.prefs.statPrio
@@ -506,14 +507,14 @@ Q:Command("gear", "gear you turned down (/qc gear reset forgets them)", function
   if arg == "reset" then
     Q.char.gear = nil
     G:Reset(); Q:Send("QC_REPLAN")
-    Q:Print("gear answers forgotten")
+    Q:Print(L["gear answers forgotten"])
     return
   end
   local n = 0
   for id, why in pairs(lg.deny) do n = n + 1; Q:Print((Q.GetItemInfo(id) or ("item " .. id)) .. ": " .. why) end
-  for sub in pairs(lg.armor) do Q:Print("never: " .. (G.ARMOR_NAMES[sub] or sub)) end
-  for sub in pairs(lg.weapon) do Q:Print("never: " .. (G.WEAPON_NAMES[sub] or sub)) end
+  for sub in pairs(lg.armor) do Q:Print(L["never: "] .. (G.ARMOR_NAMES[sub] or sub)) end
+  for sub in pairs(lg.weapon) do Q:Print(L["never: "] .. (G.WEAPON_NAMES[sub] or sub)) end
   for k, f in pairs(lg.stat) do Q:Print(("%s counts x%.2f"):format(G.STAT_NAMES[k] or k, f)) end
-  if n == 0 and not next(lg.armor) and not next(lg.weapon) then Q:Print("nothing turned down yet") end
+  if n == 0 and not next(lg.armor) and not next(lg.weapon) then Q:Print(L["nothing turned down yet"]) end
 end)
 function G.ClassWeapons() return WEAPONS[Q.player.class] or {} end

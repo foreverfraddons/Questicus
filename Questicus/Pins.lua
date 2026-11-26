@@ -1,6 +1,7 @@
 -- Questicus map pins: route steps, objective areas, every quest you can pick up, rares and
 -- notable drops on the world map; the current target and nearby objectives on the minimap.
 local Q = Questicus
+local L = Q.L
 local T, D, QS, P = Q.T, Q.Data, Q.Quests, Q.Planner
 local PN = {}
 Q.Pins = PN
@@ -42,7 +43,7 @@ local function pool(parent, size)
           if #qs > 1 then local i = QS:Info(qid); GameTooltip:AddLine(i and i.title or ("Quest " .. qid), 1, 0.82, 0.3, true) end
           for _, l in ipairs(QS:TipExtra(qid)) do GameTooltip:AddLine(l, 0.9, 0.9, 0.9, true) end
         end
-        if s.spot or s.spotK then GameTooltip:AddLine("Ctrl-click: wrong spot? Remove it from the database", 0.6, 0.6, 0.6, true) end
+        if s.spot or s.spotK then GameTooltip:AddLine(L["Ctrl-click: wrong spot? Remove it from the database"], 0.6, 0.6, 0.6, true) end
         GameTooltip:Show()
       end)
       b:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -814,9 +815,9 @@ local function hit()
       PN:ShowPatrolTop(e)
       GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
       GameTooltip:AddLine(D:Name(e.key), 1, 0.82, 0.3)
-      GameTooltip:AddLine("Patrols along this line - it walks the whole path, look along it", 0.9, 0.9, 0.9, true)
+      GameTooltip:AddLine(L["Patrols along this line - it walks the whole path, look along it"], 0.9, 0.9, 0.9, true)
       local info = QS:Info(e.quest)
-      if info then GameTooltip:AddLine("For: " .. info.title, 0.9, 0.9, 0.9, true) end
+      if info then GameTooltip:AddLine(L["For: "] .. info.title, 0.9, 0.9, 0.9, true) end
       if e.label then GameTooltip:AddLine(e.label, 0.6, 0.6, 0.6) end
       local own = QuesticusCollect and QuesticusCollect.patrol and QuesticusCollect.patrol["c:" .. e.key:sub(2)]
       GameTooltip:AddLine(own and "Path: your recording" or "Path: from the database (record a better one with /qc patrol)", 0.6, 0.6, 0.6, true)
@@ -1555,8 +1556,8 @@ local function corpsePin(parent, size)
   b:EnableMouse(true)
   b:SetScript("OnEnter", function(s)
     GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
-    GameTooltip:AddLine("Your corpse", 1, 0.82, 0.3)
-    GameTooltip:AddLine("Run back here to resurrect", 0.9, 0.9, 0.9)
+    GameTooltip:AddLine(L["Your corpse"], 1, 0.82, 0.3)
+    GameTooltip:AddLine(L["Run back here to resurrect"], 0.9, 0.9, 0.9)
     GameTooltip:Show()
   end)
   b:SetScript("OnLeave", function() GameTooltip:Hide() end)

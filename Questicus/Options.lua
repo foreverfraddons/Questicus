@@ -1,6 +1,7 @@
 -- Questicus options window (/qc options) and a button in the game's AddOns settings.
 local Q = Questicus
 local T = Q.T
+local L = Q.L
 local frame
 
 -- The window: a list of sections on the left, one short page on the right. Each page groups the
@@ -12,7 +13,7 @@ local function sizeRow(parent, text, get, set)
   f:SetSize(440, 26)
   local l = T.Text(f, 12)
   l:SetPoint("LEFT")
-  l:SetText(text)
+  l:SetText(L[text])
   local seg = T.Segments(f, { { 0.8, "Small" }, { 1, "Normal" }, { 1.25, "Large" } }, get, set, 72)
   seg:SetPoint("LEFT", 170, 0)
   f.Refresh = seg.Refresh
@@ -52,12 +53,12 @@ local function build()
     pg:Hide()
     local h = T.Text(pg, 15, T.c.gold)
     h:SetPoint("TOPLEFT", 0, -4)
-    h:SetText(title)
+    h:SetText(L[title])
     local a = T.Text(pg, 11, T.c.dim)
     a:SetPoint("TOPLEFT", 0, -26)
     a:SetPoint("RIGHT", 0, 0)
     a:SetJustifyH("LEFT")
-    a:SetText(about)
+    a:SetText(L[about])
     pg.y = -56
     pages[i] = pg
     local t = CreateFrame("Button", nil, side)
@@ -66,7 +67,8 @@ local function build()
     t.sel = T.RFill(t, { T.c.accent[1] * 0.35, T.c.accent[2] * 0.35, T.c.accent[3] * 0.35, 1 }, 5)
     t.label = T.Text(t, 12)
     t.label:SetPoint("LEFT", 10, 0)
-    t.label:SetText(title)
+    t.label:SetText(L[title])
+    t.key = title
     t:SetScript("OnClick", function() show(i) end)
     tabs[i] = t
     return pg
@@ -75,7 +77,7 @@ local function build()
     pg.y = pg.y - 6
     local g = T.Text(pg, 12, T.c.gold)
     g:SetPoint("TOPLEFT", 0, pg.y)
-    g:SetText(text)
+    g:SetText(L[text])
     pg.y = pg.y - 20
   end
   local function check(pg, text, get, set, tip)
@@ -220,7 +222,7 @@ local function build()
       r:SetShown(k ~= nil)
       if k then
         r.stat = k
-        r.label:SetText(G.STAT_NAMES[k] or k)
+        r.label:SetText(L[G.STAT_NAMES[k] or k])
         local v = (mine and mine[k]) or (not mine and G:Weights(role)[k]) or 0
         r.box:SetText(("%g"):format(math.floor(v * 1000 + 0.5) / 1000))
         local d = G.DefaultWeight(role, k)
@@ -228,8 +230,8 @@ local function build()
       end
     end
     if wnote then
-      wnote:SetText(mine and "Your own weights for this role (gold = changed from the default)."
-        or "The defaults for this role, adjusted by your stat priority from the setup questions. Change any number to use your own.")
+      wnote:SetText(mine and L["Your own weights for this role (gold = changed from the default)."]
+        or L["The defaults for this role, adjusted by your stat priority from the setup questions. Change any number to use your own."])
     end
   end
   if #roles > 1 then
@@ -296,7 +298,7 @@ local function build()
     f:SetPoint("TOPLEFT", 8, pg.y)
     local l = T.Text(f, 12)
     l:SetPoint("LEFT")
-    l:SetText(text)
+    l:SetText(L[text])
     local seg = T.Segments(f, opts, get, function(v) set(v); Q:Send("QC_OPTION") end, w or 64)
     seg:SetPoint("LEFT", 130, 0)
     refresh[#refresh + 1] = seg.Refresh
@@ -374,6 +376,123 @@ local function build()
     "Off: Questicus gives the game back your own targeting settings.")
   buttons(p, { { "Highlight settings", 150, function() frame:Hide(); Q.Glow.ShowSettings(true) end, "Effects, colours, what lights up and when (also /qc glow)." } })
 
+  -- Language: every language the game comes in; a language needs its pack (a separate download)
+  p = page("Language", "The language Questicus uses. English is built in; every other language is a small language pack you download separately.")
+  do
+    local pick = T.Button(p, "", 230, 24)
+    pick:SetPoint("TOPLEFT", 8, p.y)
+    local lbl = T.Text(p, 12)
+    lbl:SetPoint("LEFT", pick, "RIGHT", 10, 0)
+    local function nameOf(code)
+      if code == "auto" then
+        local g = Q.GameLang()
+        for _, l in ipairs(Q.LANGS) do if l.code == g then return L("Automatic (the game's language: %s)", l.name) end end
+        return L["Automatic (the game's language)"]
+      end
+      for _, l in ipairs(Q.LANGS) do if l.code == code then return l.name end end
+      return code
+    end
+    local menu
+    local rows = {}
+    local note = T.Text(p, 11, T.c.dim)
+    local reload = T.Button(p, "Reload now", 110, 24)
+    reload:SetScript("OnClick", function() if C_UI and C_UI.Reload then C_UI.Reload() elseif ReloadUI then ReloadUI() end end)
+    reload:Hide()
+    local function usable(code)
+      if code == "auto" then return true end
+      return Q.LangPack(code) == "loaded" and Q.LangFontOK(code)
+    end
+    local function refreshLang()
+      pick:SetText(nameOf(QuesticusDB.lang or "auto") .. "  v")
+      local chosen = QuesticusDB.lang or "auto"
+      local inUse = Q.Lang()
+      local want = chosen == "auto" and Q.GameLang() or chosen
+      reload:SetShown(want ~= inUse and usable(want))
+      for _, r in ipairs(rows) do r.Refresh() end
+    end
+    pick:SetScript("OnClick", function(self)
+      if menu and menu:IsShown() then menu:Hide(); return end
+      if not menu then
+        menu = CreateFrame("Frame", nil, self)
+        menu:SetFrameStrata("FULLSCREEN_DIALOG")
+        T.RFill(menu, { T.c.bg[1], T.c.bg[2], T.c.bg[3], 0.98 }, 6)
+        T.Border(menu, T.c.line, 6)
+        local opts = { { code = "auto" } }
+        for _, l in ipairs(Q.LANGS) do opts[#opts + 1] = l end
+        menu:SetSize(260, 8 + #opts * 22)
+        menu.items = {}
+        for i, o in ipairs(opts) do
+          local b = CreateFrame("Button", nil, menu)
+          b:SetSize(248, 20)
+          b:SetPoint("TOPLEFT", 6, -4 - (i - 1) * 22)
+          b.t = T.Text(b, 12)
+          b.t:SetPoint("LEFT", 6, 0)
+          b.code = o.code
+          b:SetScript("OnClick", function(btn)
+            if not usable(btn.code) then return end
+            QuesticusDB.lang = btn.code
+            menu:Hide()
+            refreshLang()
+          end)
+          b:SetScript("OnEnter", function(btn)
+            if usable(btn.code) then return end
+            GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
+            GameTooltip:SetText(Q.LangPack(btn.code) == "off" and L["Its language pack is installed but turned off in the AddOns list."]
+              or (not Q.LangFontOK(btn.code) and L["Needs the game itself in this language (its letters come with the game's font)."])
+              or L["Needs its language pack: download it from the Questicus files page."], 1, 1, 1, 1, true)
+            GameTooltip:Show()
+          end)
+          b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+          menu.items[i] = b
+        end
+      end
+      for _, b in ipairs(menu.items) do
+        b.t:SetText(nameOf(b.code))
+        local ok = usable(b.code)
+        b.t:SetTextColor(ok and 0.95 or 0.45, ok and 0.9 or 0.45, ok and 0.85 or 0.45)
+      end
+      menu:ClearAllPoints()
+      menu:SetPoint("TOPLEFT", self, "BOTTOMLEFT", 0, -2)
+      menu:Show()
+    end)
+    p.y = p.y - 34
+    group(p, "Languages")
+    for _, l in ipairs(Q.LANGS) do
+      local r = CreateFrame("Frame", nil, p)
+      r:SetSize(440, 18)
+      r:SetPoint("TOPLEFT", 8, p.y)
+      r.name = T.Text(r, 12)
+      r.name:SetPoint("LEFT", 0, 0)
+      r.state = T.Text(r, 11, T.c.dim)
+      r.state:SetPoint("LEFT", 190, 0)
+      function r.Refresh()
+        local st = Q.LangPack(l.code)
+        local ok = st == "loaded" and Q.LangFontOK(l.code)
+        r.name:SetText(l.name .. (Q.Lang() == l.code and ("  " .. Q.Color("40ff40", L["(in use)"])) or ""))
+        r.name:SetTextColor(ok and 0.95 or 0.45, ok and 0.9 or 0.45, ok and 0.85 or 0.45)
+        r.state:SetText(l.code == "enUS" and L["Built in"]
+          or (st == "loaded" and not Q.LangFontOK(l.code) and L["Installed - needs the game in this language"])
+          or (st == "loaded" and L["Installed"]) or (st == "off" and L["Installed, turned off in the AddOns list"])
+          or L["Language pack not installed"])
+      end
+      rows[#rows + 1] = r
+      p.y = p.y - 19
+    end
+    p.y = p.y - 8
+    note:SetPoint("TOPLEFT", 8, p.y)
+    note:SetWidth(440)
+    note:SetJustifyH("LEFT")
+    note:SetText(L["A greyed-out language needs its language pack. Language packs are on the Questicus files page on CurseForge, next to each Questicus download: install the pack for your language, then pick it here. Spot a translation that needs correcting? Leave a comment on the Questicus page or contact me."])
+    p.y = p.y - 64
+    local link = T.Button(p, "Questicus files page", 170, 24)
+    link:SetPoint("TOPLEFT", 8, p.y)
+    link:SetScript("OnClick", function() Q.CopyBox(L["Questicus files page"], Q.LANG_URL) end)
+    reload:SetPoint("LEFT", link, "RIGHT", 8, 0)
+    reload.tip = "A new language takes effect after a reload."
+    p.y = p.y - 32
+    refresh[#refresh + 1] = refreshLang
+  end
+
   -- 8. Advanced
   p = page("Advanced", "Recording and database helpers. You can leave these alone.")
   check(p, "Help fill the database", function() return db.collect ~= false end, function(v) db.collect = v end,
@@ -388,14 +507,14 @@ local function build()
   function frame:UpdateMeta()
     local m = Q.Data:Meta()
     local pool = Q.Quests.pool and #Q.Quests.pool or 0
-    meta:SetText(("Questicus %s\nForeverDB %s (%s)\n%d quests possible for this character")
-      :format(Q.version, m and m.build or "missing", m and m.hash or "-", pool))
+    meta:SetText(L("Questicus %s\nForeverDB %s (%s)\n%d quests possible for this character",
+      Q.version, m and m.build or L["missing"], m and m.hash or "-", pool))
   end
 
   -- footer
   local ver = T.Text(frame, 10, T.c.dim)
   ver:SetPoint("BOTTOMLEFT", 16, 16)
-  ver:SetText("Questicus " .. Q.version .. "  -  /qc help: all commands")
+  ver:SetText(L("Questicus %s  -  /qc help: all commands", Q.version))
   local news = T.Button(frame, "What's new", 100, 24)
   news:SetPoint("BOTTOMRIGHT", -14, 10)
   news.tip = "The patch notes for this version (also /qc news)"
@@ -403,7 +522,7 @@ local function build()
 
   frame:SetScript("OnShow", function() for _, f in ipairs(refresh) do f() end end)
   function frame.ShowPage(title)
-    for i, t in ipairs(tabs) do if t.label:GetText() == title then show(i) return end end
+    for i, t in ipairs(tabs) do if t.key == title or t.label:GetText() == title then show(i) return end end
   end
   show(1)
 end

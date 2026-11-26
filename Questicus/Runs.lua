@@ -10,6 +10,7 @@
 -- same run; a reset dungeon, another copy or a long time away starts a new one. Values the game hands
 -- over as secret are skipped.
 local Q = Questicus
+local L = Q.L
 local T, D, QS = Q.T, Q.Data, Q.Quests
 local R = {}
 Q.Runs = R
@@ -427,13 +428,13 @@ function R:ShowHistory(area)
   for k, a in ipairs(order) do
     if k > 4 then lines[#lines + 1] = Q.Color(T.HEX.dim, ("... and %d more dungeons"):format(#order - 4)); break end
     local av = R:Averages(a)
-    lines[#lines + 1] = Q.Color(T.HEX.gold, seen[a]) .. Q.Color(T.HEX.dim, ("  %d run%s - average "):format(av.runs, av.runs == 1 and "" or "s"))
-      .. (av.time and (R.Clock(av.time) .. Q.Color(T.HEX.dim, " to clear, ")) or "")
+    lines[#lines + 1] = Q.Color(T.HEX.gold, seen[a]) .. Q.Color(T.HEX.dim, "  " .. (av.runs == 1 and L["1 run - average "] or L("%d runs - average ", av.runs)))
+      .. (av.time and (R.Clock(av.time) .. Q.Color(T.HEX.dim, L[" to clear, "])) or "")
       .. R.Money(av.gold) .. Q.Color(T.HEX.dim, ", ") .. math.floor(av.xp) .. Q.Color(T.HEX.dim, " XP")
   end
-  if #lines == 0 then lines[1] = Q.Color(T.HEX.dim, "No runs recorded yet - they're saved as you play dungeons.") end
+  if #lines == 0 then lines[1] = Q.Color(T.HEX.dim, L["No runs recorded yet - they're saved as you play dungeons."]) end
   win.avg:SetText(table.concat(lines, "\n"))
-  win.title:SetText(Q.Color(T.HEX.accent, "Dungeon runs") .. (area and Q.Color(T.HEX.dim, " - " .. (seen[area] or "")) or ""))
+  win.title:SetText(Q.Color(T.HEX.accent, L["Dungeon runs"]) .. (area and Q.Color(T.HEX.dim, " - " .. (seen[area] or "")) or ""))
   local y = 0
   for i, r in ipairs(runs) do
     local row = hrow(i)
@@ -443,7 +444,7 @@ function R:ShowHistory(area)
     local when = date and date("%b %d %H:%M", r.start) or tostring(r.start)
     row.top:SetText(("%s  %s"):format(Q.Color(T.HEX.gold, r.name), Q.Color(T.HEX.dim, when)))
     row.sub:SetText(("%s%s   %s   %s XP   %d/%d bosses   %d item%s"):format(
-      r.done and "" or Q.Color(T.HEX.dim, "unfinished "), R.Clock(r.done or ((r.ended or now()) - r.start)), R.Money(r.money), r.xp or 0,
+      r.done and "" or Q.Color(T.HEX.dim, L["unfinished "]), R.Clock(r.done or ((r.ended or now()) - r.start)), R.Money(r.money), r.xp or 0,
       kills, r.bosses or 0, #(r.loot or {}), #(r.loot or {}) == 1 and "" or "s"))
     row:ClearAllPoints(); row:SetPoint("TOPLEFT", 0, -y); row:SetPoint("RIGHT", 0, 0); row:Show()
     y = y + 34
@@ -469,22 +470,22 @@ function R:ShowRun(run)
   end
   if win and win:IsShown() then detail:ClearAllPoints(); detail:SetPoint("TOPLEFT", win, "TOPRIGHT", 8, 0) end
   detail.title:SetText(Q.Color(T.HEX.accent, run.name) .. Q.Color(T.HEX.dim, date and ("  " .. date("%b %d %H:%M", run.start)) or ""))
-  local L = {}
-  L[#L + 1] = Q.Color(T.HEX.dim, "Time: ") .. R.Clock(run.done or ((run.ended or now()) - run.start)) .. (run.done and "" or Q.Color(T.HEX.dim, "  (not every boss was killed)"))
-  L[#L + 1] = Q.Color(T.HEX.dim, "Gold: ") .. R.Money(run.money) .. Q.Color(T.HEX.dim, "    XP: ") .. (run.xp or 0)
+  local out = {}
+  out[#out + 1] = Q.Color(T.HEX.dim, L["Time: "]) .. R.Clock(run.done or ((run.ended or now()) - run.start)) .. (run.done and "" or Q.Color(T.HEX.dim, L["  (not every boss was killed)"]))
+  out[#out + 1] = Q.Color(T.HEX.dim, L["Gold: "]) .. R.Money(run.money) .. Q.Color(T.HEX.dim, "    XP: ") .. (run.xp or 0)
     .. Q.Color(T.HEX.dim, ("    level %d"):format(run.level or 0))
-  L[#L + 1] = " "
-  L[#L + 1] = Q.Color(T.HEX.gold, "Bosses")
+  out[#out + 1] = " "
+  out[#out + 1] = Q.Color(T.HEX.gold, L["Bosses"])
   local ks = {}
   for name, k in pairs(run.kills or {}) do ks[#ks + 1] = { name, k.t } end
   table.sort(ks, function(a, b) return a[2] < b[2] end)
-  for _, k in ipairs(ks) do L[#L + 1] = ("  %s  %s"):format(Q.Color(T.HEX.dim, R.Clock(k[2])), k[1]:gsub("^%l", string.upper)) end
-  if #ks == 0 then L[#L + 1] = Q.Color(T.HEX.dim, "  none recorded") end
-  L[#L + 1] = " "
-  L[#L + 1] = Q.Color(T.HEX.gold, "Loot") .. Q.Color(T.HEX.dim, "  (uncommon and better)")
-  detail.text:SetText(table.concat(L, "\n"))
-  local h = (detail.text.GetStringHeight and detail.text:GetStringHeight()) or #L * 17
-  if type(h) ~= "number" or h < #L * 10 then h = #L * 17 end
+  for _, k in ipairs(ks) do out[#out + 1] = ("  %s  %s"):format(Q.Color(T.HEX.dim, R.Clock(k[2])), k[1]:gsub("^%l", string.upper)) end
+  if #ks == 0 then out[#out + 1] = Q.Color(T.HEX.dim, L["  none recorded"]) end
+  out[#out + 1] = " "
+  out[#out + 1] = Q.Color(T.HEX.gold, L["Loot"]) .. Q.Color(T.HEX.dim, L["  (uncommon and better)"])
+  detail.text:SetText(table.concat(out, "\n"))
+  local h = (detail.text.GetStringHeight and detail.text:GetStringHeight()) or #out * 17
+  if type(h) ~= "number" or h < #out * 10 then h = #out * 17 end
   local y = h + 8
   for i, it in ipairs(run.loot or {}) do
     local r = lrows[i]

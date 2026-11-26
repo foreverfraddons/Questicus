@@ -1,6 +1,7 @@
 -- Find a group: lists you in the game's group finder for a dungeon, after asking your role (or using
 -- the one you chose in the options). The playstyle is Relaxed unless you pick another in the options.
 local Q = Questicus
+local L = Q.L
 local T = Q.T
 local LF = {}
 Q.LFG = LF
@@ -232,7 +233,7 @@ local function roleButton(parent, role)
   return b
 end
 local function rolePrompt(act, dname)
-  if InCombatLockdown and InCombatLockdown() then Q:Print("Can't list you in combat - try again after the fight."); return end
+  if InCombatLockdown and InCombatLockdown() then Q:Print(L["Can't list you in combat - try again after the fight."]); return end
   if not pick then
     pick = T.Window("QuesticusLFGRole", 300, 128, "Find a group", nil)
     pick:SetFrameStrata("DIALOG")
@@ -256,7 +257,7 @@ local function rolePrompt(act, dname)
   want.id, want.cat, want.name = act.id, act.cat or (ai and ai.categoryID), dname or act.name
   want.group = ai and (ai.groupFinderActivityGroupID or ai.activityGroupID)
   pick.text:SetText(("List yourself for %s as:"):format(Q.Color(T.HEX.gold, act.name)) ..
-    "\n" .. Q.Color(T.HEX.dim, "The group finder opens; press again if it isn't listed yet."))
+    "\n" .. Q.Color(T.HEX.dim, L["The group finder opens; press again if it isn't listed yet."]))
   local pre = LF.cfg().role
   for role, b in pairs(pick.btns) do
     local on = pre == role
@@ -273,11 +274,11 @@ function LF:Find(area, name)
     for _, e in ipairs(Q.Dungeons:List()) do if e.area == area then dname = e.name end end
   end
   if not (C_LFGList and C_LFGList.GetAvailableCategories) then
-    Q:Print("The group finder isn't available here.")
+    Q:Print(L["The group finder isn't available here."])
     return
   end
   if IsInGroup and IsInGroup() and UnitIsGroupLeader and not UnitIsGroupLeader("player") then
-    Q:Print("Only your group's leader can list the group.")
+    Q:Print(L["Only your group's leader can list the group."])
     return
   end
   local act = LF.Activity(dname or "")
@@ -310,7 +311,7 @@ function LF.Overlay(btn)
     self:SetAttribute("macrotext", (mine and m and m:GetName()) and ("/click " .. m:GetName()) or "")
   end)
   o:SetScript("PostClick", function(_, _, down)
-    if not microBtn() then Q:Print("Couldn't find the game's group finder button - open it from the micro menu.") end
+    if not microBtn() then Q:Print(L["Couldn't find the game's group finder button - open it from the micro menu."]) end
     if down then return end
     C_Timer.After(0.4, function()
       if not finderShown() then
@@ -339,7 +340,7 @@ function LF.Overlay(btn)
   btn:HookScript("OnUpdate", place)
   btn:HookScript("OnHide", function() if not (InCombatLockdown and InCombatLockdown()) then o:Hide() end end)
   -- (in combat the overlay is hidden; a click then lands on the button itself)
-  btn:SetScript("OnClick", function() Q:Print("The group finder can't be opened by Questicus in combat - try after the fight.") end)
+  btn:SetScript("OnClick", function() Q:Print(L["The group finder can't be opened by Questicus in combat - try after the fight."]) end)
 end
 
 -- ------------------------------------------------------------------ any secure button over one of ours

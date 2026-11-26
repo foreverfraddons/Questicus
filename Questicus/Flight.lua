@@ -4,6 +4,7 @@
 -- a flight map opens. Unknown flight masters of your faction close to the route become a "get the
 -- flight path" step. With auto fly on, talking to the flight master of a fly step takes the flight.
 local Q = Questicus
+local L = Q.L
 local D = Q.Data
 local F = {}
 Q.Flight = F
@@ -356,7 +357,7 @@ Q:On("TAXIMAP_OPENED", function()
         flyingTo = n
         noteTakeoff(n)
         pcall(TakeTaxiNode, n.slot)
-        Q:Print("flying to " .. n.name)
+        Q:Print(L["flying to "] .. n.name)
       end)
     end
   end
@@ -443,7 +444,7 @@ watch:SetScript("OnUpdate", function(_, el)
       QuesticusCollect.nofp = QuesticusCollect.nofp or {}
       QuesticusCollect.nofp[s.node.id] = true
     end
-    Q:Print("no flight master at " .. s.node.name .. " - left out of routes from now on")
+    Q:Print(L["no flight master at "] .. s.node.name .. " - left out of routes from now on")
     if Q.Planner then Q.Planner:Replan(0.2) end
   end
 end)

@@ -7,6 +7,7 @@
 -- Recording also runs outside collection mode; this mode is for playing your own way (or with
 -- another guide) while Questicus watches. Per character: /qc collectonly or the Options window.
 local Q = Questicus
+local L = Q.L
 local D, QS = Q.Data, Q.Quests
 local CM = {}
 Q.CollectMode = CM
@@ -93,9 +94,9 @@ function CM:Set(on)
   Q.char.collectOnly = on and true or nil
   if on then
     hideGuiding()
-    Q:Print("collection mode on: Questicus records routes, quests, XP and rewards and doesn't guide")
+    Q:Print(L["collection mode on: Questicus records routes, quests, XP and rewards and doesn't guide"])
   else
-    Q:Print("collection mode off: guiding again")
+    Q:Print(L["collection mode off: guiding again"])
     if Q.Planner then Q.Planner:BuildAsync() end
     Q:ShowGuide()
   end

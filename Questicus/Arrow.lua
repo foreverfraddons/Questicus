@@ -1,5 +1,6 @@
 -- Questicus waypoint arrow: points at the current step's target, shows the distance and the step.
 local Q = Questicus
+local L = Q.L
 local T, D = Q.T, Q.Data
 local A = {}
 Q.Arrow = A
@@ -54,8 +55,8 @@ local function build()
   frame.label:SetWordWrap(false)
   frame:SetScript("OnEnter", function(s)
     GameTooltip:SetOwner(s, "ANCHOR_BOTTOM")
-    GameTooltip:AddLine("Questicus arrow", 0.25, 0.82, 0.79)
-    GameTooltip:AddLine("Drag to move. Right-click for options.", 1, 1, 1)
+    GameTooltip:AddLine(L["Questicus arrow"], 0.25, 0.82, 0.79)
+    GameTooltip:AddLine(L["Drag to move. Right-click for options."], 1, 1, 1)
     GameTooltip:Show()
   end)
   frame:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -69,7 +70,7 @@ local function build()
       if not frame.inFlight then
         frame.inFlight = true
         frame.arrow:Hide(); frame.here:Hide(); frame.skull:Hide()
-        frame.dist:SetText("in flight")
+        frame.dist:SetText(L["in flight"])
       end
       return
     end
@@ -139,7 +140,7 @@ function A:Update()
   if Q.OnTaxi and Q.OnTaxi() then
     local to, left = Q.Flight and Q.Flight.InFlight and Q.Flight:InFlight()
     frame.arrow:Hide(); frame.skull:Hide(); frame.here:Hide()
-    frame.label:SetText("In flight" .. (to and (" to " .. (to.name:match("^(.-),") or to.name)) or ""))
+    frame.label:SetText(L["In flight"] .. (to and (" to " .. (to.name:match("^(.-),") or to.name)) or ""))
     frame.dist:SetText(left and (left >= 60 and ("about %dm %02ds left"):format(math.floor(left / 60), math.floor(left % 60))
       or ("about %ds left"):format(math.floor(left))) or ("then: " .. shortText(s)))
     return
@@ -168,7 +169,7 @@ function A:Update()
   local dx, dy = wp.x - here.x, wp.y - here.y
   if body and d < RECLAIM then
     frame.arrow:Hide(); frame.here:Show()
-    frame.dist:SetText("at your corpse - resurrect")
+    frame.dist:SetText(L["at your corpse - resurrect"])
     return
   end
   -- "here" only when you're really on it (the spot's own check starts there: Spots.lua)

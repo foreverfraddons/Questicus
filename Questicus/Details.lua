@@ -5,6 +5,7 @@
 -- accept to turn-in, XP, money, items) and compared with the database; the comparison is saved in
 -- QuesticusCollect.qact so ForeverDB can be corrected.
 local Q = Questicus
+local L = Q.L
 local T, D, QS, P, G = Q.T, Q.Data, Q.Quests, Q.Planner, Q.Gear
 local DT = {}
 Q.Details = DT
@@ -137,8 +138,8 @@ end
 
 -- ------------------------------------------------------------------ tooltip lines for a step
 function DT:TooltipLines(tt, s)
-  if s.t and s.t > 0 then tt:AddLine("Estimated time: " .. DT.Time(s.t), 0.9, 0.85, 0.7) end
-  if s.why and s.why[1] then tt:AddLine("Why: " .. s.why[1], 0.75, 0.7, 0.6, true) end
+  if s.t and s.t > 0 then tt:AddLine(L["Estimated time: "] .. DT.Time(s.t), 0.9, 0.85, 0.7) end
+  if s.why and s.why[1] then tt:AddLine(L["Why: "] .. s.why[1], 0.75, 0.7, 0.6, true) end
   if s.xp then
     tt:AddLine(("Reward: %s XP%s%s"):format(s.xp, s.realXP and "" or " (estimate)",
       (s.money and s.money > 0) and ("  -  " .. DT.Money(s.money)) or ""), 0.9, 0.85, 0.7)
@@ -210,13 +211,13 @@ local function lines(s)
   -- why this step (and why it beats the next best one)
   if s.why and #s.why > 0 then
     add(" ")
-    add(c(gold, "Why this step"))
+    add(c(gold, L["Why this step"]))
     for _, w in ipairs(s.why) do add("  - " .. w) end
   end
   if s.drops then
     for _, d in ipairs(s.drops) do
       local qi = QS:Info(d.quest)
-      add(c(good, "  Loot " .. D:Name("i" .. (d.item or 0)) .. " here - it starts " .. (qi and qi.title or d.quest)))
+      add(c(good, L["  Loot "] .. D:Name("i" .. (d.item or 0)) .. " here - it starts " .. (qi and qi.title or d.quest)))
     end
   end
   -- where
@@ -230,14 +231,14 @@ local function lines(s)
       zone and ("  -  " .. zone.name) or "",
       (dist and dist < D.FAR) and ("  -  %d yd"):format(math.floor(dist)) or ""))
     local note = D:Note(tgt.key)
-    if note then add(c(dim, "Tip: " .. note)) end
+    if note then add(c(dim, L["Tip: "] .. note)) end
   end
   -- objectives
   if id then
     local m = P.Meta(id)
     if m and m.lines and #m.lines > 0 then
       add(" ")
-      add(c(gold, "Objectives"))
+      add(c(gold, L["Objectives"]))
       local e = QS.log[id]
       if e and e.objectives and #e.objectives > 0 then
         for _, o in ipairs(e.objectives) do add((o.finished and c(dim, "  - " .. o.text) or ("  - " .. (o.text or "")))) end
@@ -254,9 +255,9 @@ local function lines(s)
   -- rewards
   if id then
     add(" ")
-    add(c(gold, "Rewards"))
+    add(c(gold, L["Rewards"]))
     local xp, real, rec = QS.RewardXP(id, Q.player.level)
-    add(("  XP: %s%s"):format(xp, rec and c(dim, " (what the game says)") or (real and "" or c(dim, " (estimate - no data)"))))
+    add(("  XP: %s%s"):format(xp, rec and c(dim, L[" (what the game says)"]) or (real and "" or c(dim, L[" (estimate - no data)"]))))
     add("  Gold: " .. DT.Money(QS.RewardMoney(id)))
     local r = QS.Rewards(id)
     if r and r[3] then
@@ -284,10 +285,10 @@ local function lines(s)
   DT.gearItem = gearItem
   if gearItem and G then
     add(" ")
-    add(c(gold, "Why this gear"))
+    add(c(gold, L["Why this gear"]))
     add("  " .. itemLine(gearItem))
     for _, l in ipairs(G:Explain(gearItem)) do add("  - " .. l) end
-    add(c(dim, "  Not for you? Use the button below - Questicus learns from your answer."))
+    add(c(dim, L["  Not for you? Use the button below - Questicus learns from your answer."]))
   end
   -- quests you did together before (learned), and the time for the whole group
   if id and Q.Learn then
@@ -301,14 +302,14 @@ local function lines(s)
         total = total + (Q.Learn:WorkTime(q) or 0)
       end
       add(" ")
-      add(c(gold, "Done together"))
+      add(c(gold, L["Done together"]))
       add("  With " .. table.concat(names, ", "))
       if total > 0 then add(("  The whole group took about %s"):format(DT.Time(total))) end
     end
   end
   -- time
   add(" ")
-  add(c(gold, "Time"))
+  add(c(gold, L["Time"]))
   if s.t and s.t > 0 then add("  This step: about " .. DT.Time(s.t)) end
   local m = id and P.Meta(id)
   if m and m.effort then
@@ -320,7 +321,7 @@ local function lines(s)
     end
   end
   local worked = id and Q.char.work and Q.char.work[id]
-  if worked and worked > 5 then add(c(dim, "  Worked on it so far: " .. DT.Time(worked))) end
+  if worked and worked > 5 then add(c(dim, L["  Worked on it so far: "] .. DT.Time(worked))) end
   -- chain
   if info and info.x then
     local x = info.x
@@ -330,10 +331,10 @@ local function lines(s)
     if #prev == 0 and QS.prevOf and QS.prevOf[id] then prev = QS.prevOf[id] end
     if #prev > 0 or x[7] then
       add(" ")
-      add(c(gold, "Chain"))
+      add(c(gold, L["Chain"]))
       for _, q in ipairs(prev) do
         local t = D:Quest(q)
-        add("  After: " .. (t and t[1] or q) .. (QS.done[q] and c(good, "  done") or c(bad, "  not done")))
+        add("  After: " .. (t and t[1] or q) .. (QS.done[q] and c(good, L["  done"]) or c(bad, L["  not done"])))
       end
       if x[7] then local t = D:Quest(x[7]); add("  Leads to: " .. (t and t[1] or x[7])) end
     end
@@ -342,17 +343,17 @@ local function lines(s)
   local h = id and Q.char.hist and Q.char.hist[id]
   if h and h.done then
     add(" ")
-    add(c(gold, "When you did it"))
+    add(c(gold, L["When you did it"]))
     local okXP = h.estXP and h.xp and math.abs(h.estXP - h.xp) <= math.max(5, h.xp * 0.05)
-    add(("  Took %s%s"):format(DT.Time(h.secs), h.estSecs and c(dim, " (planned " .. DT.Time(h.estSecs) .. ")") or ""))
-    add(("  Got %d XP %s"):format(h.xp or 0, h.estXP and (okXP and c(good, "as planned") or
+    add(("  Took %s%s"):format(DT.Time(h.secs), h.estSecs and c(dim, L[" (planned "] .. DT.Time(h.estSecs) .. ")") or ""))
+    add(("  Got %d XP %s"):format(h.xp or 0, h.estXP and (okXP and c(good, L["as planned"]) or
       c(bad, ("(planned %d)"):format(h.estXP))) or ""))
     add(("  Got %s %s"):format(DT.Money(h.money), (h.estMoney and h.estMoney > 0) and
-      ((math.abs((h.money or 0) - h.estMoney) <= 1) and c(good, "as planned") or c(bad, "(planned " .. DT.Money(h.estMoney) .. ")")) or ""))
+      ((math.abs((h.money or 0) - h.estMoney) <= 1) and c(good, L["as planned"]) or c(bad, L["(planned "] .. DT.Money(h.estMoney) .. ")")) or ""))
     for _, it in ipairs(h.items or {}) do add("    " .. itemLine(it)) end
   elseif h and h.acc then
     add(" ")
-    add(c(dim, "Accepted " .. DT.Time(time() - h.acc) .. " ago"))
+    add(c(dim, L["Accepted "] .. DT.Time(time() - h.acc) .. " ago"))
   end
   return out
 end
@@ -389,5 +390,5 @@ Q:Command("history", "quests you turned in on this character: time, XP and gold 
         tostring(h.estXP or "?"), DT.Money(h.money)))
     end
   end
-  if n == 0 then Q:Print("no quests recorded yet - they are recorded from now on") end
+  if n == 0 then Q:Print(L["no quests recorded yet - they are recorded from now on"]) end
 end)

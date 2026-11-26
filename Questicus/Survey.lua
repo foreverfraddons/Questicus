@@ -2,6 +2,7 @@
 -- character wants to quest. Runs once per character (redo any time with /qc survey).
 local Q = Questicus
 local T = Q.T
+local L = Q.L
 local SV = {}
 Q.Survey = SV
 
@@ -28,22 +29,68 @@ local frame, pages, page
 local function header(p, title, sub)
   local t = T.Text(p, 20, T.c.gold)
   t:SetPoint("TOPLEFT", 24, -20)
-  t:SetText(title)
+  t:SetText(L[title])
   local s = T.Text(p, 12, T.c.dim)
   s:SetPoint("TOPLEFT", t, "BOTTOMLEFT", 0, -6)
   s:SetWidth(W - 48)
-  s:SetText(sub or "")
+  s:SetText(L[sub or ""])
   return t, s
 end
 
 local function label(p, text, x, y)
   local l = T.Text(p, 13, T.c.text)
   l:SetPoint("TOPLEFT", x, y)
-  l:SetText(text)
+  l:SetText(L[text])
   return l
 end
 
 -- ------------------------------------------------------------------ pages
+-- the language (first page): one needs its language pack, a separate download
+local function pageLanguage(p)
+  header(p, "Language", "Pick the language Questicus speaks. English is built in; every other language is a small language pack you download separately.")
+  local items = {}
+  local opts = { { code = "auto" } }
+  for _, l in ipairs(Q.LANGS) do opts[#opts + 1] = l end
+  local function usable(code) return code == "auto" or (Q.LangPack(code) == "loaded" and Q.LangFontOK(code)) end
+  local function nameOf(o)
+    if o.code ~= "auto" then return o.name end
+    for _, l in ipairs(Q.LANGS) do if l.code == Q.GameLang() then return L("Automatic (the game's language: %s)", l.name) end end
+    return L["Automatic (the game's language)"]
+  end
+  local reload = T.Button(p, "Reload now and continue", 200, 24)
+  reload:SetScript("OnClick", function() if C_UI and C_UI.Reload then C_UI.Reload() elseif ReloadUI then ReloadUI() end end)
+  reload:Hide()
+  local function refresh()
+    local chosen = QuesticusDB.lang or "auto"
+    for _, b in ipairs(items) do b:Refresh() end
+    local want = chosen == "auto" and Q.GameLang() or chosen
+    reload:SetShown(want ~= Q.Lang() and usable(want))
+  end
+  for i, o in ipairs(opts) do
+    local b = T.Check(p, nameOf(o), function() return (QuesticusDB.lang or "auto") == o.code end, function()
+      if not usable(o.code) then refresh(); return end
+      QuesticusDB.lang = o.code
+      refresh()
+    end, o.code ~= "auto" and not usable(o.code) and (Q.LangPack(o.code) == "off"
+      and "Its language pack is installed but turned off in the AddOns list."
+      or (not Q.LangFontOK(o.code) and "Needs the game itself in this language (its letters come with the game's font).")
+      or "Needs its language pack: download it from the Questicus files page.") or nil)
+    b:SetPoint("TOPLEFT", 24 + ((i - 1) % 2) * 300, -84 - math.floor((i - 1) / 2) * 26)
+    b:SetWidth(290)
+    if not usable(o.code) then b.label:SetTextColor(0.45, 0.45, 0.45) end
+    items[i] = b
+  end
+  local note = T.Text(p, 11, T.c.dim)
+  note:SetPoint("TOPLEFT", 24, -84 - math.ceil(#opts / 2) * 26 - 8)
+  note:SetWidth(W - 48)
+  note:SetText(L["Greyed out: that language's pack isn't installed. Language packs are on the Questicus files page on CurseForge, next to each Questicus download - install the one for your language, then pick it here. Spot a translation that needs correcting? Leave a comment on the Questicus page or contact me."])
+  local link = T.Button(p, "Questicus files page", 170, 24)
+  link:SetPoint("TOPLEFT", note, "BOTTOMLEFT", 0, -10)
+  link:SetScript("OnClick", function() Q.CopyBox(L["Questicus files page"], Q.LANG_URL) end)
+  reload:SetPoint("LEFT", link, "RIGHT", 8, 0)
+  p.Refresh = refresh
+end
+
 local function pageStyle(p)
   header(p, "Welcome to Questicus", "A few quick questions so the route fits how you like to play. You can change any of this later.")
   local cards = {}
@@ -74,7 +121,7 @@ local function pageStyle(p)
   local note = T.Text(p, 11, T.c.dim)
   note:SetPoint("BOTTOMLEFT", 24, 54)
   note:SetWidth(W - 48)
-  note:SetText("Routes are worked out live from the WoW: Forever database (ForeverDB): your position, level and quest log decide every next step.")
+  note:SetText(L["Routes are worked out live from the WoW: Forever database (ForeverDB): your position, level and quest log decide every next step."])
 end
 
 local function pageRoute(p)
@@ -311,29 +358,31 @@ local function pageDone(p)
   function p:Refresh()
     local o = pr()
     local styles = { speed = "Speedrun", balanced = "Balanced", complete = "Completionist", custom = "Custom" }
+    local elite = ({ solo = "solo only", some = "easy elites", group = "group quests" })[o.elite]
+    local gear = ({ route = "route to upgrades", onway = "upgrades on the way", off = "off" })[o.gear]
     local lines = {
-      "Style: " .. Q.Color(T.HEX.gold, styles[o.style] or o.style),
-      "Quests up to +" .. o.levelRange .. " levels" .. ((o.levelBelow or 0) > 0 and (", down to -" .. o.levelBelow) or "") .. ", " .. ({ solo = "solo only", some = "easy elites", group = "group quests" })[o.elite],
-      "Breadcrumbs: " .. o.breadcrumbs .. (o.gray and ", gray quests too" or "") .. (o.allInZone and ", finish zones" or ""),
-      "Gear: " .. ({ route = "route to upgrades", onway = "upgrades on the way", off = "off" })[o.gear] ..
-        " (" .. (Q.Gear.ROLE_NAMES[o.role or ""] or "auto") .. ")",
-      "Auto accept " .. (o.autoAccept and "on" or "off") .. ", auto turn-in " .. (o.autoTurnIn and "on" or "off"),
+      L("Style: %s", Q.Color(T.HEX.gold, L[styles[o.style] or o.style])),
+      ((o.levelBelow or 0) > 0 and L("Quests up to +%d levels, down to -%d, %s", o.levelRange, o.levelBelow, L[elite or ""])
+        or L("Quests up to +%d levels, %s", o.levelRange, L[elite or ""])),
+      L("Breadcrumbs: %s", L[tostring(o.breadcrumbs)]) .. (o.gray and L[", gray quests too"] or "") .. (o.allInZone and L[", finish zones"] or ""),
+      L("Gear: %s (%s)", L[gear or ""], L[Q.Gear.ROLE_NAMES[o.role or ""] or "auto"]),
+      L("Auto accept %s, auto turn-in %s", o.autoAccept and L["on"] or L["off"], o.autoTurnIn and L["on"] or L["off"]),
       "",
-      "The guide shows the next steps. Follow the arrow, and the route moves on by itself when you accept, finish or turn in quests.",
-      "Commands: /qc (guide), /qc survey, /qc options, /qc plan.",
+      L["The guide shows the next steps. Follow the arrow, and the route moves on by itself when you accept, finish or turn in quests."],
+      L["Commands: /qc (guide), /qc survey, /qc options, /qc plan."],
     }
     txt:SetText(table.concat(lines, "\n"))
   end
 end
 
-local BUILDERS = { pageStyle, pageRoute, pageComplete, pageGear, pageStats, pageHelpers, pageDone }
+local BUILDERS = { pageLanguage, pageStyle, pageRoute, pageComplete, pageGear, pageStats, pageHelpers, pageDone }
 
 local function show(i)
   page = math.max(1, math.min(#pages, i))
   for k, pg in ipairs(pages) do pg:SetShown(k == page) end
   if pages[page].Refresh then pages[page]:Refresh() end
   frame.back:SetShown(page > 1)
-  frame.next:SetText(page == #pages and "Start questing" or "Next")
+  frame.next:SetText(page == #pages and "Start questing" or "Next")   -- (T.Button's SetText translates)
   frame.dots:SetText(("%d / %d"):format(page, #pages))
 end
 
@@ -373,7 +422,7 @@ function SV:Finish()
   frame:Hide()
   Q:Send("QC_PREFS_CHANGED")
   if Q.ShowGuide then Q:ShowGuide() end
-  Q:Print("route ready. Follow the guide and the arrow - have fun!")
+  Q:Print(L["route ready. Follow the guide and the arrow - have fun!"])
 end
 
 Q:On("QC_READY", function(ok)

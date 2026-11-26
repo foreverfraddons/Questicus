@@ -4,6 +4,7 @@
 -- place you have walked (recorded as you play). A* over that grid prefers known ground and goes
 -- around the empty gaps (water, cliffs, walls) where a straight line would run into them.
 local Q = Questicus
+local L = Q.L
 local D = Q.Data
 local N = {}
 Q.Nav = N
@@ -970,9 +971,9 @@ end
 
 Q:Command("zone", "the zone / sub-zone ForeverDB's borders put you in, and the border crossings known", function()
   local pos = D:PlayerPos()
-  if not pos then Q:Print("no position here."); return end
+  if not pos then Q:Print(L["no position here."]); return end
   local z, s = D:ZoneAt(pos.i, pos.x, pos.y), D:SubZoneAt(pos.i, pos.x, pos.y)
-  if z == nil then Q:Print("ForeverDB has no zone borders for this continent (update ForeverDB)."); return end
+  if z == nil then Q:Print(L["ForeverDB has no zone borders for this continent (update ForeverDB)."]); return end
   local function nm(id)
     local n = id and C_Map and C_Map.GetAreaInfo and C_Map.GetAreaInfo(id)
     return (n or "?") .. " (" .. tostring(id) .. ")"

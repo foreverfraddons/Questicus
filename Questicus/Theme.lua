@@ -170,7 +170,7 @@ function T.Window(name, w, h, title, store)
   acc:SetPoint("BOTTOMLEFT", 2, 0); acc:SetPoint("BOTTOMRIGHT", -2, 0)
   f.title = T.Text(bar, 13, T.c.gold)
   f.title:SetPoint("LEFT", 12, 0)
-  f.title:SetText(title or "")
+  f.title:SetText(Q.L[title or ""])
   f.bar = bar
   bar:EnableMouse(true)
   bar:RegisterForDrag("LeftButton")
@@ -208,13 +208,13 @@ function T.Button(parent, text, w, h)
   b.label = T.Text(b, 12, T.c.gold)
   b.label:SetPoint("CENTER")
   b.label:SetJustifyH("CENTER")
-  b.label:SetText(text or "")
+  b.label:SetText(Q.L[text or ""])
   b:SetScript("OnEnter", function(s)
     T.SetBorderColor(s, rgba(T.c.accent))
     s.label:SetTextColor(rgba(T.c.text))
     if s.tip then
       GameTooltip:SetOwner(s, "ANCHOR_TOP")
-      GameTooltip:SetText(s.tip, 1, 1, 1, 1, true)
+      GameTooltip:SetText(Q.L[s.tip], 1, 1, 1, 1, true)
       GameTooltip:Show()
     end
   end)
@@ -223,7 +223,7 @@ function T.Button(parent, text, w, h)
     s.label:SetTextColor(rgba(T.c.gold))
     GameTooltip:Hide()
   end)
-  function b:SetText(t) self.label:SetText(t) end
+  function b:SetText(t) self.label:SetText(Q.L[t]) end
   return b
 end
 
@@ -241,7 +241,7 @@ function T.IconButton(parent, icon, size, tip)
   b:SetScript("OnEnter", function(s)
     if s.tip then
       GameTooltip:SetOwner(s, "ANCHOR_TOP")
-      GameTooltip:SetText(s.tip, 1, 1, 1, 1, true)
+      GameTooltip:SetText(Q.L[s.tip], 1, 1, 1, 1, true)
       GameTooltip:Show()
     end
   end)
@@ -259,14 +259,14 @@ function T.Check(parent, text, get, set, tip)
   local tick = T.RFill(box, T.c.accent, 3, "OVERLAY", 0, 3)
   b.label = T.Text(b, 12)
   b.label:SetPoint("LEFT", box, "RIGHT", 8, 0)
-  b.label:SetText(text)
+  b.label:SetText(Q.L[text])
   b.tip = tip
   function b:Refresh() tick:SetShown(get() and true or false) end
   b:SetScript("OnClick", function(s) set(not get()); s:Refresh() end)
   b:SetScript("OnEnter", function(s)
     if s.tip then
       GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
-      GameTooltip:SetText(s.tip, 1, 1, 1, 1, true)
+      GameTooltip:SetText(Q.L[s.tip], 1, 1, 1, 1, true)
       GameTooltip:Show()
     end
   end)
@@ -314,12 +314,12 @@ function T.Card(parent, w, h, icon, title, desc)
   b.title = T.Text(b, 14, T.c.gold)
   b.title:SetPoint("TOPLEFT", b.icon, "TOPRIGHT", 10, -2)
   b.title:SetPoint("RIGHT", -8, 0)
-  b.title:SetText(title)
+  b.title:SetText(Q.L[title])
   b.desc = T.Text(b, 11, T.c.dim)
   b.desc:SetPoint("TOPLEFT", b.title, "BOTTOMLEFT", 0, -4)
   b.desc:SetPoint("BOTTOMRIGHT", -8, 8)
   b.desc:SetJustifyV("TOP")
-  b.desc:SetText(desc)
+  b.desc:SetText(Q.L[desc])
   function b:SetSelected(on)
     self.selected = on
     if on then

@@ -2,6 +2,7 @@
 -- deletes leftover quest items no quest still needs. Always shows the list first: untick anything
 -- you want to keep, then press Clean up. /qc cleanup, or the broom button on the guide.
 local Q = Questicus
+local L = Q.L
 local T, D, QS, P = Q.T, Q.Data, Q.Quests, Q.Planner
 local CL = {}
 Q.Cleanup = CL
@@ -213,7 +214,7 @@ local function row(i)
     r.pick:Hide()
     r.pick:SetScript("OnClick", function()
       local d = rowData[r]
-      if d and not CL:PickUp(d.item) then Q:Print("that item isn't in your bags any more") end
+      if d and not CL:PickUp(d.item) then Q:Print(L["that item isn't in your bags any more"]) end
     end)
     r.why = T.Text(r, 10, T.c.dim)
     r.why:SetPoint("RIGHT", -4, 0)
@@ -230,7 +231,7 @@ function CL:Show()
     frame.note = T.Text(frame, 11, T.c.dim)
     frame.note:SetPoint("TOPLEFT", 14, -32)
     frame.note:SetPoint("RIGHT", -14, 0)
-    frame.note:SetText("Ticked lines go. Untick anything you want to keep.")
+    frame.note:SetText(L["Ticked lines go. Untick anything you want to keep."])
     frame.list = CreateFrame("Frame", nil, frame)
     frame.list:SetPoint("TOPLEFT", 14, -52)
     frame.list:SetPoint("RIGHT", -14, 0)
@@ -277,17 +278,17 @@ function CL:Show()
     r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y); r:SetPoint("RIGHT", 0, 0); r:Show()
     y = y + 21
   end
-  header(#quests > 0 and ("Quests (%d)"):format(#quests) or "Quests: nothing to remove - everything in your log is in the route")
+  header(#quests > 0 and L("Quests (%d)", #quests) or L["Quests: nothing to remove - everything in your log is in the route"])
   for _, q in ipairs(quests) do line(q, q.title) end
   y = y + 6
-  header(#items > 0 and ("Quest items (%d)"):format(#items) or "Quest items: nothing left over")
+  header(#items > 0 and L("Quest items (%d)", #items) or L["Quest items: nothing left over"])
   for _, it in ipairs(items) do line(it, it.name .. (it.count > 1 and (" x" .. it.count) or "")) end
   for i = n + 1, #rows do rows[i]:Hide() end
   frame.list:SetHeight(math.max(1, y))
   frame:SetHeight(math.min(700, 52 + y + 50))
   frame.go:SetShown(#quests + #items > 0)
-  frame.go:SetText("Clean up")
-  frame.note:SetText("Ticked lines go. Untick anything you want to keep.")
+  frame.go:SetText(L["Clean up"])
+  frame.note:SetText(L["Ticked lines go. Untick anything you want to keep."])
   frame.itemMode = nil
   frame:Show()
   return quests, items
@@ -296,7 +297,7 @@ end
 -- step 2: items to delete by hand (the game only lets you destroy items yourself)
 function CL:ShowItems(list)
   frame.itemMode = list
-  frame.note:SetText("Click Pick up, then click anywhere on the game world (outside your bags) and confirm the game's \"Destroy\" box.")
+  frame.note:SetText(L["Click Pick up, then click anywhere on the game world (outside your bags) and confirm the game's \"Destroy\" box."])
   local n, y = 0, 0
   local have = {}
   for _, b in ipairs(bagItems()) do have[b.item] = true end
@@ -322,7 +323,7 @@ function CL:ShowItems(list)
   if n == 0 then
     frame.itemMode = nil
     frame:Hide()
-    Q:Print("clean-up done")
+    Q:Print(L["clean-up done"])
     return
   end
   frame.list:SetHeight(math.max(1, y))

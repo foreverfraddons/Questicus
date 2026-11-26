@@ -8,6 +8,7 @@
 --    seen with the mob / object back) and saved in QuesticusCollect.resp for the database, so the next
 --    run - yours or anyone's after an update - uses the real timer.
 local Q = Questicus
+local L = Q.L
 local D, P, QS = Q.Data, Q.Planner, Q.Quests
 local S = Q.Secret
 local SP = {}
@@ -325,7 +326,7 @@ local function farScan(here)
   if not platesOn() then
     if not tipShown and current and source(current.p) and source(current.p):sub(1, 1) == "c" then
       tipShown = true
-      Q:Print("tip: turn on enemy nameplates (default key V) - Questicus then sees from a distance which spawns are up and skips the empty ones.")
+      Q:Print(L["tip: turn on enemy nameplates (default key V) - Questicus then sees from a distance which spawns are up and skips the empty ones."])
     end
     return
   end
@@ -651,7 +652,7 @@ local function buildPop()
     if SP.calib then
       SP.calib.waiting = true
       pop.yes:Hide()
-      pop.no.label:SetText("Stop")
+      pop.no.label:SetText(L["Stop"])
     end
   end)
   pop.no:SetScript("OnClick", function() SP.StopCalibrate(true) end)
@@ -675,7 +676,7 @@ function SP.MaybeCalibrate(p)
   local name = (D.Name and D:Name(src)) or "This object"
   pop.text:SetText(("|cffe0b04a%s|r's respawn timer isn't in the database yet.\n\nPlease stand here and wait for it to respawn to calibrate Questicus to this quest. Keep facing the spot - Questicus sees it come back and saves the time.\n\nThis only happens once, ever, and you're helping everyone else never have to do it."):format(name))
   pop:SetHeight(math.max(178, (pop.text:GetStringHeight() or 100) + 110))
-  pop.yes:Show(); pop.no.label:SetText("Not now")
+  pop.yes:Show(); pop.no.label:SetText(L["Not now"])
   pop:Show()
   SP.changed = true
 end
@@ -684,7 +685,7 @@ function SP.StopCalibrate(byPlayer)
   if not SP.calib then return end
   SP.calib = nil
   if pop then pop:Hide() end
-  if byPlayer then Q:Print("calibration stopped - the respawn time is still measured whenever it's seen back") end
+  if byPlayer then Q:Print(L["calibration stopped - the respawn time is still measured whenever it's seen back"]) end
   SP.changed = true
 end
 
@@ -710,7 +711,7 @@ local function calibTick(here)
   if d > 150 then
     SP.calib = nil
     if pop then pop:Hide() end
-    Q:Print("calibration stopped - you left the spot")
+    Q:Print(L["calibration stopped - you left the spot"])
     SP.changed = true
     return
   end
@@ -769,7 +770,7 @@ Q:On("QC_READY", function()
 end)
 
 Q:Command("respawn", "objective spots on cooldown and respawn times (/qc respawn reset)", function(arg)
-  if arg == "reset" then wipe(cds()); SP.Kick(); Q:Print("objective spot cooldowns cleared") return end
+  if arg == "reset" then wipe(cds()); SP.Kick(); Q:Print(L["objective spot cooldowns cleared"]) return end
   local n = 0
   for k, c in pairs(cds()) do
     n = n + 1

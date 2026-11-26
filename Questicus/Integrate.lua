@@ -4,6 +4,7 @@
 -- Inside Command Center it wears the theme: a white glyph (Media\i_questicus) tinted gold like every
 -- Command Center tool. On its own it keeps its personal icon (Media\icon).
 local Q = Questicus
+local L = Q.L
 local T = Q.T
 
 local registered = false
@@ -285,7 +286,7 @@ end)
 Q:Command("questlogdebug", "save the world map quest log's search bar layout (for a bug report)", function(arg)
   local quiet, tag = tostring(arg or ""):match("^(quiet)%s*(%S*)")
   local box = searchBox()
-  if not box then Q:Print("no quest log search box found"); return end
+  if not box then Q:Print(L["no quest log search box found"]); return end
   local function name(f) return f and (f.GetDebugName and f:GetDebugName() or f.GetName and f:GetName()) or tostring(f) end
   local function desc(f)
     local pts = {}
@@ -337,7 +338,7 @@ Q:Command("questlogdebug", "save the world map quest log's search bar layout (fo
   end
   Q.db.uiDebug = Q.db.uiDebug or {}
   Q.db.uiDebug[(tag and tag ~= "") and tag or "manual"] = out
-  if not quiet then Q:Print("saved - /reload (or log out) so it's written to disk") end
+  if not quiet then Q:Print(L["saved - /reload (or log out) so it's written to disk"]) end
 end)
 
 -- ------------------------------------------------------------------ open-the-map trace

@@ -1,0 +1,9 @@
+## Interface: 16001, 120007
+## Title: Questicus - 简体中文
+## Notes: Questicus 简体中文
+## Author: Fatedfr
+## IconTexture: Interface\AddOns\Questicus\Media\icon
+## Version: @project-version@
+## X-Questicus-Language: zhCN
+
+zhCN.lua

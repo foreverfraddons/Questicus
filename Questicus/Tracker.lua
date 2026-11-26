@@ -10,6 +10,7 @@
 -- Kept in Q.db.tracker (look) and Q.char.focus / Q.char.forced / Q.char.trackCollapsed (per character).
 local Q = Questicus
 local T, D, QS, P = Q.T, Q.Data, Q.Quests, Q.Planner
+local L = Q.L
 local TR = {}
 Q.Tracker = TR
 
@@ -54,7 +55,7 @@ end
 local function zoneOf(id)
   local z = P.QuestZone and P.QuestZone(id)
   local info = z and C_Map and C_Map.GetMapInfo and C_Map.GetMapInfo(z)
-  return (info and info.name) or "Other"
+  return (info and info.name) or L["Other"]
 end
 
 -- ------------------------------------------------------------------ rows (a pool: headers, objective lines)
@@ -102,8 +103,8 @@ local function row(i)
       if i == 1 then GameTooltip:AddLine(l, 1, 0.82, 0.3) else GameTooltip:AddLine(l, 0.9, 0.9, 0.9, true) end
     end
     local ri = routeIndex()[d.id]
-    GameTooltip:AddLine(ri and ("Route step " .. ri) or "Not on your route", 0.6, 0.8, 1)
-    GameTooltip:AddLine("Click: open in the quest log - Ctrl-click: focus - Shift-click: link - Alt-click: share with your group - Right-click: more", 0.6, 0.6, 0.6, true)
+    GameTooltip:AddLine(ri and L("Route step %d", ri) or L["Not on your route"], 0.6, 0.8, 1)
+    GameTooltip:AddLine(L["Click: open in the quest log - Ctrl-click: focus - Shift-click: link - Alt-click: share with your group - Right-click: more"], 0.6, 0.6, 0.6, true)
     GameTooltip:Show()
   end)
   r:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -205,13 +206,13 @@ function TR:Refresh()
     if dmode and inRun[id] and wasRun == nil then
       band = true
       bandTop = y
-      put("|T" .. Q.MEDIA .. "i_dungeon:13|t " .. Q.Color("c08cff", dname or "Dungeon"),
-        Q.Color(T.HEX.dim, runN .. " quest" .. (runN == 1 and "" or "s")), fs + 8, nil)
+      put("|T" .. Q.MEDIA .. "i_dungeon:13|t " .. Q.Color("c08cff", dname or L["Dungeon"]),
+        Q.Color(T.HEX.dim, runN == 1 and L["1 quest"] or L("%d quests", runN)), fs + 8, nil)
       wasRun = true
     elseif dmode and not inRun[id] and wasRun ~= false then
       band = false
       if wasRun then bandBottom = y; y = y + 6 end
-      put(Q.Color(T.HEX.dim, "Other quests"), nil, fs + 6, nil)
+      put(Q.Color(T.HEX.dim, L["Other quests"]), nil, fs + 6, nil)
       wasRun = false
     end
     if c.sort == "zone" and q.zone ~= lastZone and not (dmode and inRun[id]) then
@@ -219,14 +220,14 @@ function TR:Refresh()
       put(Q.Color(T.HEX.dim, q.zone), nil, fs + 6, nil)
     end
     local col = diffColor(q.level)
-    local title = (c.levels and ("[" .. q.level .. "] ") or "") .. (e.title or ("Quest " .. id))
+    local title = (c.levels and ("[" .. q.level .. "] ") or "") .. (e.title or L("Quest %d", id))
     local mark = (focus == id) and Q.Color(T.HEX.gold, "> ") or ""
     local right = e.complete and Q.Color(T.HEX.good, "done") or (q.ri < 999 and ("#" .. q.ri) or "")
     put(mark .. Q.Color(col, title), right, fs + 6, { id = id, header = true })
     local folded = (Q.char.trackCollapsed and Q.char.trackCollapsed[id]) or (c.collapseDone and e.complete)
     if not folded then
       if e.complete then
-        put("   " .. Q.Color(T.HEX.good, "Ready to hand in"), nil, fs + 3, { id = id })
+        put("   " .. Q.Color(T.HEX.good, L["Ready to hand in"]), nil, fs + 3, { id = id })
       else
         for _, o in ipairs(e.objectives or {}) do
           if not (c.hideDone and o.finished) then
@@ -256,14 +257,14 @@ function TR:Refresh()
     TR.bandBottom:SetPoint("BOTTOMRIGHT", body, "TOPRIGHT", 0, -bandBottom)
   end
   if #added > 0 then
-    put(Q.Color(T.HEX.dim, "Added to your route"), nil, fs + 6, nil)
+    put(Q.Color(T.HEX.dim, L["Added to your route"]), nil, fs + 6, nil)
     for _, id in ipairs(added) do
       local info = QS:Info(id)
       local q = D:Quest(id)
-      put("  " .. Q.Color(T.HEX.gold, (info and info.title) or (q and q[1]) or ("Quest " .. id)), "#" .. (ri[id] or "?"), fs + 4, { id = id, header = true })
+      put("  " .. Q.Color(T.HEX.gold, (info and info.title) or (q and q[1]) or L("Quest %d", id)), "#" .. (ri[id] or "?"), fs + 4, { id = id, header = true })
     end
   end
-  if n == 0 then put(Q.Color(T.HEX.dim, "No quests in your log"), nil, fs + 6, nil) end
+  if n == 0 then put(Q.Color(T.HEX.dim, L["No quests in your log"]), nil, fs + 6, nil) end
   for i = n + 1, #rows do rows[i]:Hide(); TR.rowData[rows[i]] = nil end
   body:SetHeight(math.max(1, y))
   -- folded: just the title bar. A size you dragged stays (the list scrolls); else it fits the list
@@ -278,8 +279,8 @@ function TR:Refresh()
     TR:PinTop()
     frame:SetHeight(h)
   end
-  frame.title:SetText(Q.Color(T.HEX.accent, "Quests") .. Q.Color(T.HEX.dim, ("  %d/%d"):format(QS.logCount or 0, QS.MaxLog())) ..
-    (focus and Q.Color(T.HEX.gold, "  focus") or ""))
+  frame.title:SetText(Q.Color(T.HEX.accent, L["Quests"]) .. Q.Color(T.HEX.dim, ("  %d/%d"):format(QS.logCount or 0, QS.MaxLog())) ..
+    (focus and Q.Color(T.HEX.gold, L["  focus"]) or ""))
   frame.scroll:SetVerticalScroll(math.min(frame.scroll:GetVerticalScroll() or 0, math.max(0, y - (h - 36))))
   TR:Thumb()
 end
@@ -337,8 +338,8 @@ function TR:OpenLog(id)
   if ToggleQuestLog then pcall(ToggleQuestLog) end
 end
 function TR:Focus(id)
-  if Q.char.focus == id then Q.char.focus = nil; Q:Print("focus off - back to the normal route")
-  else Q.char.focus = id; local i = QS:Info(id); Q:Print("focus: " .. ((i and i.title) or id) .. " - the route goes there first") end
+  if Q.char.focus == id then Q.char.focus = nil; Q:Print(L["focus off - back to the normal route"])
+  else Q.char.focus = id; local i = QS:Info(id); Q:Print(L["focus: "] .. ((i and i.title) or id) .. " - the route goes there first") end
   P:BuildAsync()
   TR:Refresh()
 end
@@ -362,15 +363,15 @@ end
 function TR:Link(id)
   local e = QS.log[id]
   local link = GetQuestLink and GetQuestLink(id)
-  if not link then link = ("|cffffff00|Hquest:%d:%d|h[%s]|h|r"):format(id, (e and e.level) or 0, (e and e.title) or ("Quest " .. id)) end
+  if not link then link = ("|cffffff00|Hquest:%d:%d|h[%s]|h|r"):format(id, (e and e.level) or 0, (e and e.title) or L("Quest %d", id)) end
   if ChatEdit_InsertLink then ChatEdit_InsertLink(link) elseif ChatFrameUtil and ChatFrameUtil.InsertLink then ChatFrameUtil.InsertLink(link) end
 end
 -- share the quest with your party (the quest log's Share button)
 function TR:Share(id)
-  if not QS.log[id] then Q:Print("That quest isn't in your log."); return end
-  if not (IsInGroup and IsInGroup()) then Q:Print("You're not in a group - nobody to share it with."); return end
+  if not QS.log[id] then Q:Print(L["That quest isn't in your log."]); return end
+  if not (IsInGroup and IsInGroup()) then Q:Print(L["You're not in a group - nobody to share it with."]); return end
   if C_QuestLog and C_QuestLog.IsPushableQuest and not C_QuestLog.IsPushableQuest(id) then
-    Q:Print("This quest can't be shared.")
+    Q:Print(L["This quest can't be shared."])
     return
   end
   local idx = C_QuestLog and C_QuestLog.GetLogIndexForQuestID and C_QuestLog.GetLogIndexForQuestID(id)
@@ -380,7 +381,7 @@ function TR:Share(id)
   if QuestLogPushQuest then
     QuestLogPushQuest()
     local e = QS.log[id]
-    Q:Print("Shared " .. ((e and e.title) or ("quest " .. id)) .. " with your group.")
+    Q:Print(L("Shared %s with your group.", (e and e.title) or L("Quest %d", id)))
   end
   if prev and prev > 0 and SelectQuestLogEntry then SelectQuestLogEntry(prev) end
 end
@@ -422,7 +423,7 @@ function TR:Menu(id, anchor)
   end
   local inLog = QS.log[id] ~= nil
   local items = {}
-  local function add(text, fn) items[#items + 1] = { text, fn } end
+  local function add(text, fn) items[#items + 1] = { L[text], fn } end
   add(Q.char.focus == id and "Stop focusing" or "Focus (go here first)", function() TR:Focus(id) end)
   local forced = Q.char.forced and Q.char.forced[id]
   if forced then add("Take off my route", function() TR:Force(id, false) end)
@@ -437,7 +438,7 @@ function TR:Menu(id, anchor)
   add("Wowhead link", function() TR:Wowhead(id) end)
   if inLog then add("Abandon", function() TR:Abandon(id) end) end
   local i = QS:Info(id)
-  menu.title:SetText((i and i.title) or (QS.log[id] and QS.log[id].title) or ("Quest " .. id))
+  menu.title:SetText((i and i.title) or (QS.log[id] and QS.log[id].title) or L("Quest %d", id))
   for k, it in ipairs(items) do
     local b = menuBtns[k]
     if not b then b = T.Button(menu, "", 176, 20); menuBtns[k] = b end
@@ -488,7 +489,7 @@ function TR:Wowhead(id)
   end
   local i = QS:Info(id)
   wh.url = url
-  wh.what:SetText(((i and i.title) or ("Quest " .. id)) .. "  -  Ctrl-C to copy")
+  wh.what:SetText(((i and i.title) or L("Quest %d", id)) .. "  -  " .. L["Ctrl-C to copy"])
   wh:Show()
   wh.input:SetText(url)
   wh.input:SetFocus()
@@ -535,7 +536,7 @@ function TR:SearchResults(text)
       b:ClearAllPoints()
       b:SetPoint("TOPLEFT", 14, -62 - (i - 1) * 22)
       b:SetText(("[%d] %s"):format(info.level, info.title))
-      b:SetScript("OnClick", function() TR:Force(info.id, true); Q:Print("added to your route: " .. info.title); search:Hide() end)
+      b:SetScript("OnClick", function() TR:Force(info.id, true); Q:Print(L["added to your route: "] .. info.title); search:Hide() end)
       b:Show()
     end
   end
@@ -563,13 +564,13 @@ function TR:Settings()
     check("Only quests on my route", "onlyRoute")
     check("Hide the game's own tracker", "hideBlizzard")
     check("Lock in place", "locked")
-    local lbl = T.Text(opt, 11, T.c.dim); lbl:SetPoint("TOPLEFT", 14, y - 2); lbl:SetText("Order"); y = y - 18
+    local lbl = T.Text(opt, 11, T.c.dim); lbl:SetPoint("TOPLEFT", 14, y - 2); lbl:SetText(L["Order"]); y = y - 18
     local seg = T.Segments(opt, { { "route", "Route" }, { "zone", "Zone" }, { "level", "Level" } },
       function() return cfg().sort end, function(v) cfg().sort = v; TR:Refresh() end, 80)
     seg:SetPoint("TOPLEFT", 14, y); y = y - 30
     local function stepper(text, key, step, lo, hi)
       local l = T.Text(opt, 11, T.c.dim); l:SetPoint("TOPLEFT", 14, y - 4)
-      local function upd() l:SetText(("%s: %s"):format(text, tostring(cfg()[key]))) end
+      local function upd() l:SetText(("%s: %s"):format(L[text], tostring(cfg()[key]))) end
       upd()
       local minus = T.Button(opt, "-", 24, 18); minus:SetPoint("TOPLEFT", 180, y)
       local plus = T.Button(opt, "+", 24, 18); plus:SetPoint("LEFT", minus, "RIGHT", 6, 0)
@@ -618,7 +619,7 @@ function TR:Build()
     b.t = b:CreateTexture(nil, "OVERLAY"); b.t:SetSize(14, 14); b.t:SetPoint("CENTER"); b.t:SetTexture(icon)
     b.t:SetAlpha(0.75)
     b:SetScript("OnClick", fn)
-    b:SetScript("OnEnter", function(s) s.t:SetAlpha(1); GameTooltip:SetOwner(s, "ANCHOR_BOTTOM"); GameTooltip:AddLine(tip, 1, 1, 1); GameTooltip:Show() end)
+    b:SetScript("OnEnter", function(s) s.t:SetAlpha(1); GameTooltip:SetOwner(s, "ANCHOR_BOTTOM"); GameTooltip:AddLine(L[tip], 1, 1, 1); GameTooltip:Show() end)
     b:SetScript("OnLeave", function(s) s.t:SetAlpha(0.75); GameTooltip:Hide() end)
     return b
   end
@@ -687,8 +688,8 @@ function TR:Build()
   grip:SetScript("OnClick", function() c.height = nil; TR:Refresh() end)
   grip:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    GameTooltip:AddLine("Drag to resize", 1, 1, 1)
-    GameTooltip:AddLine("Right-click: fit the list again", 0.7, 0.7, 0.7)
+    GameTooltip:AddLine(L["Drag to resize"], 1, 1, 1)
+    GameTooltip:AddLine(L["Right-click: fit the list again"], 0.7, 0.7, 0.7)
     GameTooltip:Show()
   end)
   grip:SetScript("OnLeave", function() GameTooltip:Hide() end)

@@ -6,6 +6,7 @@
 -- animated by its state: out of reach, within reach, or unusable for now. Questicus' own code and
 -- art (Media\qg_*.tga); settings in QuesticusDB.glow (account) and the character's categories.
 local Q = Questicus
+local L = Q.L
 local T = Q.T
 local G = {}
 Q.Glow = G
@@ -937,13 +938,13 @@ end)
 -- ------------------------------------------------------------------ the interact key (the game's own)
 function G.InteractKey() return GetBindingKey and GetBindingKey("INTERACTTARGET") end
 function G.SetInteractKey(k)
-  if InCombatLockdown and InCombatLockdown() then Q:Print("key bindings can't change in combat.") return end
+  if InCombatLockdown and InCombatLockdown() then Q:Print(L["key bindings can't change in combat."]) return end
   local old = G.InteractKey()
   if old then pcall(SetBinding, old) end
   if k then
     local taken = GetBindingAction and GetBindingAction(k)
     if taken and taken ~= "" and taken ~= "INTERACTTARGET" then Q:Print(k .. " no longer does \"" .. (_G["BINDING_NAME_" .. taken] or taken) .. "\".") end
-    if not SetBinding(k, "INTERACTTARGET") then Q:Print("the game refused the key " .. k .. ".") end
+    if not SetBinding(k, "INTERACTTARGET") then Q:Print(L["the game refused the key "] .. k .. ".") end
   end
   if SaveBindings and GetCurrentBindingSet then pcall(SaveBindings, GetCurrentBindingSet()) end
 end
@@ -955,7 +956,7 @@ function G.Ignore(name)
     local ok, n = pcall(UnitName, UNIT)
     name = ok and not S(n) and n or nil
   end
-  if not name then Q:Print("no object in front of you to ignore.") return end
+  if not name then Q:Print(L["no object in front of you to ignore."]) return end
   local c = G.cfg()
   local k = name:lower()
   if c.ignored[k] then
@@ -973,7 +974,7 @@ function G.SetOn(on)
   c.on = on and true or false
   G.ApplyCVars()
   if not c.on then cur.on = false; if hiddenPlate then gameName(hiddenPlate, true); hiddenPlate = nil end end
-  Q:Print("highlights " .. (c.on and "on." or "off - your own targeting settings are back."))
+  Q:Print(L["highlights "] .. (c.on and "on." or "off - your own targeting settings are back."))
 end
 
 Q:On("PLAYER_LOGIN", function()
@@ -989,7 +990,7 @@ local function status()
     c.effect, c.range, c.arc, tostring(c.exclusive), tostring(c.glowOnly)))
   local on = {}
   for _, k in ipairs(G.CATS) do if G.cats()[k] then on[#on + 1] = G.CAT_NAMES[k] end end
-  Q:Print("lit on this character: " .. table.concat(on, ", ") .. " | herbalism " .. tostring(p.herb and true or false) .. ", mining " .. tostring(p.ore and true or false))
+  Q:Print(L["lit on this character: "] .. table.concat(on, ", ") .. " | herbalism " .. tostring(p.herb and true or false) .. ", mining " .. tostring(p.ore and true or false))
   for _, n in ipairs(CV) do Q:Print("  " .. n .. " = " .. tostring(getc(n))) end
   local cat, st, name, cursor = G.Classify()
   if cat then
@@ -997,7 +998,7 @@ local function status()
     Q:Print(("in front of you: %s -> %s, %s (cursor %s), nameplate %s, %s"):format(tostring(name), cat, st, tostring(cursor),
       plateOf() and "yes" or "NO", okW and "lit" or ("not lit: " .. tostring(why))))
   else
-    Q:Print("nothing in front of you the game picked (soft target).")
+    Q:Print(L["nothing in front of you the game picked (soft target)."])
   end
 end
 
@@ -1008,19 +1009,19 @@ Q:Command("glow", "highlights: /qc glow [on | off | effect <name> | ignore | ign
   elseif a == "on" then G.SetOn(true)
   elseif a == "off" then G.SetOn(false)
   elseif a == "status" then status()
-  elseif a == "debug" then c.debug = not c.debug; Q:Print("highlight diagnostics " .. (c.debug and "on" or "off"))
+  elseif a == "debug" then c.debug = not c.debug; Q:Print(L["highlight diagnostics "] .. (c.debug and "on" or "off"))
   elseif a == "ignore" then G.Ignore()
   elseif a == "ignore list" then
     local l = {}
     for _, n in pairs(c.ignored) do l[#l + 1] = n end
     table.sort(l)
     Q:Print(#l == 0 and "no object is ignored." or ("ignored: " .. table.concat(l, ", ")))
-  elseif a == "ignore clear" then c.ignored = {}; Q:Print("no object is ignored any more.")
+  elseif a == "ignore clear" then c.ignored = {}; Q:Print(L["no object is ignored any more."])
   elseif a:match("^effect") then
     local e = a:match("^effect%s+(%S+)")
-    if e and E[e] then c.effect = e; Q:Print("effect: " .. G.EFFECT_NAMES[e])
-    else Q:Print("effects: " .. table.concat(G.EFFECT_ORDER, ", ") .. " (now " .. c.effect .. ")") end
+    if e and E[e] then c.effect = e; Q:Print(L["effect: "] .. G.EFFECT_NAMES[e])
+    else Q:Print(L["effects: "] .. table.concat(G.EFFECT_ORDER, ", ") .. " (now " .. c.effect .. ")") end
   else
-    Q:Print("/qc glow [on | off | effect <name> | ignore | ignore list | ignore clear | status | debug]")
+    Q:Print(L["/qc glow [on | off | effect <name> | ignore | ignore list | ignore clear | status | debug]"])
   end
 end)

@@ -4,6 +4,7 @@
 -- It rides on the game's own navigation frame (where the game draws its waypoint marker), so it works
 -- for any waypoint that's tracked: Questicus' own, a pin you put on the map, /way, a map link.
 local Q = Questicus
+local L = Q.L
 local T, D = Q.T, Q.Data
 local B = {}
 Q.Beacon = B
@@ -224,7 +225,7 @@ local function build()
       local c = B.Context()
       GameTooltip:AddLine(c.name or "Waypoint", 1, 0.82, 0.3)
       if c.sub then GameTooltip:AddLine(c.sub, 0.9, 0.9, 0.9) end
-      GameTooltip:AddLine("Right-click: clear", 0.6, 0.6, 0.6)
+      GameTooltip:AddLine(L["Right-click: clear"], 0.6, 0.6, 0.6)
       GameTooltip:Show()
     end)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -447,6 +448,6 @@ Q:On("QC_READY", function()
   local loaded = C_AddOns and C_AddOns.IsAddOnLoaded or IsAddOnLoaded
   if loaded and loaded("WaypointUI") then
     B.standDown = true
-    Q:Print("WaypointUI is running, so Questicus' in-world waypoint is off. Questicus now has everything it did - disable WaypointUI and /reload to use Questicus' own.")
+    Q:Print(L["WaypointUI is running, so Questicus' in-world waypoint is off. Questicus now has everything it did - disable WaypointUI and /reload to use Questicus' own."])
   end
 end)

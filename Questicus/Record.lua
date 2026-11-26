@@ -25,6 +25,7 @@
 -- Never: anything about other players, chat, or your settings. Off with Options > Advanced >
 -- "Help fill the database" (the same switch as Collect.lua).
 local Q = Questicus
+local L = Q.L
 local D, QS = Q.Data, Q.Quests
 local S = Q.Secret
 local R = {}
@@ -880,7 +881,7 @@ Q:Command("recorded", "what Questicus has recorded for the database", function()
   local n = R.Counts()
   local parts = {}
   for _, k in ipairs(KEYS) do if n[k] and n[k] > 0 then parts[#parts + 1] = k .. " " .. n[k] end end
-  Q:Print("recorded: " .. (#parts > 0 and table.concat(parts, ", ") or "nothing yet") ..
+  Q:Print(L["recorded: "] .. (#parts > 0 and table.concat(parts, ", ") or "nothing yet") ..
     (ccRecords() and " (loot and npcs: Command Center records those)" or ""))
   local lt = R.lastTrainer
   if lt then

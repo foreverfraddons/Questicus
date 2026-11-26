@@ -3,6 +3,7 @@
 -- Your own pins win: a pin you put on the map or the minimap, /way, or a map link in chat is
 -- followed until you get there or clear it, then the route's pin comes back.
 local Q = Questicus
+local L = Q.L
 local D = Q.Data
 local W = {}
 Q.Waypoint = W
@@ -77,7 +78,7 @@ end
 -- put down one of your own pins (from /way, the minimap, ...): followed until you're there
 function W:PinUser(m, x, y, name, quiet)
   if not canPin(m) then
-    if not quiet then Q:Print("Can't put a waypoint on that map.") end
+    if not quiet then Q:Print(L["Can't put a waypoint on that map."]) end
     return false
   end
   local i, wx, wy = worldOf(m, x, y)

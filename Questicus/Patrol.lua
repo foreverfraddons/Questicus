@@ -3,6 +3,7 @@
 -- the map instead of a cloud of icons) and goes to ForeverDB with your recordings, so everyone gets it.
 --   /qc patrol   - open the recorder
 local Q = Questicus
+local L = Q.L
 local T, D = Q.T, Q.Data
 local PT = {}
 Q.Patrol = PT
@@ -28,7 +29,7 @@ end
 
 function PT:Start()
   local id, name = targetNPC()
-  if not id then Q:Print("target the mob that patrols first, then press Start"); return false end
+  if not id then Q:Print(L["target the mob that patrols first, then press Start"]); return false end
   rec = { npc = id, name = name or D:Name("c" .. id), pts = {}, last = nil, map = nil }
   PT:Refresh()
   return true
@@ -59,7 +60,7 @@ function PT:Stop(save)
     Q:Print(("patrol path of %s saved (%d points) - shown on the map and sent to ForeverDB with your recordings"):format(rec.name, n))
     if Q.Pins and Q.Pins.RefreshWorld then Q.Pins:RefreshWorld(true) end
   elseif save then
-    Q:Print("not enough of the path yet - follow the mob a bit longer")
+    Q:Print(L["not enough of the path yet - follow the mob a bit longer"])
     return
   end
   rec = nil
@@ -71,7 +72,7 @@ function PT:Refresh()
   if rec then
     frame.status:SetText(("Recording %s: %d points\nFollow it all the way round, then Stop."):format(rec.name, #rec.pts / 2))
   else
-    frame.status:SetText("Target a mob that walks a path, press Start and follow it around its route.")
+    frame.status:SetText(L["Target a mob that walks a path, press Start and follow it around its route."])
   end
   frame.start:SetShown(not rec)
   frame.stop:SetShown(rec ~= nil)

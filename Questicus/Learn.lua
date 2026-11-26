@@ -302,7 +302,7 @@ Q:Command("learn", "what Questicus has learned about your play (/qc learn reset 
   local s = st()
   if arg == "reset" then
     Q.char.learn, Q.char.work = nil, nil
-    Q:Print("learning reset for this character (quest times other characters recorded stay)")
+    Q:Print(Q.L["learning reset for this character (quest times other characters recorded stay)"])
     if P.Replan then P:Replan(1) end
     return
   end

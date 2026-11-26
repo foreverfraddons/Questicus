@@ -2,6 +2,7 @@
 -- quest objectives with live progress. The arrow and the map pins follow the current step.
 local Q = Questicus
 local T, D, QS, P = Q.T, Q.Data, Q.Quests, Q.Planner
+local L = Q.L
 local GD = {}
 Q.Guide = GD
 
@@ -65,26 +66,28 @@ end
 
 function GD.StepText(s, short)
   if s.type == "accept" and s.startItem then
-    return "Use " .. itemText(s.startItem) .. " to start " .. c(gold, s.title)
+    return L("Use %s to start %s", itemText(s.startItem), c(gold, s.title))
   elseif s.type == "accept" then
-    return "Accept " .. c(gold, s.title) .. (short and "" or (" from " .. c(white, s.npc)))
+    return short and L("Accept %s", c(gold, s.title)) or L("Accept %s from %s", c(gold, s.title), c(white, s.npc))
   elseif s.type == "turnin" then
-    return "Turn in " .. c(gold, s.title) .. (short and "" or (" to " .. c(white, s.npc)))
+    return short and L("Turn in %s", c(gold, s.title)) or L("Turn in %s to %s", c(gold, s.title), c(white, s.npc))
   elseif s.type == "buy" then
-    return "Buy " .. itemText(s.item) .. " from " .. c(white, s.npc) .. c(good, (" +%d%%"):format(math.floor(s.pct or 0)))
+    return L("Buy %s from %s", itemText(s.item), c(white, s.npc)) .. c(good, (" +%d%%"):format(math.floor(s.pct or 0)))
   elseif s.type == "fly" then
-    return "Fly to " .. c(gold, s.to.name) .. (short and "" or (" from " .. c(white, s.from.name)))
+    return short and L("Fly to %s", c(gold, s.to.name)) or L("Fly to %s from %s", c(gold, s.to.name), c(white, s.from.name))
   elseif s.type == "hearth" then
-    return "Hearth to " .. c(gold, (s.to and s.to.name) or "your inn")
+    return L("Hearth to %s", c(gold, (s.to and s.to.name) or L["your inn"]))
   elseif s.type == "fp" then
-    return "Get the flight path at " .. c(gold, s.node.name)
+    return L("Get the flight path at %s", c(gold, s.node.name))
   elseif s.type == "explore" then
-    return "Explore " .. c(gold, s.area and s.area.name or "this area")
+    return L("Explore %s", c(gold, s.area and s.area.name or L["this area"]))
   elseif s.type == "prep" then
-    return c(gold, "Before the dungeon: ") .. (s.prep and s.prep.text or "")
+    return c(gold, L["Before the dungeon: "]) .. (s.prep and L[s.prep.text or ""] or "")
   elseif s.type == "boat" then
-    return ("Take the %s to "):format(s.kind or "boat") .. c(gold, s.toName or "the other continent") ..
-      (short and "" or (" - at " .. c(white, s.from and s.from.place or "the docks")))
+    local what = ({ boat = L["boat"], zeppelin = L["zeppelin"], tram = L["tram"] })[s.kind or "boat"] or L[s.kind or "boat"]
+    local to = c(gold, s.toName or L["the other continent"])
+    return short and L("Take the %s to %s", what, to)
+      or L("Take the %s to %s - at %s", what, to, c(white, s.from and s.from.place or L["the docks"]))
   elseif s.type == "complete" then
     local t = {}
     for i, title in ipairs(s.titles or {}) do
@@ -93,7 +96,8 @@ function GD.StepText(s, short)
       local part = s.partText and q and s.partText[q]
       local m = q and P.Meta(q)
       local whole = m and m.lines and part and #m.lines <= 1
-      t[#t + 1] = c(gold, title) .. ((part and part ~= "" and not whole and (s.partial or #s.quests > 1)) and c(dim, " (" .. part .. ")") or "")
+      local tl = (q and QS:Info(q) and QS:Info(q).title) or title
+      t[#t + 1] = c(gold, tl) .. ((part and part ~= "" and not whole and (s.partial or #s.quests > 1)) and c(dim, " (" .. part .. ")") or "")
     end
     -- a dungeon run: the dungeon is the step (the quests are listed under it)
     if s.dungeon and not short then
@@ -102,9 +106,9 @@ function GD.StepText(s, short)
         local e = QS.log[id]
         if (e and e.complete) or (QS.IsDone and QS:IsDone(id)) then done = done + 1 end
       end
-      return "Run " .. c("c08cff", s.dungeon) .. c(dim, ("   %d/%d quests done"):format(done, #s.quests))
+      return L("Run %s", c("c08cff", s.dungeon)) .. c(dim, "   " .. L("%d/%d quests done", done, #s.quests))
     end
-    return "Do " .. table.concat(t, ", ") .. (s.dungeon and c(T.HEX.bad, " in " .. s.dungeon) or "")
+    return L("Do %s", table.concat(t, ", ")) .. (s.dungeon and c(T.HEX.bad, " " .. L("in %s", s.dungeon)) or "")
   end
   return s.type
 end
@@ -147,8 +151,8 @@ local function sourceHint(id, text)
       if l and l.from then
         local who = D:Name(l.from)
         if who and who ~= "" then
-          if l.kind == "buy" then return c(dim, " (sold by " .. who .. ")") end
-          return c(dim, (l.from:sub(1, 1) == "o" and " (from " or " (drops from ") .. who .. ")")
+          if l.kind == "buy" then return c(dim, " " .. L("(sold by %s)", who)) end
+          return c(dim, " " .. (l.from:sub(1, 1) == "o" and L("(from %s)", who) or L("(drops from %s)", who)))
         end
       end
     end
@@ -159,7 +163,7 @@ local function sourceHint(id, text)
       local kind = l.from:sub(1, 1)
       local who = D:Name(l.from)
       if who and who ~= "" then
-        if l.kind == "buy" then return c(dim, " (sold by " .. who .. ")") end
+        if l.kind == "buy" then return c(dim, L[" (sold by "] .. who .. ")") end
         return c(dim, (kind == "o" and " (from " or " (drops from ") .. who .. ")")
       end
     end
@@ -176,7 +180,7 @@ local function objectiveLines(s)
     local e = QS.log[id]
     local how = GD.HowText(id)
     if how and not (e and e.complete) then
-      out[#out + 1] = c(T.HEX.gold, "  How: ") .. c(white, how)
+      out[#out + 1] = c(T.HEX.gold, "  " .. L["How: "]) .. c(white, how)
     end
     -- the quest's item to use (the quest item button / its key binding)
     local item = items[id]
@@ -188,8 +192,8 @@ local function objectiveLines(s)
       for li, l in ipairs(m and m.lines or {}) do
         if open[li] and (l.kind == "kill" or l.kind == "use") and l.name then target = l.name break end
       end
-      out[#out + 1] = c(T.HEX.gold, "  Use ") .. itemText(item) .. (target and (" on " .. c(white, target)) or "") ..
-        c(dim, key and (" (quest item button or " .. key .. ")") or " (the quest item button)")
+      out[#out + 1] = "  " .. (target and L("Use %s on %s", itemText(item), c(white, target)) or L("Use %s", itemText(item))) ..
+        c(dim, " " .. (key and L("(quest item button or %s)", key) or L["(the quest item button)"]))
     end
     if e and e.objectives and #e.objectives > 0 then
       for _, o in ipairs(e.objectives) do
@@ -199,7 +203,7 @@ local function objectiveLines(s)
     else
       local m = P.Meta(id)
       for _, l in ipairs(m and m.lines or {}) do
-        local verb = ({ kill = "Kill ", loot = "Get ", use = "Use ", explore = "", buy = "Buy " })[l.kind] or ""
+        local verb = ({ kill = L["Kill "], loot = L["Get "], use = L["Use "], explore = "", buy = L["Buy "] })[l.kind] or ""
         local from = l.from and (c(dim, " (" .. D:Name(l.from) .. ")")) or ""
         out[#out + 1] = "  - " .. verb .. c(white, l.name) .. from
       end
@@ -214,11 +218,11 @@ local function dungeonLines(s)
   local items = Q.QuestItem and Q.QuestItem.Items and Q.QuestItem:Items() or {}
   for k, id in ipairs(s.quests) do
     local e = QS.log[id]
-    local title = (s.titles and s.titles[k]) or (QS:Info(id) or {}).title or ("Quest " .. id)
+    local title = (s.titles and s.titles[k]) or (QS:Info(id) or {}).title or L("Quest %d", id)
     if k > 1 then out[#out + 1] = " " end
     out[#out + 1] = c("c08cff", "|TInterface\\GossipFrame\\ActiveQuestIcon:12|t ") .. c(gold, title)
     if e and e.complete then
-      out[#out + 1] = "     " .. c(good, "done - hand it in")
+      out[#out + 1] = "     " .. c(good, L["done - hand it in"])
     elseif e and e.objectives and #e.objectives > 0 then
       for _, o in ipairs(e.objectives) do
         local txt = o.text or ""
@@ -227,12 +231,12 @@ local function dungeonLines(s)
     else
       local m = P.Meta(id)
       for _, l in ipairs(m and m.lines or {}) do
-        local verb = ({ kill = "Kill ", loot = "Get ", use = "Use ", explore = "", buy = "Buy " })[l.kind] or ""
+        local verb = ({ kill = L["Kill "], loot = L["Get "], use = L["Use "], explore = "", buy = L["Buy "] })[l.kind] or ""
         out[#out + 1] = "     " .. verb .. c(white, l.name) .. (l.from and c(dim, "  " .. D:Name(l.from)) or "")
       end
     end
     local item = items[id]
-    if item and not (e and e.complete) then out[#out + 1] = "     " .. c(dim, "use ") .. itemText(item) end
+    if item and not (e and e.complete) then out[#out + 1] = "     " .. c(dim, L["use "]) .. itemText(item) end
   end
   return out
 end
@@ -371,7 +375,7 @@ function GD:OnTheWay(s)
                 keys[srcKey] = id
                 if not named[id] then
                   named[id] = true
-                  out[#out + 1] = c(white, (QS:Info(id) and QS:Info(id).title) or e.title or ("Quest " .. id))
+                  out[#out + 1] = c(white, (QS:Info(id) and QS:Info(id).title) or e.title or L("Quest %d", id))
                 end
                 break
               end
@@ -391,7 +395,7 @@ local function menuItems(index)
   local s = (index == 0) and P.prevStep or (P.steps and P.steps[index])
   if not s then return {} end
   local items = {}
-  local function add(text, tip, fn) items[#items + 1] = { text, tip, fn } end
+  local function add(text, tip, fn) items[#items + 1] = { L[text], tip and L[tip], fn } end
   -- the step you just finished: notes only
   if index == 0 then
     if Q.Author then Q.Author:MenuItems(s, 0, add) end
@@ -413,7 +417,7 @@ local function menuItems(index)
     add("Remove from route", "Never route this quest again (/qc unskip brings it back)", function()
       for _, id in ipairs(ids) do Q.char.skipped[id] = true end
       GD.focus = 1; P:SkipQuest(ids[1])
-      Q:Print("removed from the route: " .. (s.title or (s.titles and table.concat(s.titles, ", ")) or ""))
+      Q:Print(L["removed from the route: "] .. (s.title or (s.titles and table.concat(s.titles, ", ")) or ""))
     end)
   elseif s.type == "hearth" then
     add("Don't hearth this time", "Leave the hearthstone out of the route for 30 minutes", function()
@@ -491,7 +495,7 @@ function GD:Menu(index, anchor)
   local items = menuItems(index)
   local s = (index == 0) and P.prevStep or P.steps[index]
   if not s then return items end
-  menu.title:SetText(index == 0 and ("Last step: " .. GD.StepText(s, true)) or ("Step %d: %s"):format(index, GD.StepText(s, true)))
+  menu.title:SetText(index == 0 and (L["Last step: "] .. GD.StepText(s, true)) or L("Step %d: %s", index, GD.StepText(s, true)))
   for i, it in ipairs(items) do
     local b = menu.buttons[i]
     if not b then
@@ -550,8 +554,8 @@ local function newRow(parent)
     GameTooltip:AddLine(GD.StepText(s), 1, 1, 1, true)
     for _, l in ipairs(objectiveLines(s)) do GameTooltip:AddLine(l, 0.8, 0.8, 0.8, true) end
     if Q.Details then Q.Details:TooltipLines(GameTooltip, s) end
-    for _, n in ipairs(Q.Author and Q.Author:NotesFor(s) or {}) do GameTooltip:AddLine("Note: " .. n, 0.88, 0.69, 0.29, true) end
-    GameTooltip:AddLine("Click: details, and point the arrow here - right-click: more (remove, do next ...)", 0.6, 0.6, 0.6, true)
+    for _, n in ipairs(Q.Author and Q.Author:NotesFor(s) or {}) do GameTooltip:AddLine(L["Note: "] .. n, 0.88, 0.69, 0.29, true) end
+    GameTooltip:AddLine(L["Click: details, and point the arrow here - right-click: more (remove, do next ...)"], 0.6, 0.6, 0.6, true)
     GameTooltip:Show()
   end)
   r:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -584,8 +588,8 @@ local function build()
   frame.clean:SetScript("OnEnter", function(self)
     self.icon:SetVertexColor(T.c.gold[1], T.c.gold[2], T.c.gold[3], 1)
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-    GameTooltip:AddLine("Clean up quest log", 1, 1, 1)
-    GameTooltip:AddLine("Abandon quests that aren't in your route and delete quest items nothing needs. Shows the list first.", 0.8, 0.8, 0.8, true)
+    GameTooltip:AddLine(L["Clean up quest log"], 1, 1, 1)
+    GameTooltip:AddLine(L["Abandon quests that aren't in your route and delete quest items nothing needs. Shows the list first."], 0.8, 0.8, 0.8, true)
     GameTooltip:Show()
   end)
   frame.clean:SetScript("OnLeave", function(self)
@@ -606,8 +610,8 @@ local function build()
   frame.dng:SetScript("OnEnter", function(self)
     self.icon:SetVertexColor(T.c.gold[1], T.c.gold[2], T.c.gold[3], 1)
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-    GameTooltip:AddLine("Dungeons", 1, 1, 1)
-    GameTooltip:AddLine("Levels, bosses, quests, XP and clear time of every dungeon - and \"Get all quests\" to route you through a dungeon's quests.", 0.8, 0.8, 0.8, true)
+    GameTooltip:AddLine(L["Dungeons"], 1, 1, 1)
+    GameTooltip:AddLine(L["Levels, bosses, quests, XP and clear time of every dungeon - and \"Get all quests\" to route you through a dungeon's quests."], 0.8, 0.8, 0.8, true)
     GameTooltip:Show()
   end)
   frame.dng:SetScript("OnLeave", function(self)
@@ -629,8 +633,8 @@ local function build()
   frame.zn:SetScript("OnEnter", function(self)
     self.icon:SetAlpha(1)
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-    GameTooltip:AddLine("Zones", 1, 1, 1)
-    GameTooltip:AddLine("Pick which zones your route may use.", 0.8, 0.8, 0.8, true)
+    GameTooltip:AddLine(L["Zones"], 1, 1, 1)
+    GameTooltip:AddLine(L["Pick which zones your route may use."], 0.8, 0.8, 0.8, true)
     GameTooltip:Show()
   end)
   frame.zn:SetScript("OnLeave", function(self) self.icon:SetAlpha(0.75); GameTooltip:Hide() end)
@@ -660,7 +664,7 @@ local function build()
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:AddLine(GD.StepText(s), 1, 1, 1, true)
     Q.Details:TooltipLines(GameTooltip, s)
-    GameTooltip:AddLine("Click for all details", 0.6, 0.6, 0.6)
+    GameTooltip:AddLine(L["Click for all details"], 0.6, 0.6, 0.6)
     GameTooltip:Show()
   end)
   cur:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -774,9 +778,9 @@ local function build()
   frame.prev:SetScript("OnEnter", function(self)
     if not P.prevStep then return end
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-    GameTooltip:AddLine("Last step: " .. GD.StepText(P.prevStep), 1, 1, 1, true)
-    for _, n in ipairs(Q.Author and Q.Author:NotesFor(P.prevStep) or {}) do GameTooltip:AddLine("Note: " .. n, 0.88, 0.69, 0.29, true) end
-    if Q.Author and Q.Author:IsAuthor() then GameTooltip:AddLine("Click: add a note to it", 0.6, 0.6, 0.6) end
+    GameTooltip:AddLine(L["Last step: "] .. GD.StepText(P.prevStep), 1, 1, 1, true)
+    for _, n in ipairs(Q.Author and Q.Author:NotesFor(P.prevStep) or {}) do GameTooltip:AddLine(L["Note: "] .. n, 0.88, 0.69, 0.29, true) end
+    if Q.Author and Q.Author:IsAuthor() then GameTooltip:AddLine(L["Click: add a note to it"], 0.6, 0.6, 0.6) end
     GameTooltip:Show()
   end)
   frame.prev:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -843,8 +847,8 @@ local function build()
   grip:SetScript("OnClick", function() GD:ResetSize() end)
   grip:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    GameTooltip:AddLine("Drag to resize", 1, 1, 1)
-    GameTooltip:AddLine("Right-click: back to the automatic size", 0.7, 0.7, 0.7)
+    GameTooltip:AddLine(L["Drag to resize"], 1, 1, 1)
+    GameTooltip:AddLine(L["Right-click: back to the automatic size"], 0.7, 0.7, 0.7)
     GameTooltip:Show()
   end)
   grip:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -890,7 +894,7 @@ local function build()
     acc = 0
     -- on a flight path the distance isn't measured: "in flight" once, measured again when you land
     if Q.OnTaxi() then
-      if not frame.inFlight then frame.inFlight = true; if cur and cur.info then cur.info:SetText("in flight") end end
+      if not frame.inFlight then frame.inFlight = true; if cur and cur.info then cur.info:SetText(L["in flight"]) end end
       return
     end
     frame.inFlight = nil
@@ -927,7 +931,7 @@ function GD:Refresh()
   end
   if frame.prev then
     local ps = P.prevStep
-    frame.prev.text:SetText(ps and (Q.Color(T.HEX.good, "Last step: ") .. GD.StepText(ps, true)) or "")
+    frame.prev.text:SetText(ps and (Q.Color(T.HEX.good, L["Last step: "]) .. GD.StepText(ps, true)) or "")
   end
   local dm = Q.char.dmode and D:Dungeon(Q.char.dmode)
   frame.title:SetText(Q.Color(T.HEX.accent, "Questicus") .. (dm and Q.Color(T.HEX.dim, " - " .. dm[1]) or ""))
@@ -936,10 +940,10 @@ function GD:Refresh()
   local xp, max = UnitXP and UnitXP("player") or 0, UnitXPMax and UnitXPMax("player") or 1
   local ttl = Q.Details and Q.Details:TimeToLevel()
   local w = frame:GetWidth() or WIDTH
-  local full = ("Level %d  %d%%"):format(lv, math.floor(xp / math.max(1, max) * 100)) ..
+  local full = L("Level %d  %d%%", lv, math.floor(xp / math.max(1, max) * 100)) ..
     (ttl and ("  -  " .. ttl .. " to " .. (lv + 1)) or "")
   -- narrow window: just the level and %, then only the %
-  frame.lvl:SetText(w >= 330 and full or (w >= 280 and ("Lv %d  %d%%"):format(lv, math.floor(xp / math.max(1, max) * 100))
+  frame.lvl:SetText(w >= 330 and full or (w >= 280 and L("Lv %d  %d%%", lv, math.floor(xp / math.max(1, max) * 100))
     or ("%d%%"):format(math.floor(xp / math.max(1, max) * 100))))
   frame.xp:SetValue(xp / math.max(1, max))
   if GD.focus > #steps then GD.focus = 1 end
@@ -948,17 +952,17 @@ function GD:Refresh()
     cur.icon:SetTexture(ICON.explore)
     cur.num:SetText("")
     if D.old then
-      cur.text:SetText("ForeverDB needs an update.")
-      cur.obj:SetText("This ForeverDB has no quest details yet. Update it on CurseForge.")
+      cur.text:SetText(L["ForeverDB needs an update."])
+      cur.obj:SetText(L["This ForeverDB has no quest details yet. Update it on CurseForge."])
     elseif not D:Ready() then
-      cur.text:SetText("ForeverDB is not installed.")
-      cur.obj:SetText("Questicus needs the ForeverDB addon for its quest data.")
+      cur.text:SetText(L["ForeverDB is not installed."])
+      cur.obj:SetText(L["Questicus needs the ForeverDB addon for its quest data."])
     elseif not Q.char.surveyDone then
-      cur.text:SetText("Answer a few questions to start.")
-      cur.obj:SetText("/qc survey")
+      cur.text:SetText(L["Answer a few questions to start."])
+      cur.obj:SetText(L["/qc survey"])
     else
-      cur.text:SetText("No quests to route right now.")
-      cur.obj:SetText("Try a wider level range in /qc options, or /qc unskip.")
+      cur.text:SetText(L["No quests to route right now."])
+      cur.obj:SetText(L["Try a wider level range in /qc options, or /qc unskip."])
     end
     cur.up:SetText("")
     cur.skip:Hide(); cur.map:Hide()
@@ -981,18 +985,18 @@ function GD:Refresh()
       -- an escort: green, and it asks before it starts (Auto.lua)
       cur.glow:SetVertexColor(0.35, 0.95, 0.45, 0.8)
       cur.icon:SetVertexColor(1, 1, 1, 1)
-      cur.num:SetText(c("5cff6a", "ESCORT"))
+      cur.num:SetText(c("5cff6a", L["ESCORT"]))
       T.SetBorderColor(cur, 0.35, 0.9, 0.45, 1)
       local info = QS:Info(esc)
-      cur.ebanner.text:SetText("ESCORT QUEST - " .. ((info and info.title) or "escort"):upper())
+      cur.ebanner.text:SetText(L("ESCORT QUEST - %s", ((info and info.title) or L["escort"]):upper()))
       cur.ebanner:SetWidth(math.min((cur.ebanner.text:GetStringWidth() or 200) + 24, math.max(120, (cur:GetWidth() or 300) - 12)))
-      lines[#lines + 1] = c("5cff6a", "  Escort: ") .. c(dim, s.type == "accept"
-        and "it starts when you accept it - be ready to follow and keep them alive. Questicus asks first."
-        or "stay close and keep them alive until they're safe.")
+      lines[#lines + 1] = c("5cff6a", "  " .. L["Escort: "]) .. c(dim, s.type == "accept"
+        and L["it starts when you accept it - be ready to follow and keep them alive. Questicus asks first."]
+        or L["stay close and keep them alive until they're safe."])
     elseif dArea then
       cur.glow:SetVertexColor(0.75, 0.45, 1, 0.8)
       cur.icon:SetVertexColor(0.85, 0.65, 1, 1)
-      cur.num:SetText(c("c08cff", "DUNGEON"))
+      cur.num:SetText(c("c08cff", L["DUNGEON"]))
       T.SetBorderColor(cur, 0.75, 0.45, 1, 1)
       local bt, done, total = Q.Bosses, 0, 0
       if bt and Q.Dungeons then
@@ -1002,7 +1006,7 @@ function GD:Refresh()
           end
         end
       end
-      cur.banner.text:SetText("DUNGEON RUN - " .. (dName or "dungeon"):upper() .. (total > 0 and ("   bosses %d/%d"):format(done, total) or ""))
+      cur.banner.text:SetText(L("DUNGEON RUN - %s", (dName or L["dungeon"]):upper()) .. (total > 0 and ("   " .. L("bosses %d/%d", done, total)) or ""))
       cur.banner:SetWidth(math.min((cur.banner.text:GetStringWidth() or 200) + 24, math.max(120, (cur:GetWidth() or 300) - 12)))
 
     else
@@ -1010,14 +1014,14 @@ function GD:Refresh()
       T.SetBorderColor(cur, T.c.accent[1], T.c.accent[2], T.c.accent[3], 0.45)
     end
     if s.type == "boat" then
-      lines[#lines + 1] = c(dim, "  Board at ") .. c(white, (s.from and s.from.place) or "the docks") ..
-        c(dim, (" - the %s lands at "):format(s.kind or "boat")) .. c(white, (s.to and s.to.place) or s.toName or "")
-      lines[#lines + 1] = c(dim, "  Wait on the platform / dock until it arrives, then get on; the route carries on where it lands.")
+      lines[#lines + 1] = c(dim, "  " .. L("Board at %s - it lands at %s", c(white, (s.from and s.from.place) or L["the docks"]) .. "|cff" .. dim,
+        c(white, (s.to and s.to.place) or s.toName or "")))
+      lines[#lines + 1] = c(dim, "  " .. L["Wait on the platform / dock until it arrives, then get on; the route carries on where it lands."])
     end
     -- items you put together for a quest (qx 21): "Combine A + B -> C"
     for _, id in ipairs((s.type == "complete" and (open or not dArea)) and s.quests or {}) do
       local combine = Q.Bosses and Q.Bosses.CombineText and Q.Bosses.CombineText(id)
-      if combine then lines[#lines + 1] = (dArea and "     " .. c(dim, "combine ") or c(T.HEX.gold, "  Combine: ")) .. combine end
+      if combine then lines[#lines + 1] = (dArea and "     " .. c(dim, L["combine "]) or c(T.HEX.gold, "  " .. L["Combine: "])) .. combine end
     end
     -- hand-checked tip for where you are going (ForeverDB fixes.json), e.g. "stands in the murloc hut"
     local tp = GD:Target()
@@ -1029,25 +1033,25 @@ function GD:Refresh()
       end
     end
     if dArea and not open then note = nil end
-    if note then lines[#lines + 1] = c(T.HEX.accent, "  Tip: ") .. c(dim, note) end
+    if note then lines[#lines + 1] = c(T.HEX.accent, "  " .. L["Tip: "]) .. c(dim, note) end
     -- the author's notes for this step (AuthorNotes.lua)
     for _, n in ipairs(Q.Author and Q.Author:NotesFor(s) or {}) do
-      lines[#lines + 1] = c(T.HEX.gold, "  Note: ") .. c(T.HEX.white, n)
+      lines[#lines + 1] = c(T.HEX.gold, "  " .. L["Note: "]) .. c(T.HEX.white, n)
     end
     local way = GD:OnTheWay(s)
     if #way > 0 then
       lines[#lines + 1] = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_7:12|t " ..
-        c(T.HEX.gold, "On the way: ") .. table.concat(way, ", ") .. c(dim, " (marked X)")
+        c(T.HEX.gold, L["On the way: "]) .. table.concat(way, ", ") .. c(dim, " " .. L["(marked X)"])
     end
     if s.unknown and not GD:Target() then
-      lines[#lines + 1] = c(dim, "  (no map spot for this one yet - check the quest text)")
+      lines[#lines + 1] = c(dim, "  " .. L["(no map spot for this one yet - check the quest text)"])
     end
     if s.type == "turnin" and s.quests[1] and not QS.log[s.quests[1]] then
-      lines = { c(dim, "  (not in your quest log)") }
+      lines = { c(dim, "  " .. L["(not in your quest log)"]) }
     end
     cur.obj:SetText(table.concat(lines, "\n"))
     local up = s.upgrade
-    cur.up:SetText(up and ("Upgrade: " .. itemText(up.item) .. (" +%d%%"):format(math.floor(up.pct))) or "")
+    cur.up:SetText(up and (L["Upgrade: "] .. itemText(up.item) .. (" +%d%%"):format(math.floor(up.pct))) or "")
     cur.skip:Show(); cur.map:Show()
   end
   -- layout of the current box
@@ -1146,7 +1150,7 @@ end
 
 function Q:ShowGuide()
   if Q.CollectOnly and Q.CollectOnly() then
-    Q:Print("collection mode is on - Questicus only records (/qc collectonly to guide again)")
+    Q:Print(L["collection mode is on - Questicus only records (/qc collectonly to guide again)"])
     return
   end
   if not frame then build() end

@@ -2,6 +2,7 @@
 -- Each one is followed (in the world, on the map) until you get there; then the next one, then the
 -- route again (Waypoint.lua).
 local Q = Questicus
+local L = Q.L
 local T, D = Q.T, Q.Data
 local WY = {}
 Q.Way = WY
@@ -85,15 +86,15 @@ function WY.Command(msg)
   if m == "clear" or m == "reset" then
     W.queue = {}
     if W.manual then W:NextUser() end
-    Q:Print("Your waypoints cleared - back to the route.")
+    Q:Print(L["Your waypoints cleared - back to the route."])
     return
   end
   if m == "paste" then WY.ShowPaste(); return end
   if m == "" or m == "help" then
-    Q:Print("/way [zone] x y [name] - a waypoint (zone: the open map or where you are when left out)")
-    Q:Print("/way paste - put in a list of /way lines, followed one after the other")
-    Q:Print("/way clear - drop your waypoints, back to the route")
-    Q:Print("Ctrl-click the minimap: a waypoint where you clicked")
+    Q:Print(L["/way [zone] x y [name] - a waypoint (zone: the open map or where you are when left out)"])
+    Q:Print(L["/way paste - put in a list of /way lines, followed one after the other"])
+    Q:Print(L["/way clear - drop your waypoints, back to the route"])
+    Q:Print(L["Ctrl-click the minimap: a waypoint where you clicked"])
     return
   end
   local w, err = WY.Parse(msg)
@@ -109,7 +110,7 @@ function WY.Many(text)
     local w = WY.Parse(line)
     if w then list[#list + 1] = w end
   end
-  if #list == 0 then Q:Print("No /way lines in that."); return 0 end
+  if #list == 0 then Q:Print(L["No /way lines in that."]); return 0 end
   local W = Q.Waypoint
   W.queue = {}
   for k = 2, #list do
@@ -186,7 +187,7 @@ local function onMinimapClick(_, button)
   local pt = WY.MinimapCursorPos()
   if not pt then return end
   local m, x, y = D:MapPos(pt)
-  if not m then Q:Print("Can't put a waypoint there."); return end
+  if not m then Q:Print(L["Can't put a waypoint there."]); return end
   Q.Waypoint.queue = {}
   wayTo({ m = m, x = x, y = y })
 end
@@ -198,7 +199,7 @@ end)
 Q:Command("waysound", "the waypoint's sounds: /qc waysound show|near|leave <file ID | 0 for none | blank for default>", function(rest)
   local which, id = (rest or ""):lower():match("^(%a+)%s*(%d*)")
   if not (which == "show" or which == "near" or which == "leave") then
-    Q:Print("/qc waysound show|near|leave <file ID>  - 0 mutes it, nothing puts the default back")
+    Q:Print(L["/qc waysound show|near|leave <file ID>  - 0 mutes it, nothing puts the default back"])
     return
   end
   cfg().sounds = cfg().sounds or {}

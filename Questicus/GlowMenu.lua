@@ -2,6 +2,7 @@
 -- the effect and its look (for every object or one category), categories and colours, when to hide
 -- it, detection, the interact key, the cut-out around your character, and the tracking switch.
 local Q = Questicus
+local L = Q.L
 local T = Q.T
 local G = Q.Glow
 
@@ -99,7 +100,7 @@ end
 
 local function header(parent, text)
   local h = T.Text(parent, 12, T.c.gold)
-  h:SetText(text)
+  h:SetText(L[text])
   return h
 end
 
@@ -129,14 +130,14 @@ local function swatch(parent, cat)
         cancelFunc = function() c.colors[cat] = old; show() end,
       })
     else
-      Q:Print("this client has no colour picker.")
+      Q:Print(L["this client has no colour picker."])
     end
   end)
   b:SetScript("OnEnter", function(s)
     GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
     GameTooltip:SetText(G.CAT_NAMES[cat] .. " colour", 1, 1, 1)
-    GameTooltip:AddLine("Left-click: choose a colour", 0.8, 0.8, 0.8)
-    GameTooltip:AddLine("Right-click: back to the original", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine(L["Left-click: choose a colour"], 0.8, 0.8, 0.8)
+    GameTooltip:AddLine(L["Right-click: back to the original"], 0.8, 0.8, 0.8)
     GameTooltip:Show()
   end)
   b:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -277,7 +278,7 @@ local function build()
   refreshers[#refreshers + 1] = function()
     local n = 0
     for _ in pairs(G.cfg().ignored) do n = n + 1 end
-    ignN:SetText("Ignored objects: " .. n .. "   (/qc glow ignore clear forgets them)")
+    ignN:SetText(L["Ignored objects: "] .. n .. "   (/qc glow ignore clear forgets them)")
   end
 
   -- column 2 lower: hide / detection
@@ -307,10 +308,10 @@ local function build()
   kb:SetPoint("TOPLEFT", x2 + 260, -436)
   kb:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   kb.tip = "The game's interact key: gathers, loots or uses the lit object once it's within reach (it works on NPCs too). Left-click: choose a key, right-click: remove it."
-  local function kbShow() kb.label:SetText("Interact key: " .. (G.InteractKey() or "not bound")) end
+  local function kbShow() kb.label:SetText(L["Interact key: "] .. (G.InteractKey() or "not bound")) end
   kb:SetScript("OnClick", function(s, btn)
     if btn == "RightButton" then G.SetInteractKey(nil); kbShow() return end
-    s.label:SetText("Press a key (Escape: cancel)")
+    s.label:SetText(L["Press a key (Escape: cancel)"])
     s:EnableKeyboard(true)
     s:SetScript("OnKeyDown", function(self, key)
       self:EnableKeyboard(false)
@@ -354,7 +355,7 @@ local function build()
   df:SetPoint("BOTTOMRIGHT", -14, 10)
   df.tip = "Puts the effect, look and detection settings back (click twice)."
   df:SetScript("OnClick", function(s)
-    if not s.armed then s.armed = true; s.label:SetText("Sure?"); Q.After(3, function() s.armed = false; s.label:SetText("Defaults") end) return end
+    if not s.armed then s.armed = true; s.label:SetText(L["Sure?"]); Q.After(3, function() s.armed = false; s.label:SetText(L["Defaults"]) end) return end
     local cc = G.cfg()
     local d = G.Defaults()
     for _, k in ipairs({ "effect", "size", "intensity", "offsetY", "follow", "name", "icon", "textSize", "range", "arc", "exclusive", "glowOnly" }) do cc[k] = d[k] end

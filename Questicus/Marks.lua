@@ -2,6 +2,7 @@
 -- drop your quest items), a star over NPCs with a quest for you. Drawn on nameplates (the game's
 -- real raid markers can't be set by addons in WoW Forever).
 local Q = Questicus
+local L = Q.L
 local D, QS, P = Q.Data, Q.Quests, Q.Planner
 local M = {}
 Q.Marks = M
@@ -200,7 +201,7 @@ local function mobInfo(tt, unit)
   if not db then return end
   local g = db.gold and db.gold[npc]
   if g and g[1] and g[1] > 0 then
-    tt:AddLine("Questicus: about " .. money(g[1]) .. " per kill", 0.25, 0.82, 0.79)
+    tt:AddLine(L["Questicus: about "] .. money(g[1]) .. " per kill", 0.25, 0.82, 0.79)
   end
   local sk = canSkin() and skinsOf(npc)
   if sk and #sk > 0 then
@@ -210,7 +211,7 @@ local function mobInfo(tt, unit)
       local name = Q.GetItemInfo(id) or (Q.Data.Name and Q.Data:Name("i" .. id)) or ("item " .. id)
       parts[#parts + 1] = name .. " " .. math.floor(ch / 100 + 0.5) .. "%"
     end
-    tt:AddLine("Skinning: " .. table.concat(parts, ", "), 0.85, 0.7, 0.45)
+    tt:AddLine(L["Skinning: "] .. table.concat(parts, ", "), 0.85, 0.7, 0.45)
   end
 end
 
@@ -226,7 +227,7 @@ local function tipLine(tt)
 end
 Q:Command("mobinfo", "money per kill and skinning on mob tooltips on / off", function()
   Q.db.marks.mobInfo = Q.db.marks.mobInfo == false
-  Q:Print("mob tooltips: " .. (Q.db.marks.mobInfo and "on" or "off"))
+  Q:Print(L["mob tooltips: "] .. (Q.db.marks.mobInfo and "on" or "off"))
 end)
 if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType then
   TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, tipLine)

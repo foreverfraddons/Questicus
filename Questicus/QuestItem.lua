@@ -6,6 +6,7 @@
 -- It's a secure action button: WoW doesn't let addons show, hide or change it in combat, so it is
 -- set up before the fight and stays as it was until the fight ends.
 local Q = Questicus
+local L = Q.L
 local T, D, QS, P = Q.T, Q.Data, Q.Quests, Q.Planner
 local QI = {}
 Q.QuestItem = QI
@@ -147,8 +148,8 @@ local function build()
   btn:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
     if self.item and GameTooltip.SetItemByID then pcall(GameTooltip.SetItemByID, GameTooltip, self.item) end
-    GameTooltip:AddLine("Questicus: click to use" .. (self.why and (" (" .. self.why .. ")") or ""), 0.9, 0.8, 0.5, true)
-    GameTooltip:AddLine("Shift-drag to move", 0.6, 0.6, 0.6)
+    GameTooltip:AddLine(L["Questicus: click to use"] .. (self.why and (" (" .. self.why .. ")") or ""), 0.9, 0.8, 0.5, true)
+    GameTooltip:AddLine(L["Shift-drag to move"], 0.6, 0.6, 0.6)
     GameTooltip:Show()
   end)
   btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -224,5 +225,5 @@ Q:Command("questitem", "the quest item button: /qc questitem off | on", function
   Q.db.questItem = Q.db.questItem or {}
   Q.db.questItem.off = (arg == "off")
   QI:Refresh()
-  Q:Print("quest item button " .. (Q.db.questItem.off and "off" or "on"))
+  Q:Print(L["quest item button "] .. (Q.db.questItem.off and "off" or "on"))
 end)

@@ -1,6 +1,7 @@
 -- Questicus data layer: reads the shared ForeverDB addon (LoadOnDemand) and turns its spawn data
 -- into points with world coordinates (yards, for routing) and map positions (for pins).
 local Q = Questicus
+local L = Q.L
 local D = {}
 Q.Data = D
 
@@ -17,11 +18,11 @@ function D:Load()
   if not _G.ForeverDB then pcall(loadAddon, "ForeverDB") end
   DB = _G.ForeverDB
   if not DB or not DB.quest then
-    Q:Print("ForeverDB is missing - install it (CurseForge: ForeverDB). Questicus needs it for quest data.")
+    Q:Print(L["ForeverDB is missing - install it (CurseForge: ForeverDB). Questicus needs it for quest data."])
     return false
   end
   if not (DB.qx and DB.nfac and DB.qe) then
-    Q:Print("Your ForeverDB is too old for Questicus (it has no quest details). Update ForeverDB on CurseForge.")
+    Q:Print(L["Your ForeverDB is too old for Questicus (it has no quest details). Update ForeverDB on CurseForge."])
     D.old = true
     return false
   end
@@ -419,12 +420,12 @@ Q:Command("spots", "spots you removed with Ctrl-click (/qc spots undo puts the l
     if QuesticusCollect then QuesticusCollect.removed = nil end
     wipe(pointCache)
     if Q.Planner then Q.Planner:Reset(); Q.Planner:Replan(0.2) end
-    Q:Print("all removed spots are back")
+    Q:Print(L["all removed spots are back"])
     return
   end
   local n = 0
   for k, list in pairs(r) do n = n + #list; Q:Print(("%s: %d spot(s) removed"):format(D:Name(k), #list)) end
-  if n == 0 then Q:Print("no spots removed - Ctrl-click a wrong map or minimap icon to remove it") end
+  if n == 0 then Q:Print(L["no spots removed - Ctrl-click a wrong map or minimap icon to remove it"]) end
 end)
 
 function D:Points(key)
