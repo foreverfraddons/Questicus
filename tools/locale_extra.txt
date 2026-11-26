@@ -239,3 +239,30 @@ Linked pin
 out of reach
 within reach
 unusable for now
+
+# Secrets.lua notes and tasks
+Mason Connery is chained up near the end of Alcaz Prison. Leave The Questioner (at the entrance) alive until you have his quest.
+The Questioner: kill him only after taking Mason Connery's quest - he drops the Ornate Shackle Key.
+Connery's Trunk: Moonbrook inn, upstairs (Westfall 43.4, 67.8) - click the loose floorboards by the chest.
+Secret (Cozy Sleeping Bag): the burned-out remains by the debris pile at Alexston's Farmstead.
+Secret (Cozy Sleeping Bag): the rubble of the destroyed tower south of Camp Taurajo.
+Secret (Cozy Sleeping Bag): an abandoned camp up the mountain path northeast of Sun Rock Retreat. Stepping Stones' reward lights its campfire.
+Secret (Cozy Sleeping Bag): the dirt mound at the top of the path north of the camp. Take the jumps slowly - a fall means climbing again.
+Secret (Cozy Sleeping Bag): at Stonewrought Dam, jump down from the easternmost dwarf head. Miss it and you land in the Wetlands.
+Secret (Cozy Sleeping Bag): the bag hanging on the wall inside Thoradin's Wall. From the Hillsbrad side, climb the debris of the broken cart into the wall.
+Secret (Cozy Sleeping Bag): the scroll just below the bag - it hands you the Cozy Sleeping Bag.
+Secret (Night Watchman's Torch): the dead Night Watch Guard lies at one of several spots in Duskwood and moves around - look after dark on the game clock. Accept An Unfortunate End on the body and hand it in right there.
+Secret (Dawn Waker): use the Night Watchman's Torch here to reveal the Ancient Hilt. Altairus guards it: pull him away, run until he gives up, then come back - no need to kill him.
+Secret (Dawn Waker): Ealaane wants the Ancient Skyborne Blade, small and glowing blue, at one of 48.9 72.7 / 50.4 44.3 / 66.3 43.2 / 59.9 82.2 on Zephras Isle.
+Secret (Dawn Waker): the Ancient Heirloom ring - wear it (not just carry it) for the rest of the Dawn Waker secret.
+Secret (Dawn Waker): after handing in the Clouded Water Globe, talk to Onu again and pick the extra dialog option for the Befouled Water Globe.
+Secret (Dawn Waker): after handing in Baron Aquanis' globe, talk to Je'neu again and pick the extra dialog option for the Befouled Water Globe.
+Secret (Excitable Slime): the slimes swim in the Undercity canals. Stand somewhere dry next to one, target it and /dance until it wriggles in place facing you - then it offers WRIGGLE. Buy Nutritious Slime Sludge from Boyle (by the Apothecarium) first.
+Boyle sells the Nutritious Slime Sludge for WRIGGLE. (the Excitable Slime companion).
+Secret (Prairie Chicken): target a chicken and /chicken at it until it offers CLUCK! - bring Special Chicken Feed from Farmer Saldean.
+Farmer Saldean sells the Special Chicken Feed for CLUCK! (the Prairie Chicken companion).
+Magus Tirth: /chicken at him to turn him back into a human, then /beckon - only then does he sell the Ancona Chicken.
+Secret: pick up the Ancient Heirloom (Zephras Isle, top floor of the tower) and wear it
+Dawn Waker secret: the ring has to be worn for the Highborne spirit, the switches and the vault to show up later
+Secret: /sing by the frogs (Zephras Isle) - a Musical Gustjumper joins you
+Hidden companion: use /sing next to the group of frogs; another frog appears and becomes your pet

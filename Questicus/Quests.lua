@@ -187,6 +187,58 @@ local function giverOK(key, fac)
   return not f or f == "AH" or f == fac
 end
 
+-- ------------------------------------------------------------------ professions
+-- the skill lines you know, [skillLine] = rank. nil when the game doesn't tell (then nothing is
+-- filtered by profession)
+local SKILL_IDS = { Alchemy = 171, Blacksmithing = 164, Enchanting = 333, Engineering = 202, Herbalism = 182,
+  Leatherworking = 165, Mining = 186, Skinning = 393, Tailoring = 197, Cooking = 185, ["First Aid"] = 129,
+  Fishing = 356, Jewelcrafting = 755, Inscription = 773, Lockpicking = 633 }
+local skills
+function QS.Skills()
+  if skills ~= nil then return skills or nil end
+  local out, any = {}, false
+  if GetProfessions and GetProfessionInfo then
+    local ok, a, b, c, d, e, f = pcall(GetProfessions)
+    if ok then
+      for _, i in pairs({ a, b, c, d, e, f }) do
+        local ok2, _, _, rank, _, _, _, line = pcall(GetProfessionInfo, i)
+        if ok2 and line then out[line] = rank or 1; any = true end
+      end
+    end
+  end
+  if not any and GetNumSkillLines and GetSkillLineInfo then
+    local ok, n = pcall(GetNumSkillLines)
+    for i = 1, (ok and n or 0) do
+      local ok2, name, header, _, rank = pcall(GetSkillLineInfo, i)
+      if ok2 and name and not header and SKILL_IDS[name] then out[SKILL_IDS[name]] = rank or 1; any = true end
+      if ok2 and name and not header then any = true end
+    end
+  end
+  skills = any and out or false
+  return skills or nil
+end
+-- x[14] = { skill line, rank needed } (or just the skill line)
+function QS.HasSkill(req)
+  local have = QS.Skills()
+  if not have then return true end
+  local line, rank = req, 1
+  if type(req) == "table" then line, rank = req[1], req[2] or 1 end
+  if not line then return true end
+  return (have[line] or 0) >= (rank or 1)
+end
+Q:On("SKILL_LINES_CHANGED", function()
+  local old = skills
+  skills = nil
+  local new = QS.Skills()
+  local function sig(t) local k = {} for l in pairs(t or {}) do k[#k + 1] = l end table.sort(k) return table.concat(k, ",") end
+  if old ~= nil and sig(old or nil) ~= sig(new) then
+    -- a profession learned / dropped: its quests (Camping 101 ...) come / go
+    wipe(QS.cache)
+    if QS.pool and QS.BuildPool then QS:BuildPool() end
+    if Q.Planner and Q.Planner.BuildAsync then Q.Planner:BuildAsync() end
+  end
+end)
+
 function QS:Info(id)
   local c = QS.cache[id]
   if c ~= nil then return c or nil end
@@ -204,6 +256,15 @@ function QS:Info(id)
   if races ~= 0 and not Q.HasBit(races, p.race) then return end
   if not Q.HasBit(x[2], p.classID) then return end
   local sort = x[11]
+  -- secrets / hidden collectibles: their own rules (Secrets.lua) - no category or repeatable filter,
+  -- and the level they're worth doing at instead of the database's (a "level 60" torch in Duskwood)
+  local secret = Q.Secrets and Q.Secrets.Is(id)
+  if secret then
+    info.secret = secret
+    local lv = Q.Secrets.LEVEL and Q.Secrets.LEVEL[id]
+    if lv then info.level = lv end
+    sort = (sort and sort < 0 and not CLASS_SORT[sort]) and nil or sort
+  end
   if sort and sort < 0 then
     if CLASS_SORT[sort] then
       if CLASS_SORT[sort] ~= p.class or not pr.classQuests then return end
@@ -223,7 +284,9 @@ function QS:Info(id)
     info.dungeon = sort                  -- quest of a dungeon (its area id); routing decides below
   end
   if x[14] and not pr.profQuests then return end                   -- needs a profession skill
-  if x[13] and x[13] % 2 == 1 then                                   -- repeatable
+  -- ... that you have (Camping 101 for each profession: only yours)
+  if x[14] and not QS.HasSkill(x[14]) then return end
+  if x[13] and x[13] % 2 == 1 and not secret then                    -- repeatable
     if not pr.repeatable then return end
     info.repeatable = true
   end
@@ -536,6 +599,8 @@ end
 function QS:Available(id, st)
   local info = QS:Info(id)
   if not info then return false end
+  -- secrets: what they need first (the torch before the Ancient Hilt ...)
+  if info.secret and Q.Secrets.Gate and not Q.Secrets.Gate(id, st) then return false end
   local done = st and st.done or QS.done
   local log = st and st.log or QS.log
   local level = st and st.level or Q.player.level

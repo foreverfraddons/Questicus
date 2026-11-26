@@ -19,6 +19,8 @@ Flight.lua
 Quests.lua
 Gear.lua
 Planner.lua
+Books.lua
+Collectibles.lua
 Survey.lua
 Guide.lua
 Spots.lua

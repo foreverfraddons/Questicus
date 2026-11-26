@@ -96,7 +96,8 @@ local function shortText(s)
       return (what and (what .. " - ") or "") .. title .. more
     end
     return (s.titles and s.titles[1] or "Objectives") .. ((s.titles and #s.titles > 1) and (" +" .. (#s.titles - 1)) or "")
-  elseif s.type == "buy" then return "Buy at " .. (s.npc or "vendor") end
+  elseif s.type == "buy" then return "Buy at " .. (s.npc or "vendor")
+  elseif s.type == "task" then return ((s.task and (s.task.short or s.task.text) or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")) end
   return ""
 end
 

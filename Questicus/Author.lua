@@ -52,6 +52,7 @@ function A.StepKey(s)
   if s.type == "fp" and s.node then return "fp:" .. s.node.id end
   if s.type == "fly" and s.to then return "fly:" .. s.to.id end
   if s.type == "buy" then return "buy:" .. (s.item or 0) end
+  if s.type == "task" and s.key then return s.key end
   return s.type .. ":" .. ((s.quests and s.quests[1]) or s.item or 0)
 end
 -- every note key a step can carry (a bundle of quests: one per quest)

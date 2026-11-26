@@ -697,6 +697,7 @@ local function newState()
     bought = {},
     fp = {},
     explored = {},
+    tasks = {},                         -- route tasks done in the simulation (books, secrets, pets ...)
     blocked = Q.char.blocked or {},
     lastKey = Q.char.lastDone,          -- the last thing you really did (for the author's route rules)
   }
@@ -790,6 +791,8 @@ local optedOut
 function P.OptedOut(id) return optedOut(id) end
 function optedOut(id)
   if P.dset and P.dset[id] then return false end
+  -- library books and their rewards: Books.lua routes them (pick up, bank, hand in)
+  if Q.Books and Q.Books.Handles(id) then return true end
   if Q.char.forced and Q.char.forced[id] then return false end
   if P.ZoneOff(id) then return true end
   if P.Excluded(id) then return true end
@@ -1067,19 +1070,72 @@ do
   end)
 end
 -- areas worth a detour from here (the zone you're in and the zones the route is in)
+-- (completionist: every area of the zone you're finishing, however far - the zone is done before
+-- you leave it, so nothing is left to walk back for)
 local function exploreNear(st)
   local map = P.MapOf(st.pos)
   local out = {}
   if not map then return out end
+  local whole = P.zoneFocus and map == P.zoneFocus
   for _, a in ipairs(P.ExploreTargets(map)) do
-    if not st.explored[a.key] and D.Dist(st.pos, a.point) < 600 then out[#out + 1] = a end
+    if not st.explored[a.key] and (whole or D.Dist(st.pos, a.point) < 600) then out[#out + 1] = a end
+  end
+  if P.zoneFocus and map ~= P.zoneFocus then
+    for _, a in ipairs(P.ExploreTargets(P.zoneFocus)) do
+      if not st.explored[a.key] and a.point.i == (st.pos and st.pos.i) then out[#out + 1] = a end
+    end
   end
   return out
 end
+P.ExploreNear = exploreNear
+
+-- completionist: unexplored areas the walk from a to b goes through (or nearly: a short bend through
+-- the area costs less than coming back for it later). Returns the ones to take in walking order.
+local PASS_NEAR = 45                   -- yards: walking this close to an area's middle uncovers it
+function P.ExploreOnTheWay(st, a, b)
+  if not (a and b and a.i == b.i) or Q.prefs.style ~= "complete" or P.dset or Q.char.noExplore then return nil end
+  local d = D.Dist(a, b)
+  if d < 30 then return nil end
+  local seen, out = {}, {}
+  for _, m in ipairs({ P.MapOf(a), P.MapOf(b) }) do
+    if m and not seen[m] then
+      seen[m] = true
+      for _, ar in ipairs(P.ExploreTargets(m)) do
+        if not st.explored[ar.key] and ar.point.i == a.i then
+          local p = ar.point
+          local extra = D.Dist(a, p) + D.Dist(p, b) - d
+          -- how far along the walk (0-1) and how far off it
+          local dx, dy = b.x - a.x, b.y - a.y
+          local u = ((p.x - a.x) * dx + (p.y - a.y) * dy) / (d * d)
+          if u > 0 and u < 1 then
+            local off = math.abs((p.x - a.x) * dy - (p.y - a.y) * dx) / d
+            if off <= PASS_NEAR then
+              out[#out + 1] = { area = ar, u = u, pass = true }
+            elseif extra <= math.max(40, d * 0.12) then
+              out[#out + 1] = { area = ar, u = u, extra = extra }
+            end
+          end
+        end
+      end
+    end
+  end
+  table.sort(out, function(x, y) return x.u < y.u end)
+  return #out > 0 and out or nil
+end
+
+-- ------------------------------------------------------------------ route tasks
+-- Things to do on the way that aren't quests: library books to pick up, bank and hand in, secrets'
+-- items to loot, companions to buy ... Each provider is called with (st, level, add, travel) and calls
+-- add(task, point, seconds, value) for what it has to offer; task = { key, text, short, why = {..},
+-- icon, quests = {..}, apply = function(st) }. Books.lua, Secrets.lua and Collectibles.lua add them.
+P.TaskProviders = P.TaskProviders or {}
+function P.AddTasks(fn) P.TaskProviders[#P.TaskProviders + 1] = fn end
+P.travel = function(a, b, lv) return travel(a, b, lv) end
 
 P.prefer, P.later = {}, {}
 function P.ActionKey(a)
   if a.type == "explore" then return "explore:" .. a.area.key end
+  if a.type == "task" then return "task:" .. a.task.key end
   if a.type == "fp" then return "fp:" .. a.node.id end
   if a.type == "prep" then return "prep:" .. a.prep.key end
   return a.type .. ":" .. (a.id or a.item or 0)
@@ -1316,6 +1372,18 @@ local function bestAction(st, cands)
         end
       end
     end
+    -- route tasks (books, secrets, companions): not in dungeon mode
+    if not P.dset and #P.TaskProviders > 0 then
+      local function add(task, point, t, value)
+        if not (task and task.key and point and t and value and value > 0) then return end
+        if st.tasks[task.key] or P.later["task" .. task.key] or (Q.char.noTask and Q.char.noTask[task.key]) then return end
+        offer({ type = "task", task = task, point = point, t = t }, value / (t + 5))
+      end
+      for _, prov in ipairs(P.TaskProviders) do
+        local ok, err = pcall(prov, st, lv, add, travel)
+        if not ok and P.trace then P.trace[#P.trace + 1] = { err = err } end
+      end
+    end
     for _, n in ipairs(Q.Flight:Unknown(st.pos, P.dset and 600 or 350)) do
       if not st.fp[n.id] then
         local t = travel(st.pos, n, lv) + 8
@@ -1380,6 +1448,9 @@ local function apply(st, a)
     st.fp[a.node.id] = true
   elseif a.type == "explore" then
     st.explored[a.area.key] = true
+  elseif a.type == "task" then
+    st.tasks[a.task.key] = true
+    if a.task.apply then a.task.apply(st) end
   elseif a.type == "prep" then
     st.prep = st.prep or {}
     st.prep[a.prep.key] = true
@@ -1485,6 +1556,7 @@ local function short(a)
   if a.type == "buy" then return L("buy %s", D:Name("i" .. (a.item or 0))) end
   if a.type == "fp" then return L("get the flight path at %s", a.node.name) end
   if a.type == "explore" then return "explore " .. a.area.name end
+  if a.type == "task" then return a.task.short or a.task.text end
   if a.type == "prep" then return a.prep.text end
   return a.type
 end
@@ -1534,7 +1606,10 @@ local function reasons(a, alt, st)
   elseif a.type == "buy" then
     why[#why + 1] = L("%d%% better than what you wear, on the way", math.floor(a.pct or 0))
   elseif a.type == "explore" then
-    why[#why + 1] = L["Completionist: an area of the map you haven't explored yet - exploration XP and the zone's Explorer achievement"]
+    why[#why + 1] = a.onTheWay and L["Completionist: right on your way to the next step - uncovering it now saves walking back for it"]
+      or L["Completionist: an area of the map you haven't explored yet - exploration XP and the zone's Explorer achievement"]
+  elseif a.type == "task" then
+    for _, w in ipairs(a.task.why or {}) do why[#why + 1] = w end
   elseif a.type == "fp" then
     why[#why + 1] = L["A flight path you don't have yet, a few seconds away - later routes can fly from here"]
   end
@@ -1559,6 +1634,14 @@ local function makeStep(a, st, alt)
   if a.type == "prep" then
     s.key, s.prep, s.quests = "prep:" .. a.prep.key, a.prep, { a.prep.quest }
     s.why = { a.prep.why }
+  end
+  if a.type == "task" then
+    s.key, s.task, s.quests = "task:" .. a.task.key, a.task, a.task.quests or {}
+  end
+  -- areas the walk to this step uncovers by itself (completionist)
+  if a.passes then
+    s.passes = a.passes
+    s.why[#s.why + 1] = L("On the way you uncover %s", table.concat(a.passes, ", "))
   end
   if a.type == "accept" and a.item then s.point = nil end
   if a.type == "accept" or a.type == "turnin" then
@@ -1882,6 +1965,26 @@ function P:Build()
         t = leg.t, key = "fly:" .. leg.to.id, npc = leg.from.name,
         why = { L("Flying saves about %s over running (%s instead of %s)", mins(leg.walk - leg.t), mins(leg.t), mins(leg.walk)) } }
     end
+    -- completionist: areas of the map this walk goes through or right past. The ones a short bend
+    -- reaches become steps of their own first; the ones you walk through anyway are marked explored
+    -- (the step says so) - the whole zone gets uncovered on the way instead of by walking back
+    local ways = a.point and a.type ~= "explore" and P.ExploreOnTheWay(st, st.pos, a.point)
+    local work = ways and a.t and math.max(0, a.t - travel(st.pos, a.point, st.level))
+    if ways then
+      for _, w in ipairs(ways) do
+        if w.pass then
+          st.explored[w.area.key] = true
+          a.passes = a.passes or {}
+          a.passes[#a.passes + 1] = w.area.name
+        elseif #steps < P.MAX_STEPS - 1 then
+          local ex = { type = "explore", area = w.area, point = w.area.point, onTheWay = true,
+            t = travel(st.pos, w.area.point, st.level) + 3 }
+          steps[#steps + 1] = makeStep(ex, st, nil)
+          apply(st, ex)
+        end
+      end
+      if work then a.t = travel(st.pos, a.point, st.level) + work end
+    end
     steps[#steps + 1] = makeStep(a, st, alt)
     for k = #steps, 1, -1 do if steps[k].counted then break end; elapsed = elapsed + (steps[k].t or 0); steps[k].counted = true end
     apply(st, a)
@@ -1889,7 +1992,11 @@ function P:Build()
       cands = effCut(candidates(st), st)       -- new quests unlocked / new level window
       lastLevel = st.level
     else
-      for i = #cands, 1, -1 do if st.log[cands[i]] then table.remove(cands, i) end end
+      for i = #cands, 1, -1 do
+        local id = cands[i]
+        -- (a secret with several versions: taking one rules out the others)
+        if st.log[id] or (Q.Secrets and Q.Secrets.QUESTS[id] and not Q.Secrets.Gate(id, st)) then table.remove(cands, i) end
+      end
     end
   end
   -- the step that just dropped off the top was done: keep it (the guide shows it, for notes)
@@ -1917,7 +2024,7 @@ function P:LogFirst(steps)
   local real = s
   if s and (s.type == "fly" or s.type == "hearth") then real = steps[2] or s end
   local key = s and (s.type == "fly" and ("fly:" .. s.to.id) or s.key) or nil
-  P.stickKey = real and ((real.type == "fp" or real.type == "explore") and real.key or (real.type .. ":" .. ((real.quests and real.quests[1]) or real.item or 0))) or nil
+  P.stickKey = real and ((real.type == "fp" or real.type == "explore" or real.type == "task") and real.key or (real.type .. ":" .. ((real.quests and real.quests[1]) or real.item or 0))) or nil
   if key == P.lastFirst then return end
   P.lastFirst = key
   if not (s and Q.char) then return end
@@ -2070,6 +2177,7 @@ end)
 Q:Command("plan", "rebuild the route now", function() P:Build(); Q:Print(#(P.steps or {}) .. " steps planned") end)
 Q:Command("unskip", "bring back every quest you skipped", function()
   wipe(Q.char.skipped)
+  Q.char.noTask = nil
   QS:BuildPool()
   P:Build()
   Q:Print(L["skipped quests are back in the route"])

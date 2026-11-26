@@ -64,7 +64,12 @@ function D:NPC(id) return DB.npc[id] end                      -- {name, sub, min
 function D:Object(id) return DB.obj[id] end
 function D:Item(id) return DB.item[id] end                    -- {name, quality, reqLevel}
 function D:Faction(npcID) return DB.nfac and DB.nfac[npcID] end
-function D:Note(key) return key and DB.note and DB.note[(key:gsub(":", ""))] end   -- hand-written tip
+-- hand-written tip (in your language when the language pack has it)
+function D:Note(key)
+  local n = key and DB.note and DB.note[(key:gsub(":", ""))]
+  if type(n) == "string" and Q.L then return Q.L[n] end
+  return n
+end
 function D:Vendors(item) return DB.vend and DB.vend[item] end
 
 -- ------------------------------------------------------------------ the client's language

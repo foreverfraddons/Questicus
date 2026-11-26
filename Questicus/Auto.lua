@@ -26,6 +26,8 @@ local function wanted(id)
   if not id or id == 0 then return false end
   if Q.char.skipped[id] then return false end
   if QS:Info(id) == nil then return false end
+  -- library books: the one you carry, the reward you've earned
+  if Q.Books and Q.Books.Handles(id) then return Q.Books.AutoWanted(id) end
   if Q.char.forced and Q.char.forced[id] then return true end   -- you added it yourself
   -- left out by your settings (dungeon quests off, elites with solo only, escort / PvP off ...)
   local P = Q.Planner

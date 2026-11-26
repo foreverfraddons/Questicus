@@ -61,6 +61,7 @@ local function stepIcon(s)
   end
   if s.type == "boat" then return ICON[s.kind or "boat"] or ICON.boat end
   if s.type == "prep" then return ICON.kill end
+  if s.type == "task" then return (s.task and (s.task.tex or ICON[s.task.icon or "loot"])) or ICON.loot end
   return ICON[s.type] or ICON.accept
 end
 
@@ -83,6 +84,8 @@ function GD.StepText(s, short)
     return L("Explore %s", c(gold, s.area and s.area.name or L["this area"]))
   elseif s.type == "prep" then
     return c(gold, L["Before the dungeon: "]) .. (s.prep and L[s.prep.text or ""] or "")
+  elseif s.type == "task" then
+    return (s.task and s.task.text) or ""
   elseif s.type == "boat" then
     local what = ({ boat = L["boat"], zeppelin = L["zeppelin"], tram = L["tram"] })[s.kind or "boat"] or L[s.kind or "boat"]
     local to = c(gold, s.toName and L[s.toName] or L["the other continent"])
@@ -451,6 +454,15 @@ local function menuItems(index)
     add(L["Remove from route"], L["Never send me to this flight master"], function()
       Q.char.noFP = Q.char.noFP or {}
       Q.char.noFP[s.node.id] = true
+      GD.focus = 1; P:Build()
+    end)
+  elseif s.type == "task" and s.task then
+    add(L["Skip for now"], L["Leave this for later"], function()
+      P.later["task" .. s.task.key] = true; GD.focus = 1; P:Build()
+    end)
+    add(L["Remove from route"], L["Don't suggest this again (/qc unskip brings it back)"], function()
+      Q.char.noTask = Q.char.noTask or {}
+      Q.char.noTask[s.task.key] = true
       GD.focus = 1; P:Build()
     end)
   elseif s.type == "buy" then

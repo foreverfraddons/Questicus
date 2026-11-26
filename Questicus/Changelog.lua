@@ -6,7 +6,17 @@
 -- update goes out once "next" holds 10 lines (release.yml, MIN_CHANGES).
 local Q = Questicus
 Q.Changelog = {
-  { v = "next" },
+  { v = "next",
+    added = {
+      "Completionist routes now pick up WoW Forever's library books zone by zone, put them in the bank when you pass one while the librarian is far away, take them out again near your librarian and hand them in when a reward is due or you're there anyway.",
+      "Completionist routes include more secrets: the Cozy Sleeping Bag chain, the Night Watchman's Torch, the start of Dawn Waker (Ancient Hilt, Eluvi'ana, Ancient Heirloom) and the hidden Excitable Slime, Prairie Chicken and Musical Gustjumper companions - each at a level that suits it, with tips for every step.",
+      "Completionist routes buy the vendor companions you don't have yet when the route passes their seller.",
+    },
+    changed = {
+      "Completionist routes uncover the whole zone along the way: walking through an area counts, a short bend picks up areas next to your path, and the rest of the zone is explored before you leave it - no walking back.",
+      "Profession quests (like Camping 101) only show up for the professions you have.",
+    },
+  },
   { v = "0.9.035",
     changed = {
       "The language packs now come with Questicus itself - nothing to download separately, and only the language you pick is loaded.",
