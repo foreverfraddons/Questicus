@@ -11,6 +11,7 @@ Q.Changelog = {
       "Questicus in your language: German, French, Spanish (Spain and Mexico), Italian, Portuguese (Brazil), Russian, Korean and Chinese (simplified and traditional). Each language is a small language pack on the Questicus files page on CurseForge - install the one for your language next to Questicus.",
       "Options > Language: every language with whether its pack is installed, a drop-down to pick one (Automatic follows the game's language), and a link to the files page.",
       "The first-time setup now starts with the language choice.",
+      "What's new is shown in your language too, from this version on.",
     },
   },
   { v = "0.9.033" },
