@@ -443,9 +443,9 @@ function R:ShowHistory(area)
     for _ in pairs(r.kills or {}) do kills = kills + 1 end
     local when = date and date("%b %d %H:%M", r.start) or tostring(r.start)
     row.top:SetText(("%s  %s"):format(Q.Color(T.HEX.gold, r.name), Q.Color(T.HEX.dim, when)))
-    row.sub:SetText(L("%s%s   %s   %s XP   %d/%d bosses   %d item%s", 
+    row.sub:SetText(L("%s%s   %s   %s XP   %d/%d bosses   loot: %d",
       r.done and "" or Q.Color(T.HEX.dim, L["unfinished "]), R.Clock(r.done or ((r.ended or now()) - r.start)), R.Money(r.money), r.xp or 0,
-      kills, r.bosses or 0, #(r.loot or {}), #(r.loot or {}) == 1 and "" or "s"))
+      kills, r.bosses or 0, #(r.loot or {})))
     row:ClearAllPoints(); row:SetPoint("TOPLEFT", 0, -y); row:SetPoint("RIGHT", 0, 0); row:Show()
     y = y + 34
   end
