@@ -7,3 +7,4 @@
 ## X-Questicus-Language: esES
 
 esES.lua
+news.lua

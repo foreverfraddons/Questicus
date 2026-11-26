@@ -7,3 +7,4 @@
 ## X-Questicus-Language: zhCN
 
 zhCN.lua
+news.lua

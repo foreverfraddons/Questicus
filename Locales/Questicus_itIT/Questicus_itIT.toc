@@ -7,3 +7,4 @@
 ## X-Questicus-Language: itIT
 
 itIT.lua
+news.lua

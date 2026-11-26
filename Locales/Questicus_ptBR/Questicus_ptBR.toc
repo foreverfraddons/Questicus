@@ -7,3 +7,4 @@
 ## X-Questicus-Language: ptBR
 
 ptBR.lua
+news.lua

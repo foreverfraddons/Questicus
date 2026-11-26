@@ -68,6 +68,8 @@ jobs:
           bad=0
           while IFS= read -r -d '' f; do luac5.1 -p "$f" || bad=1; done < <(find Questicus Locales -name '*.lua' -print0)
           python3 tools/locales.py check || echo "(some language pack phrases are missing - they show in English)"
+          # What's new is shown in each player's language: the coming release's lines must be translated in every pack
+          python3 tools/locales.py release || bad=1
           exit $bad
 
       - name: Bump version and tag

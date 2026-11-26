@@ -7,3 +7,4 @@
 ## X-Questicus-Language: koKR
 
 koKR.lua
+news.lua

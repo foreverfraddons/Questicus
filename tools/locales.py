@@ -138,7 +138,7 @@ def main():
     elif cmd == "check":
         bad = 0
         for code in ([sys.argv[2]] if len(sys.argv) > 2 else CODES):
-            p = load_pack(code)
+            p = load_pack(code, code + ".lua")
             if p is None: print(f"{code}: no pack"); bad += 1; continue
             miss = [s for s in k if s not in p]
             extra = [s for s in p if s not in k]

@@ -7,3 +7,4 @@
 ## X-Questicus-Language: zhTW
 
 zhTW.lua
+news.lua

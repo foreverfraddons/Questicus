@@ -7,3 +7,4 @@
 ## X-Questicus-Language: esMX
 
 esMX.lua
+news.lua
