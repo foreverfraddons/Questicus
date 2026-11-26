@@ -6,7 +6,8 @@
 -- update goes out once "next" holds 10 lines (release.yml, MIN_CHANGES).
 local Q = Questicus
 Q.Changelog = {
-  { v = "next",
+  { v = "next" },
+  { v = "0.9.035",
     changed = {
       "The language packs now come with Questicus itself - nothing to download separately, and only the language you pick is loaded.",
     },
