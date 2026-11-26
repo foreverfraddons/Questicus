@@ -2,6 +2,7 @@
 QuesticusLocales = QuesticusLocales or {}
 local t = QuesticusLocales.ruRU or {}
 QuesticusLocales.ruRU = t
+t["The language packs now come with Questicus itself - nothing to download separately, and only the language you pick is loaded."] = "Языковые пакеты теперь входят в сам Questicus — ничего не нужно скачивать отдельно, и загружается только выбранный язык."
 t["Questicus in your language: German, French, Spanish (Spain and Mexico), Italian, Portuguese (Brazil), Russian, Korean and Chinese (simplified and traditional). Each language is a small language pack on the Questicus files page on CurseForge - install the one for your language next to Questicus."] = "Questicus на вашем языке: немецкий, французский, испанский (Испания и Мексика), итальянский, португальский (Бразилия), русский, корейский и китайский (упрощенный и традиционный). Каждый язык — это небольшой языковой пакет на странице файлов Questicus на CurseForge: установите пакет своего языка рядом с Questicus."
 t["Options > Language: every language with whether its pack is installed, a drop-down to pick one (Automatic follows the game's language), and a link to the files page."] = "Настройки > Язык: все языки с отметкой, установлен ли пакет, выпадающий список для выбора (Автоматически — язык игры) и ссылка на страницу файлов."
 t["The first-time setup now starts with the language choice."] = "Первая настройка теперь начинается с выбора языка."

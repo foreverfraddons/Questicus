@@ -3,6 +3,8 @@
 ## Notes: Questicus 繁體中文
 ## Author: Fatedfr
 ## IconTexture: Interface\AddOns\Questicus\Media\icon
+## Dependencies: Questicus
+## LoadOnDemand: 1
 ## Version: @project-version@
 ## X-Questicus-Language: zhTW
 

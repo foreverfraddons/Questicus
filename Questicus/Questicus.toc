@@ -6,7 +6,7 @@
 ## IconTexture: Interface\AddOns\Questicus\Media\icon
 ## SavedVariables: QuesticusDB, QuesticusCollect, QuesticusAuthor, QuesticusMapDB
 ## SavedVariablesPerCharacter: QuesticusChar, QuesticusMapCharDB
-## OptionalDeps: Questicus_deDE, Questicus_frFR, Questicus_esES, Questicus_esMX, Questicus_itIT, Questicus_ptBR, Questicus_ruRU, Questicus_koKR, Questicus_zhCN, Questicus_zhTW, ForeverDB, CommandCenter, OpenMap, Questie, Leatrix_Maps, BetterMaps, HighFidelityWorldMap, HiddenMaps, Mapster, Magnify
+## OptionalDeps: ForeverDB, CommandCenter, OpenMap, Questie, Leatrix_Maps, BetterMaps, HighFidelityWorldMap, HiddenMaps, Mapster, Magnify
 ## X-License: Questicus: all rights Fatedfr; WorldMap\ (Questicus Maps) is built from OpenMap (MIT, Ji and the OpenMap contributors, WorldMap\LICENSE.txt); map art is Blizzard's
 ## X-Requires: ForeverDB (loaded on demand)
 

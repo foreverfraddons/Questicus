@@ -47,7 +47,7 @@ end
 -- ------------------------------------------------------------------ pages
 -- the language (first page): one needs its language pack, a separate download
 local function pageLanguage(p)
-  header(p, L["Language"], L["Pick the language Questicus speaks. English is built in; every other language is a small language pack you download separately."])
+  header(p, L["Language"], L["Pick the language Questicus speaks. English is built in; every other language is a small language pack that comes with Questicus and only loads when you pick it."])
   local items = {}
   local opts = { { code = "auto" } }
   for _, l in ipairs(Q.LANGS) do opts[#opts + 1] = l end
@@ -74,7 +74,7 @@ local function pageLanguage(p)
     end, o.code ~= "auto" and not usable(o.code) and (Q.LangPack(o.code) == "off"
       and "Its language pack is installed but turned off in the AddOns list."
       or (not Q.LangFontOK(o.code) and "Needs the game itself in this language (its letters come with the game's font).")
-      or "Needs its language pack: download it from the Questicus files page.") or nil)
+      or "Its language pack is missing - reinstall Questicus (the packs come with it).") or nil)
     b:SetPoint("TOPLEFT", 24 + ((i - 1) % 2) * 300, -84 - math.floor((i - 1) / 2) * 26)
     b:SetWidth(290)
     if not usable(o.code) then b.label:SetTextColor(0.45, 0.45, 0.45) end
@@ -83,11 +83,8 @@ local function pageLanguage(p)
   local note = T.Text(p, 11, T.c.dim)
   note:SetPoint("TOPLEFT", 24, -84 - math.ceil(#opts / 2) * 26 - 8)
   note:SetWidth(W - 48)
-  note:SetText(L["Greyed out: that language's pack isn't installed. Language packs are on the Questicus files page on CurseForge, next to each Questicus download - install the one for your language, then pick it here. Spot a translation that needs correcting? Leave a comment on the Questicus page or contact me."])
-  local link = T.Button(p, L["Questicus files page"], 170, 24)
-  link:SetPoint("TOPLEFT", note, "BOTTOMLEFT", 0, -10)
-  link:SetScript("OnClick", function() Q.CopyBox(L["Questicus files page"], Q.LANG_URL) end)
-  reload:SetPoint("LEFT", link, "RIGHT", 8, 0)
+  note:SetText(L["Greyed out: that language's pack is turned off in the AddOns list or missing - turn it on there, or reinstall Questicus. Spot a translation that needs correcting? Leave a comment on the Questicus page or contact me."])
+  reload:SetPoint("TOPLEFT", note, "BOTTOMLEFT", 0, -10)
   p.Refresh = refresh
 end
 

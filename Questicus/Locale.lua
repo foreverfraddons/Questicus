@@ -1,7 +1,8 @@
 -- Questicus: languages.
--- Questicus is written in English. Every other language the game comes in is a separate language pack
--- (an addon of its own: Questicus_deDE, Questicus_frFR, ...), downloaded from the Questicus files page
--- on CurseForge. A pack loads before Questicus (OptionalDeps in Questicus.toc) and puts its phrases in
+-- Questicus is written in English. Every other language the game comes in is a language pack that
+-- ships with Questicus (an addon of its own: Questicus_deDE, Questicus_frFR, ... - CurseForge allows no
+-- separate downloads per version). The packs are load-on-demand: only the language in use is loaded
+-- (at ADDON_LOADED, once the saved choice is known). A pack puts its phrases in
 -- QuesticusLocales[code] = { ["English phrase"] = "translation", ... }.
 --
 -- In the code: local L = Q.L, then L["Skip"] for a phrase, L("%d quests done", n) for one with values
@@ -26,8 +27,6 @@ Q.LANGS = {
   { code = "zhCN", name = "简体中文" },
   { code = "zhTW", name = "繁體中文" },
 }
--- where the language packs are (the Questicus files page: each release carries them as extra files)
-Q.LANG_URL = "https://www.curseforge.com/wow/addons/questicus/files"
 -- languages whose letters need the game's own font for that language (only there on a client in it)
 local CJK = { koKR = true, zhCN = true, zhTW = true }
 
@@ -40,16 +39,28 @@ local function gameLang()
 end
 Q.GameLang = gameLang
 
--- the language pack for code: "loaded", "off" (installed but turned off in the AddOns list), "missing"
+-- the language pack for code: "loaded" (loaded, or installed and ready to load), "off" (turned off in
+-- the AddOns list), "missing"
 function Q.LangPack(code)
   if code == "enUS" then return "loaded" end
   if QuesticusLocales[code] then return "loaded" end
   local info = C_AddOns and C_AddOns.GetAddOnInfo or GetAddOnInfo
   if info then
     local ok, name, _, _, loadable, reason = pcall(info, "Questicus_" .. code)
-    if ok and name and reason ~= "MISSING" then return "off" end
+    if not ok or not name or reason == "MISSING" then return "missing" end
+    if reason == "DISABLED" then return "off" end
+    return "loaded"
   end
   return "missing"
+end
+
+-- load a language's pack (it's load-on-demand) - true when its phrases are there
+local function loadPack(code)
+  if code == "enUS" or QuesticusLocales[code] then return true end
+  if Q.LangPack(code) ~= "loaded" then return false end
+  local load = C_AddOns and C_AddOns.LoadAddOn or LoadAddOn
+  if load then pcall(load, "Questicus_" .. code) end
+  return QuesticusLocales[code] ~= nil
 end
 
 -- can this client show the language's letters?
@@ -60,9 +71,10 @@ end
 
 -- the language in use
 local current, phrases = "enUS", nil
+local ready = false     -- packs are only loaded once the saved choice is known (ADDON_LOADED)
 local function pick(choice)
   local want = (choice == nil or choice == "auto") and gameLang() or choice
-  if want ~= "enUS" and QuesticusLocales[want] and Q.LangFontOK(want) then return want end
+  if want ~= "enUS" and Q.LangFontOK(want) and (QuesticusLocales[want] or (ready and loadPack(want))) then return want end
   return "enUS"
 end
 function Q.SetLanguage(choice)
@@ -95,6 +107,7 @@ Q:On("ADDON_LOADED", function(name)
   if name ~= Q.name then return end
   QuesticusDB = QuesticusDB or {}
   QuesticusDB.lang = QuesticusDB.lang or "auto"
+  ready = true
   Q.SetLanguage(QuesticusDB.lang)
   if Q.T then Q.T.FONT = Q.LangFont(Q.T.FONT) end
 end)

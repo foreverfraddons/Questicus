@@ -6,7 +6,11 @@
 -- update goes out once "next" holds 10 lines (release.yml, MIN_CHANGES).
 local Q = Questicus
 Q.Changelog = {
-  { v = "next" },
+  { v = "next",
+    changed = {
+      "The language packs now come with Questicus itself - nothing to download separately, and only the language you pick is loaded.",
+    },
+  },
   { v = "0.9.034",
     added = {
       "Questicus in your language: German, French, Spanish (Spain and Mexico), Italian, Portuguese (Brazil), Russian, Korean and Chinese (simplified and traditional). Each language is a small language pack on the Questicus files page on CurseForge - install the one for your language next to Questicus.",

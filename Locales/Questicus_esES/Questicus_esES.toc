@@ -3,6 +3,8 @@
 ## Notes: Questicus en español (España)
 ## Author: Fatedfr
 ## IconTexture: Interface\AddOns\Questicus\Media\icon
+## Dependencies: Questicus
+## LoadOnDemand: 1
 ## Version: @project-version@
 ## X-Questicus-Language: esES
 

@@ -2,6 +2,7 @@
 QuesticusLocales = QuesticusLocales or {}
 local t = QuesticusLocales.zhTW or {}
 QuesticusLocales.zhTW = t
+t["The language packs now come with Questicus itself - nothing to download separately, and only the language you pick is loaded."] = "語言包現在直接隨 Questicus 一起提供 - 不需另外下載，而且只載入你選擇的語言。"
 t["Questicus in your language: German, French, Spanish (Spain and Mexico), Italian, Portuguese (Brazil), Russian, Korean and Chinese (simplified and traditional). Each language is a small language pack on the Questicus files page on CurseForge - install the one for your language next to Questicus."] = "Questicus 支援你的語言了：德語、法語、西班牙語（西班牙和墨西哥）、義大利語、葡萄牙語（巴西）、俄語、韓語和中文（簡體和繁體）。每種語言都是 CurseForge 上 Questicus 檔案頁面中的一個小型語言包 - 在 Questicus 旁邊安裝你的語言包即可。"
 t["Options > Language: every language with whether its pack is installed, a drop-down to pick one (Automatic follows the game's language), and a link to the files page."] = "選項 > 語言：列出每種語言及其語言包是否已安裝，一個用來選擇語言的下拉選單（自動 = 跟隨遊戲語言），以及檔案頁面的連結。"
 t["The first-time setup now starts with the language choice."] = "首次設定現在從選擇語言開始。"

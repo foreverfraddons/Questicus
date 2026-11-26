@@ -123,8 +123,8 @@ jobs:
           git tag -f "${{ steps.ver.outputs.tag }}"
           git ls-files Questicus/Media/Textures | wc -l
 
-      # The BigWigsMods packager (v2), run as a script so the CurseForge answer (the new file's id) is
-      # kept: the language packs are uploaded as additional files of that file.
+      # The BigWigsMods packager (v2). The language packs (Locales/) go into the same zip as addons of
+      # their own (.pkgmeta move-folders): CurseForge refuses additional files on WoW projects.
       - name: Package and upload (CurseForge + GitHub release)
         if: steps.check.outputs.go == 'true'
         env:
@@ -136,38 +136,3 @@ jobs:
           sed -i '0,/rm -f "\$resultfile" 2>\/dev\/null/s//cp -f "$resultfile" "$releasedir\/cf_main.json" 2>\/dev\/null; &/' /tmp/release.sh
           grep -q 'cf_main.json' /tmp/release.sh || { echo "packager changed - can't keep the CurseForge file id"; exit 1; }
           bash /tmp/release.sh ${{ vars.CF_PROJECT_ID != '' && format('-p {0}', vars.CF_PROJECT_ID) || '' }}
-
-      # Language packs (Locales/Questicus_<code>): separate small addons, uploaded to the Questicus files
-      # page as additional files of this release, and attached to the GitHub release.
-      - name: Language packs
-        if: steps.check.outputs.go == 'true'
-        env:
-          CF_API_KEY: ${{ secrets.CF_API_KEY }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VER="${{ steps.ver.outputs.version }}"
-          mkdir -p .release/packs
-          for d in Locales/Questicus_*/; do
-            name=$(basename "$d")
-            rm -rf "/tmp/packs/$name"; mkdir -p /tmp/packs
-            cp -r "$d" "/tmp/packs/$name"
-            sed -i "s/@project-version@/$VER/" "/tmp/packs/$name/$name.toc"
-            (cd /tmp/packs && zip -qr "$GITHUB_WORKSPACE/.release/packs/$name-$VER.zip" "$name")
-          done
-          ls -la .release/packs
-          gh release upload "${{ steps.ver.outputs.tag }}" .release/packs/*.zip --clobber || echo "(no GitHub release to attach the packs to)"
-          if [ -z "${{ vars.CF_PROJECT_ID }}" ] || [ -z "$CF_API_KEY" ]; then echo "No CurseForge project - packs not uploaded there."; exit 0; fi
-          PARENT=$(jq -r '.id // empty' .release/cf_main.json 2>/dev/null)
-          if [ -z "$PARENT" ]; then echo "No CurseForge file id from the main upload - packs not uploaded."; cat .release/cf_main.json 2>/dev/null; exit 1; fi
-          echo "Main file: $PARENT"
-          for z in .release/packs/*.zip; do
-            name=$(basename "$z" .zip); name=${name%-$VER}
-            title=$(grep -m1 '^## Title:' "Locales/$name/$name.toc" | sed 's/## Title: *//')
-            meta=$(jq -n --argjson p "$PARENT" --arg n "$title $VER" --arg t "$RELEASE_TYPE" \
-              --arg c "Language pack for Questicus $VER. Install it next to Questicus, then pick the language in Questicus options > Language." \
-              '{parentFileID: $p, displayName: $n, releaseType: $t, changelog: $c, changelogType: "markdown"}')
-            code=$(curl -sS --retry 3 --retry-delay 10 -o /tmp/cf_pack.json -w "%{http_code}" -H "x-api-token: $CF_API_KEY" \
-              --form-string "metadata=$meta" -F "file=@$z" "https://wow.curseforge.com/api/projects/${{ vars.CF_PROJECT_ID }}/upload-file")
-            echo "$name: $code $(cat /tmp/cf_pack.json)"
-            [ "$code" = "200" ] || exit 1
-          done

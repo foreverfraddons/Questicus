@@ -377,7 +377,7 @@ local function build()
   buttons(p, { { "Highlight settings", 150, function() frame:Hide(); Q.Glow.ShowSettings(true) end, "Effects, colours, what lights up and when (also /qc glow)." } })
 
   -- Language: every language the game comes in; a language needs its pack (a separate download)
-  p = page("Language", "The language Questicus uses. English is built in; every other language is a small language pack you download separately.")
+  p = page("Language", "The language Questicus uses. English is built in; every other language is a small language pack that comes with Questicus and only loads when you pick it.")
   do
     local pick = T.Button(p, "", 230, 24)
     pick:SetPoint("TOPLEFT", 8, p.y)
@@ -439,7 +439,7 @@ local function build()
             GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
             GameTooltip:SetText(Q.LangPack(btn.code) == "off" and L["Its language pack is installed but turned off in the AddOns list."]
               or (not Q.LangFontOK(btn.code) and L["Needs the game itself in this language (its letters come with the game's font)."])
-              or L["Needs its language pack: download it from the Questicus files page."], 1, 1, 1, 1, true)
+              or L["Its language pack is missing - reinstall Questicus (the packs come with it)."], 1, 1, 1, 1, true)
             GameTooltip:Show()
           end)
           b:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -482,12 +482,9 @@ local function build()
     note:SetPoint("TOPLEFT", 8, p.y)
     note:SetWidth(440)
     note:SetJustifyH("LEFT")
-    note:SetText(L["A greyed-out language needs its language pack. Language packs are on the Questicus files page on CurseForge, next to each Questicus download: install the pack for your language, then pick it here. Spot a translation that needs correcting? Leave a comment on the Questicus page or contact me."])
+    note:SetText(L["Every language comes with Questicus: each is a small language pack in your AddOns list (Questicus - Deutsch, Questicus - Français, ...) that only loads when you pick it. A greyed-out language's pack is turned off in the AddOns list or missing - turn it on, or reinstall Questicus. Spot a translation that needs correcting? Leave a comment on the Questicus page or contact me."])
     p.y = p.y - 64
-    local link = T.Button(p, L["Questicus files page"], 170, 24)
-    link:SetPoint("TOPLEFT", 8, p.y)
-    link:SetScript("OnClick", function() Q.CopyBox(L["Questicus files page"], Q.LANG_URL) end)
-    reload:SetPoint("LEFT", link, "RIGHT", 8, 0)
+    reload:SetPoint("TOPLEFT", 8, p.y)
     reload.tip = L["A new language takes effect after a reload."]
     p.y = p.y - 32
     refresh[#refresh + 1] = refreshLang

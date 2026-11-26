@@ -2,6 +2,18 @@ package-as: Questicus
 
 move-folders:
   Questicus/Questicus: Questicus
+  # the language packs: addons of their own in the same download (load-on-demand; CurseForge allows no
+  # extra files per version)
+  Questicus/Locales/Questicus_deDE: Questicus_deDE
+  Questicus/Locales/Questicus_frFR: Questicus_frFR
+  Questicus/Locales/Questicus_esES: Questicus_esES
+  Questicus/Locales/Questicus_esMX: Questicus_esMX
+  Questicus/Locales/Questicus_itIT: Questicus_itIT
+  Questicus/Locales/Questicus_ptBR: Questicus_ptBR
+  Questicus/Locales/Questicus_ruRU: Questicus_ruRU
+  Questicus/Locales/Questicus_koKR: Questicus_koKR
+  Questicus/Locales/Questicus_zhCN: Questicus_zhCN
+  Questicus/Locales/Questicus_zhTW: Questicus_zhTW
 
 # The quest database ships as its own CurseForge project (ForeverDB). The map art (Questicus Maps,
 # from OpenMap) is copied into Questicus/Media/Textures by the release workflow before packaging.
@@ -14,7 +26,6 @@ required-dependencies:
   - forever-db
 
 ignore:
-  - Locales
   - tools
   - upstream.json
   - README.md
