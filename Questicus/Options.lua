@@ -173,6 +173,9 @@ local function build()
   check(p, "Shade the area objectives can be in", function() return db.pins.areas ~= false end,
     function(v) db.pins.areas = v; Q.Pins:RefreshWorld() end)
   check(p, "Rares and notable drops", function() return pr().collectibles end, function(v) pr().collectibles = v; Q.Pins:RefreshWorld() end)
+  check(p, "Collectibles tracker", function() return pr().collectTracker end, function(v) pr().collectTracker = v or nil end,
+    "Your companions, mounts, toys, secrets and library books: what you have, where the rest come from, and a click puts one on your route. Tells you in chat when you get a new one. (/qc collectibles)")
+  buttons(p, { { "Open the collectibles tracker", 220, function() if Q.Collectibles then Q.Collectibles:Show() end end } })
   size(p, "Icon size", function() return db.pins.size end, function(v) db.pins.size = v; Q.Pins:RefreshWorld() end)
   group(p, "Minimap")
   check(p, "Show the route on the minimap", function() return db.pins.minimap end, function(v) db.pins.minimap = v end)

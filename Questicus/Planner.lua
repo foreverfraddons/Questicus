@@ -1021,15 +1021,17 @@ function P.ExploreTargets(map)
     local got = exploredKeys(map)
     for _, e in ipairs(zone) do
       if e.kind == "explore" and e.key and e.x and not got[e.key] and not (Q.char.explored and Q.char.explored[map .. ":" .. e.key]) then
-        local done
+        local done, cname
         if e.achievement and e.criteria and GetAchievementCriteriaInfoByID then
-          local ok, _, _, c = pcall(GetAchievementCriteriaInfoByID, e.achievement, e.criteria)
+          local ok, cs, _, c = pcall(GetAchievementCriteriaInfoByID, e.achievement, e.criteria)
           done = ok and c == true
+          -- (the area's name as the game writes it, in the client's language)
+          if ok and not D.ENGLISH and type(cs) == "string" and cs ~= "" and not Q.Secret(cs) then cname = cs end
         end
         if not done then
           local i, x, y = D:WorldPos(map, e.x, e.y)
           if i then
-            out[#out + 1] = { key = map .. ":" .. e.key, name = names[e.key] or L["an unexplored area"], map = map,
+            out[#out + 1] = { key = map .. ":" .. e.key, name = cname or names[e.key] or L["an unexplored area"], map = map,
               point = { i = i, x = x, y = y, m = map, mx = e.x, my = e.y } }
           end
         end

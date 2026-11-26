@@ -97,6 +97,33 @@ function D.LearnName(kind, id, name)
   if name == UNKNOWNOBJECT or name == UNKNOWN then return end
   l[kind][id] = name
 end
+-- ForeverDB's own translations (the ForeverDB_Locales folder, loaded on first use and only on a client
+-- in another language; it keeps just the game's language): loc.npc / obj / item / quest / qtext / taxi /
+-- uimap / area / faction ... What the game itself shows (recorded names, the quest log, tooltips) still
+-- comes first.
+local locDB
+function D.LocDB()
+  if D.ENGLISH then return nil end
+  if locDB ~= nil then return locDB or nil end
+  locDB = false
+  if not _G.ForeverDBLocale then pcall(loadAddon, "ForeverDB_Locales") end
+  local F = _G.ForeverDBLocale
+  local all = F and F.loc
+  if all then
+    local fb = (F.meta and F.meta.locFallback) or { esMX = "esES", ptPT = "ptBR" }
+    locDB = all[LOCALE] or all[fb[LOCALE] or ""] or false
+  end
+  return locDB or nil
+end
+-- a translated text from ForeverDB: D:LocText("npc", 123), ("taxi", nodeID), ("qtext", quest) ...
+function D:LocText(tbl, id)
+  local l = D.LocDB()
+  local t = l and l[tbl]
+  local v = t and t[id]
+  if type(v) == "string" then return str(v) end
+  return v
+end
+
 local tipTried = {}
 -- the name in the client's language (nil on an English client, or not known yet)
 function D:LocalName(key)
@@ -107,9 +134,11 @@ function D:LocalName(key)
   if kind == "i" then
     local n = C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(id)
     if not str(n) and GetItemInfo then n = GetItemInfo(id) end
-    return str(n)
+    return str(n) or D:LocText("item", id)
   elseif kind == "c" then
     if l and l.c[id] then return l.c[id] end
+    local dn = D:LocText("npc", id)
+    if dn then return dn end
     -- the creature's tooltip has its name in the client's language (asked once per session)
     if not tipTried[id] and C_TooltipInfo and C_TooltipInfo.GetHyperlink then
       tipTried[id] = true
@@ -119,11 +148,13 @@ function D:LocalName(key)
       if n then D.LearnName("c", id, n); return n end
     end
   elseif kind == "o" then
-    return l and l.o[id]
+    return (l and l.o[id]) or D:LocText("obj", id)
   elseif kind == "q" then
     if l and l.q[id] then return l.q[id] end
     local n = C_QuestLog and C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(id)
     if str(n) then D.LearnName("q", id, n); return n end
+    local dn = D:LocText("quest", id)
+    if dn then return dn end
     if C_QuestLog and C_QuestLog.RequestLoadQuestByID then pcall(C_QuestLog.RequestLoadQuestByID, id) end
   end
   return nil
@@ -131,6 +162,22 @@ end
 Q:On("QUEST_DATA_LOAD_RESULT", function(id, ok)
   if ok and id and not D.ENGLISH then D:LocalName("q" .. id) end
 end)
+
+-- an NPC's title (<Banker>, <Librarian> ...) in the client's language
+function D:LocalSub(id)
+  return D:LocText("npcsub", id) or (DB.npc[id] and DB.npc[id][2])
+end
+-- a quest's objective text (the quest window's "Objectives") in the client's language, or English
+function D:QuestObjectives(id)
+  local t = D:LocText("qtext", id)
+  if type(t) == "table" and str(t.o) then return t.o end
+  local e = DB.qtext and DB.qtext[id]
+  return e and str(e.o) or nil
+end
+-- a flight master's place / a faction / a map in the client's language (nil: use the English one)
+function D:LocalTaxi(id) return D:LocText("taxi", id) end
+function D:LocalFaction(id) return D:LocText("faction", id) end
+function D:LocalMap(uiMap) return D:LocText("uimap", uiMap) end
 
 -- the English name from ForeverDB (for matching against the database's own text)
 function D:EName(key)

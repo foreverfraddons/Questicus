@@ -11,10 +11,12 @@ Q.Changelog = {
       "Completionist routes now pick up WoW Forever's library books zone by zone, put them in the bank when you pass one while the librarian is far away, take them out again near your librarian and hand them in when a reward is due or you're there anyway.",
       "Completionist routes include more secrets: the Cozy Sleeping Bag chain, the Night Watchman's Torch, the start of Dawn Waker (Ancient Hilt, Eluvi'ana, Ancient Heirloom) and the hidden Excitable Slime, Prairie Chicken and Musical Gustjumper companions - each at a level that suits it, with tips for every step.",
       "Completionist routes buy the vendor companions you don't have yet when the route passes their seller.",
+      "Collectibles tracker (optional, Options > Map & minimap or /qc collectibles): your companions, mounts, toys, secrets and library books, where each one you're missing comes from, and a click to put it on your route - its quest, its vendor or the mob that drops it. Tells you in chat when you get a new one.",
     },
     changed = {
       "Completionist routes uncover the whole zone along the way: walking through an area counts, a short bend picks up areas next to your path, and the rest of the zone is explored before you leave it - no walking back.",
       "Profession quests (like Camping 101) only show up for the professions you have.",
+      "On a game in another language, names of NPCs, objects, items, quests and flight paths come from ForeverDB's translations when the game hasn't shown them yet, and explored areas use the game's own names.",
     },
   },
   { v = "0.9.035",

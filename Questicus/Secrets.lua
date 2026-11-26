@@ -64,6 +64,12 @@ function S.Owned(it)
       if ok2 and n and n > 0 then return true end
     end
   end
+  -- a companion / mount item teaches a spell: known = owned
+  local spell = C_Item and C_Item.GetItemSpell and select(2, pcall(C_Item.GetItemSpell, it))
+  local sid = spell and select(3, pcall(C_Item.GetItemSpell, it))
+  if type(sid) == "number" then
+    if (IsSpellKnown and IsSpellKnown(sid)) or (IsPlayerSpell and IsPlayerSpell(sid)) then return true end
+  end
   return Q.char and Q.char.secretGot and Q.char.secretGot[it] == true or false
 end
 

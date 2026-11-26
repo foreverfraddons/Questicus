@@ -25,10 +25,13 @@ local function load()
     if low:find("^zz") or low:find("test") or low:find("programmer") or low:find("%[dnt%]") then return end
     local n = byId[id]
     if not n then
-      n = { id = id, name = name, i = inst, x = x, y = y, key = "taxi" .. id }
+      -- (the place in the client's language from ForeverDB; the English name still finds it)
+      local shown = (not D.ENGLISH and D.LocalTaxi and D:LocalTaxi(id)) or name
+      n = { id = id, name = shown, ename = name, i = inst, x = x, y = y, key = "taxi" .. id }
       byId[id] = n
       nodes[#nodes + 1] = n
       byName[name:lower()] = n
+      byName[shown:lower()] = byName[shown:lower()] or n
       local short = name:match("^(.-),") -- "Crossroads, The Barrens" -> "crossroads"
       if short then byName[short:lower()] = byName[short:lower()] or n end
     end
