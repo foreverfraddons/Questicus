@@ -138,14 +138,14 @@ local STEPS = {
       for _, b in ipairs(L.CategoryView.CategoryButtons or {}) do
         if b.categoryID == want.cat then return b, "category " .. tostring(want.cat) end
       end
-      return nil, "category " .. tostring(want.cat) .. " not found"
+      return nil, "category " .. tostring(want.cat) .. L[" not found"]
     end },
   { "Exp", function()           -- the dungeon's group, if folded
       local gid = want.group
       if not gid or gid == 0 then return nil, "no group" end
       local f, node = rowFor(function(d) return d.activityGroupID == gid and d.activityID == nil end)
       if f and node.IsCollapsed and node:IsCollapsed() then return f.ExpandOrCollapseButton, "unfold group" end
-      return nil, f and "group open" or "group row not shown"
+      return nil, f and L["group open"] or L["group row not shown"]
     end },
   { "Act", function()           -- tick the dungeon
       local f = rowFor(function(d) return d.activityID == want.id end)
@@ -161,7 +161,7 @@ for _, r in ipairs({ "tank", "healer", "dps" }) do
     if not rb then return nil, "no role boxes (in a group?)" end
     local cb = rb.CheckButton
     local on = want.role == r
-    if not cb:IsEnabled() then return nil, r .. " not allowed" end
+    if not cb:IsEnabled() then return nil, r .. L[" not allowed"] end
     if (cb:GetChecked() and true or false) ~= on then return cb, (on and "tick " or "untick ") .. r end
     return nil, r .. " ok"
   end }
@@ -202,9 +202,9 @@ local function report(dname)
     LF.diag.listed = listed() and true or false
     Q.db.lfgDiag = LF.diag
     if LF.diag.listed then
-      Q:Print(("Listed for %s as %s. Players can now find you in the group finder."):format(dname, ROLES[want.role] or want.role))
+      Q:Print(L("Listed for %s as %s. Players can now find you in the group finder.", dname, ROLES[want.role] or want.role))
     else
-      Q:Print(("Not listed yet for %s - press your role again (the first press opens the group finder). /qc lfg why shows each step."):format(dname))
+      Q:Print(L("Not listed yet for %s - press your role again (the first press opens the group finder). /qc lfg why shows each step.", dname))
     end
   end)
 end
@@ -256,7 +256,7 @@ local function rolePrompt(act, dname)
   local ai = C_LFGList.GetActivityInfoTable and C_LFGList.GetActivityInfoTable(act.id)
   want.id, want.cat, want.name = act.id, act.cat or (ai and ai.categoryID), dname or act.name
   want.group = ai and (ai.groupFinderActivityGroupID or ai.activityGroupID)
-  pick.text:SetText(("List yourself for %s as:"):format(Q.Color(T.HEX.gold, act.name)) ..
+  pick.text:SetText(L("List yourself for %s as:", Q.Color(T.HEX.gold, act.name)) ..
     "\n" .. Q.Color(T.HEX.dim, L["The group finder opens; press again if it isn't listed yet."]))
   local pre = LF.cfg().role
   for role, b in pairs(pick.btns) do
@@ -283,7 +283,7 @@ function LF:Find(area, name)
   end
   local act = LF.Activity(dname or "")
   if not act then
-    Q:Print(("%s isn't in the group finder's list."):format(dname or "This dungeon"))
+    Q:Print(L("%s isn't in the group finder's list.", dname or L["This dungeon"]))
     return
   end
   rolePrompt(act, dname)
@@ -316,7 +316,7 @@ function LF.Overlay(btn)
     C_Timer.After(0.4, function()
       if not finderShown() then
         local m = microBtn()
-        Q:Print(("The group finder didn't open (button %s, key-down %s)."):format(tostring(m and m:GetName()),
+        Q:Print(L("The group finder didn't open (button %s, key-down %s).", tostring(m and m:GetName()),
           tostring(GetCVarBool and GetCVarBool("ActionButtonUseKeyDown"))))
       end
     end)

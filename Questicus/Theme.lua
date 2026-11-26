@@ -121,8 +121,21 @@ function T.SetBorderColor(f, r, g, b, a)
   for _, l in ipairs(f.__border or {}) do l:SetVertexColor(r, g, b, a or 1) end
 end
 
+-- Text on Questicus' own labels goes through the language pack: a label set to an English phrase
+-- (or lines of them) shows the translation. Text put together from pieces is translated by the caller.
+local function tr(s)
+  local L = Q.L
+  if type(s) ~= "string" or not L or s == "" then return s end
+  local t = L[s]
+  if t ~= s or not s:find("\n", 1, true) then return t end
+  return (s:gsub("[^\n]+", function(line) return L[line] end))
+end
+T.Translate = tr
+local function trSetText(self, s, ...) return self.__SetText(self, tr(s), ...) end
+
 function T.Text(parent, size, color, flags)
   local fs = parent:CreateFontString(nil, "OVERLAY")
+  if not fs.__SetText then fs.__SetText = fs.SetText; fs.SetText = trSetText end
   fs:SetFont(T.FONT, size or 12, flags or "")
   fs:SetTextColor(rgba(color or T.c.text))
   fs:SetJustifyH("LEFT")

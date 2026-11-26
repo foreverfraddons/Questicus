@@ -5,6 +5,7 @@
 --    spots cost more in the pathing next time (QuesticusCollect.avoid[continent][cell] = count)
 -- Ground only: flights, taxis, swimming detours across water are left out; deaths cancel the walk.
 local Q = Questicus
+local L = Q.L
 local D = Q.Data
 local PL = {}
 Q.Paths = PL
@@ -69,35 +70,35 @@ local function start(target)
 end
 
 local function finish()
-  local L = leg
+  local lg = leg
   leg = nil
-  if not L or L.walked < MIN_LEG then return end
+  if not lg or lg.walked < MIN_LEG then return end
   local c = store()
   if not c then return end
   -- detour factor for the zone
-  local ratio = math.max(1, math.min(3, L.walked / L.straight))
-  if L.map then
-    local e = c.pathk[L.map] or { r = 0, n = 0 }
+  local ratio = math.max(1, math.min(3, lg.walked / lg.straight))
+  if lg.map then
+    local e = c.pathk[lg.map] or { r = 0, n = 0 }
     e.r, e.n = e.r + ratio, e.n + 1
     if e.n > 40 then e.r, e.n = e.r * 0.5, e.n * 0.5 end      -- recent walks count most
-    c.pathk[L.map] = e
+    c.pathk[lg.map] = e
   end
   -- the line went where you couldn't: spots on it far from everything you walked
   if ratio < DETOUR then return end
-  local av = c.avoid[L.from.i] or {}
-  c.avoid[L.from.i] = av
+  local av = c.avoid[lg.from.i] or {}
+  c.avoid[lg.from.i] = av
   local marked = 0
   -- a walk much longer than the line is strong evidence (a mountain range, a zone wall): one such walk
   -- is enough for the next route to go round
   local inc = ratio >= 2 and 3 or (ratio >= 1.5 and 2 or 1)
-  for k = 1, #L.line - 1 do
-    local a, b = L.line[k], L.line[k + 1]
+  for k = 1, #lg.line - 1 do
+    local a, b = lg.line[k], lg.line[k + 1]
     local segLen = D.Dist(a, b)
     local n = math.max(1, math.floor(segLen / CELL))
     for j = 1, n - 1 do
       local px, py = a.x + (b.x - a.x) * j / n, a.y + (b.y - a.y) * j / n
       local near = false
-      for _, w in ipairs(L.trail) do
+      for _, w in ipairs(lg.trail) do
         local dx, dy = w.x - px, w.y - py
         if dx * dx + dy * dy <= OFF_LINE * OFF_LINE then near = true; break end
       end
@@ -109,9 +110,9 @@ local function finish()
     end
   end
   if marked > 0 and Q.Nav and Q.Nav.Forget then Q.Nav:Forget() end
-  PL.lastLeg = { ratio = ratio, marked = marked, map = L.map, walked = L.walked, straight = L.straight, at = now() }
+  PL.lastLeg = { ratio = ratio, marked = marked, map = lg.map, walked = lg.walked, straight = lg.straight, at = now() }
   if marked > 0 then
-    Q:Print(("learned from that walk: %.1fx longer than the line, %d spots to go round next time"):format(ratio, marked))
+    Q:Print(L("learned from that walk: %.1fx longer than the line, %d spots to go round next time", ratio, marked))
   end
 end
 
@@ -166,15 +167,15 @@ Q:Command("paths", "what Questicus learned about walking vs the route line", fun
   for _, t in pairs(c.avoid or {}) do for _ in pairs(t) do cells = cells + 1 end end
   local here = D:PlayerPos()
   local map = here and D:MapPos(here)
-  Q:Print(("learned from %d walks; %d spots where the line didn't work; walking here takes x%.2f the straight line")
+  Q:Print((L["learned from %d walks; %d spots where the line didn't work; walking here takes x%.2f the straight line"])
     :format(math.floor(n), cells, PL.Factor(map)))
-  local L = PL.lastLeg
-  if L then
-    Q:Print(("last walk learned %d s ago: %d yd walked for %d yd of line (x%.1f), %d spots marked")
-      :format(math.floor(now() - (L.at or now())), math.floor(L.walked or 0), math.floor(L.straight or 0), L.ratio or 1, L.marked or 0))
+  local lg = PL.lastLeg
+  if lg then
+    Q:Print((L["last walk learned %d s ago: %d yd walked for %d yd of line (x%.1f), %d spots marked"])
+      :format(math.floor(now() - (lg.at or now())), math.floor(lg.walked or 0), math.floor(lg.straight or 0), lg.ratio or 1, lg.marked or 0))
   end
   if leg then
-    Q:Print(("walk in progress: %d yd so far, %d yd from the target%s"):format(math.floor(leg.walked),
+    Q:Print(L("walk in progress: %d yd so far, %d yd from the target%s", math.floor(leg.walked),
       math.floor(D.Dist(D:PlayerPos() or leg.last, leg.target)), leg.away and " (paused: not on the map)" or ""))
   end
 end)

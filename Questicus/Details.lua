@@ -18,13 +18,13 @@ function DT.Time(sec)
   if not sec or sec <= 0 then return "-" end
   sec = math.floor(sec + 0.5)
   if sec < 60 then return sec .. " s" end
-  if sec < 3600 then return ("%d min %02d s"):format(math.floor(sec / 60), sec % 60) end
-  return ("%d h %02d min"):format(math.floor(sec / 3600), math.floor(sec % 3600 / 60))
+  if sec < 3600 then return L("%d min %02d s", math.floor(sec / 60), sec % 60) end
+  return L("%d h %02d min", math.floor(sec / 3600), math.floor(sec % 3600 / 60))
 end
 local function short(sec)
   if not sec then return nil end
-  if sec < 3600 then return ("%d min"):format(math.max(1, math.floor(sec / 60 + 0.5))) end
-  return ("%d h %d min"):format(math.floor(sec / 3600), math.floor(sec % 3600 / 60))
+  if sec < 3600 then return L("%d min", math.max(1, math.floor(sec / 60 + 0.5))) end
+  return L("%d h %d min", math.floor(sec / 3600), math.floor(sec % 3600 / 60))
 end
 function DT.Money(copper)
   copper = math.floor(copper or 0)
@@ -46,7 +46,7 @@ local function itemLine(id)
     local ok, g1, p1 = pcall(G.Upgrade, G, id)
     if ok then gain, pct = g1, p1 end
   end
-  local tag = (gain and gain > 0 and pct) and c(T.HEX.good, (" upgrade +%d%%"):format(math.floor(pct))) or ""
+  local tag = (gain and gain > 0 and pct) and c(T.HEX.good, L(" upgrade +%d%%", math.floor(pct))) or ""
   return "|T" .. icon .. ":14|t " .. txt .. tag
 end
 local function factionName(id)
@@ -141,7 +141,7 @@ function DT:TooltipLines(tt, s)
   if s.t and s.t > 0 then tt:AddLine(L["Estimated time: "] .. DT.Time(s.t), 0.9, 0.85, 0.7) end
   if s.why and s.why[1] then tt:AddLine(L["Why: "] .. s.why[1], 0.75, 0.7, 0.6, true) end
   if s.xp then
-    tt:AddLine(("Reward: %s XP%s%s"):format(s.xp, s.realXP and "" or " (estimate)",
+    tt:AddLine(L("Reward: %s XP%s%s", s.xp, s.realXP and "" or " (estimate)",
       (s.money and s.money > 0) and ("  -  " .. DT.Money(s.money)) or ""), 0.9, 0.85, 0.7)
   end
 end
@@ -158,9 +158,9 @@ local function build()
   frame.text:SetSpacing(3)
   frame:SetScript("OnHide", function() shownIndex = nil; if frame.menu then frame.menu:Hide() end end)
   -- "not for me": turn the gear down with a reason, Questicus learns from it
-  frame.deny = T.Button(frame, "Not for me...", 110, 20)
+  frame.deny = T.Button(frame, L["Not for me..."], 110, 20)
   frame.deny:SetPoint("BOTTOMLEFT", 10, 8)
-  frame.deny.tip = "Turn this item down and tell Questicus why"
+  frame.deny.tip = L["Turn this item down and tell Questicus why"]
   frame.deny:Hide()
   local menu = CreateFrame("Frame", nil, frame)
   menu:SetSize(250, 4 + #G.DENY_REASONS * 24)
@@ -174,7 +174,7 @@ local function build()
     b:SetScript("OnClick", function()
       if DT.gearItem then
         G:Deny(DT.gearItem, r[1])
-        Q:Print(("%s turned down: %s"):format(Q.GetItemInfo(DT.gearItem) or ("item " .. DT.gearItem), r[2]))
+        Q:Print(L("%s turned down: %s", Q.GetItemInfo(DT.gearItem) or ("item " .. DT.gearItem), r[2]))
       end
       menu:Hide()
       DT:Refresh()
@@ -205,7 +205,7 @@ local function lines(s)
   local id = s.quests and s.quests[1]
   local info = id and QS:Info(id)
   if info then
-    add(c(dim, ("Quest level %d  -  needs level %d%s%s"):format(info.level, info.min,
+    add(c(dim, L("Quest level %d  -  needs level %d%s%s", info.level, info.min,
       info.elite and "  -  elite" or "", info.dungeon and "  -  dungeon" or "")))
   end
   -- why this step (and why it beats the next best one)
@@ -217,7 +217,7 @@ local function lines(s)
   if s.drops then
     for _, d in ipairs(s.drops) do
       local qi = QS:Info(d.quest)
-      add(c(good, L["  Loot "] .. D:Name("i" .. (d.item or 0)) .. " here - it starts " .. (qi and qi.title or d.quest)))
+      add(c(good, L["  Loot "] .. D:Name("i" .. (d.item or 0)) .. L[" here - it starts "] .. (qi and qi.title or d.quest)))
     end
   end
   -- where
@@ -227,7 +227,7 @@ local function lines(s)
     local m = D:MapPos(tgt)
     local zone = m and C_Map and C_Map.GetMapInfo and C_Map.GetMapInfo(m)
     local dist = here and D.Dist(here, tgt)
-    add(("Where: %s%s%s"):format(tgt.key and D:Name(tgt.key) or "here",
+    add(L("Where: %s%s%s", tgt.key and D:Name(tgt.key) or "here",
       zone and ("  -  " .. zone.name) or "",
       (dist and dist < D.FAR) and ("  -  %d yd"):format(math.floor(dist)) or ""))
     local note = D:Note(tgt.key)
@@ -244,10 +244,10 @@ local function lines(s)
         for _, o in ipairs(e.objectives) do add((o.finished and c(dim, "  - " .. o.text) or ("  - " .. (o.text or "")))) end
       else
         for _, l in ipairs(m.lines) do
-          local verb = ({ kill = "Kill ", loot = "Get ", use = "Use ", explore = "", buy = "Buy " })[l.kind] or ""
+          local verb = ({ kill = L["Kill "], loot = L["Get "], use = L["Use "], explore = "", buy = L["Buy "] })[l.kind] or ""
           local n = 0
           if l.kind == "loot" then for _ in ipairs(D:ItemSources(tonumber(l.key:sub(2)))) do n = n + 1 end end
-          add("  - " .. verb .. l.name .. (n > 1 and c(dim, (" (%d mobs drop it)"):format(n)) or ""))
+          add("  - " .. verb .. l.name .. (n > 1 and c(dim, L(" (%d mobs drop it)", n)) or ""))
         end
       end
     end
@@ -261,11 +261,11 @@ local function lines(s)
     add("  Gold: " .. DT.Money(QS.RewardMoney(id)))
     local r = QS.Rewards(id)
     if r and r[3] then
-      add("  Choose one:")
+      add(L["  Choose one:"])
       for _, it in ipairs(r[3]) do add("    " .. itemLine(it)) end
     end
     if r and r[4] then
-      add("  You also get:")
+      add(L["  You also get:"])
       for _, it in ipairs(r[4]) do add("    " .. itemLine(it)) end
     end
     if not (r and (r[3] or r[4])) and D.rewards and D.rewards[id] then
@@ -273,7 +273,7 @@ local function lines(s)
     end
     local rep = info and info.x and info.x[15]
     if rep then
-      for i = 1, #rep - 1, 2 do add(("  Reputation: %s %+d"):format(factionName(rep[i]), rep[i + 1])) end
+      for i = 1, #rep - 1, 2 do add(L("  Reputation: %s %+d", factionName(rep[i]), rep[i + 1])) end
     end
   end
   -- the gear Questicus wants you to get here, and why
@@ -304,19 +304,19 @@ local function lines(s)
       add(" ")
       add(c(gold, L["Done together"]))
       add("  With " .. table.concat(names, ", "))
-      if total > 0 then add(("  The whole group took about %s"):format(DT.Time(total))) end
+      if total > 0 then add(L("  The whole group took about %s", DT.Time(total))) end
     end
   end
   -- time
   add(" ")
   add(c(gold, L["Time"]))
-  if s.t and s.t > 0 then add("  This step: about " .. DT.Time(s.t)) end
+  if s.t and s.t > 0 then add(L["  This step: about "] .. DT.Time(s.t)) end
   local m = id and P.Meta(id)
   if m and m.effort then
     local work, learned = P.WorkTime(id, m, Q.player.level)
-    add("  Whole quest: about " .. DT.Time(P.Effort(m)) .. c(dim, learned and " (work time learned from real runs)" or ""))
+    add(L["  Whole quest: about "] .. DT.Time(P.Effort(m)) .. c(dim, learned and L[" (work time learned from real runs)"] or ""))
     if not learned and Q.Learn then
-      add(c(dim, ("  Kills: ~%d s each + %d s between pulls (%s)"):format(math.floor(Q.Learn:TTK(0) + 0.5),
+      add(c(dim, L("  Kills: ~%d s each + %d s between pulls (%s)", math.floor(Q.Learn:TTK(0) + 0.5),
         math.floor(Q.Learn:Gap() + 0.5), (Q.char.learn and Q.char.learn.ttkAll and Q.char.learn.ttkAll.n or 0) >= 5 and "learned" or "estimate")))
     end
   end
@@ -336,7 +336,7 @@ local function lines(s)
         local t = D:Quest(q)
         add("  After: " .. (t and t[1] or q) .. (QS.done[q] and c(good, L["  done"]) or c(bad, L["  not done"])))
       end
-      if x[7] then local t = D:Quest(x[7]); add("  Leads to: " .. (t and t[1] or x[7])) end
+      if x[7] then local t = D:Quest(x[7]); add(L["  Leads to: "] .. (t and t[1] or x[7])) end
     end
   end
   -- history (this character)
@@ -345,10 +345,10 @@ local function lines(s)
     add(" ")
     add(c(gold, L["When you did it"]))
     local okXP = h.estXP and h.xp and math.abs(h.estXP - h.xp) <= math.max(5, h.xp * 0.05)
-    add(("  Took %s%s"):format(DT.Time(h.secs), h.estSecs and c(dim, L[" (planned "] .. DT.Time(h.estSecs) .. ")") or ""))
-    add(("  Got %d XP %s"):format(h.xp or 0, h.estXP and (okXP and c(good, L["as planned"]) or
-      c(bad, ("(planned %d)"):format(h.estXP))) or ""))
-    add(("  Got %s %s"):format(DT.Money(h.money), (h.estMoney and h.estMoney > 0) and
+    add(L("  Took %s%s", DT.Time(h.secs), h.estSecs and c(dim, L[" (planned "] .. DT.Time(h.estSecs) .. ")") or ""))
+    add(L("  Got %d XP %s", h.xp or 0, h.estXP and (okXP and c(good, L["as planned"]) or
+      c(bad, L("(planned %d)", h.estXP))) or ""))
+    add(L("  Got %s %s", DT.Money(h.money), (h.estMoney and h.estMoney > 0) and
       ((math.abs((h.money or 0) - h.estMoney) <= 1) and c(good, L["as planned"]) or c(bad, L["(planned "] .. DT.Money(h.estMoney) .. ")")) or ""))
     for _, it in ipairs(h.items or {}) do add("    " .. itemLine(it)) end
   elseif h and h.acc then
@@ -362,7 +362,7 @@ function DT:Refresh()
   if not frame or not frame:IsShown() then return end
   local s = P.steps and P.steps[shownIndex or 1]
   if not s then frame:Hide(); return end
-  frame.title:SetText(("Step %d of your route"):format(shownIndex or 1))
+  frame.title:SetText(L("Step %d of your route", shownIndex or 1))
   frame.text:SetText(table.concat(lines(s), "\n"))
   frame.deny:SetShown(DT.gearItem ~= nil)
   frame:SetHeight(math.max(160, (frame.text:GetStringHeight() or 300) + 50 + (DT.gearItem and 26 or 0)))
@@ -386,7 +386,7 @@ Q:Command("history", "quests you turned in on this character: time, XP and gold 
   for id, h in pairs(hist()) do
     if h.done then
       n = n + 1
-      Q:Print(("%s: %s, %d XP (planned %s), %s"):format(h.title or id, DT.Time(h.secs), h.xp or 0,
+      Q:Print(L("%s: %s, %d XP (planned %s), %s", h.title or id, DT.Time(h.secs), h.xp or 0,
         tostring(h.estXP or "?"), DT.Money(h.money)))
     end
   end

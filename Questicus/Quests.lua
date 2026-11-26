@@ -1,6 +1,7 @@
 -- Questicus quest state: which quests this character can do, what is in the log, what is done,
 -- and rough XP numbers for planning.
 local Q = Questicus
+local L = Q.L
 local QS = {}
 Q.Quests = QS
 local D = Q.Data
@@ -195,7 +196,7 @@ function QS:Info(id)
   local x = D:QuestExtra(id) or {}
   local p, pr = Q.player, Q.prefs
   -- title: in the client's language when known (the quest log, the game's quest cache); etitle: English
-  local info = { id = id, title = (not D.ENGLISH and D:LocalName("q" .. id)) or q[1] or ("Quest " .. id),
+  local info = { id = id, title = (not D.ENGLISH and D:LocalName("q" .. id)) or q[1] or (L["Quest "] .. id),
     etitle = q[1], level = q[2] or q[3] or 1, min = q[3] or 1, x = x }
   -- race / class
   local races = QS.RACE_FIX[id]
@@ -311,13 +312,13 @@ end
 function QS:QuestTip(id, giverName, footer, iconsOnly)   -- iconsOnly: rewards as icons (the tracker)
   local info = QS:Info(id)
   local q = D:Quest(id)
-  local title = (info and info.title) or (q and q[1]) or ("Quest " .. id)
+  local title = (info and info.title) or (q and q[1]) or (L["Quest "] .. id)
   local lv = (info and info.level) or (q and q[2]) or 0
   local lines = { ("%s  [%d]"):format(title, lv) }
   local xp = QS.RewardXP(id, Q.player.level)
   local m = QS.RewardMoney(id)
   lines[#lines + 1] = ("%d XP%s"):format(xp or 0, (m and m > 0) and ("   " .. money(m)) or "")
-  if giverName then lines[#lines + 1] = "From " .. giverName end
+  if giverName then lines[#lines + 1] = L["From "] .. giverName end
   QS:TipExtra(id, lines, true)             -- the objective, with the chain under it
   local chain = QS:Chain(id)
   if #chain > 1 then
@@ -510,15 +511,15 @@ function QS.RepBlock(id, keys)
   local need = x[19]
   if type(need) == "table" and need[1] then
     local reaction, value = QS.Standing(need[1])
-    if value and need[2] and value < need[2] then return "needs more reputation" end
-    if not reaction and (need[2] or 0) > 0 then return "needs reputation you don't have yet" end
+    if value and need[2] and value < need[2] then return L["needs more reputation"] end
+    if not reaction and (need[2] or 0) > 0 then return L["needs reputation you don't have yet"] end
   end
   -- the faction the quest gives reputation with is the quest NPCs' own: hostile / unfriendly with it,
   -- they won't talk to you (Timbermaw, Bloodsail, Wildhammer ... before you've earned them)
   local rep = x[15]
   if type(rep) == "table" and rep[1] and (rep[2] or 0) > 0 then
     local reaction = QS.Standing(rep[1])
-    if reaction and reaction <= 3 then return "hostile with its faction" end
+    if reaction and reaction <= 3 then return L["hostile with its faction"] end
   end
   -- its NPCs were seen hostile to you
   local h = Q.char and Q.char.hostile
@@ -528,7 +529,7 @@ function QS.RepBlock(id, keys)
       local npc = tonumber(tostring(k):match("^c:?(%d+)$"))
       if not (npc and h[npc]) then all = false break end
     end
-    if all then return "its NPC is hostile to you" end
+    if all then return L["its NPC is hostile to you"] end
   end
 end
 
@@ -674,7 +675,7 @@ function QS:NotOffered(npcKey, offered)
         QuesticusCollect.qna = QuesticusCollect.qna or {}
         QuesticusCollect.qna[id] = { npc = npcKey, lv = Q.player.level, n = ((QuesticusCollect.qna[id] or {}).n or 0) + 1 }
       end
-      Q:Print(("%s isn't offered here yet - it probably needs an earlier quest first. Route updated.")
+      Q:Print((L["%s isn't offered here yet - it probably needs an earlier quest first. Route updated."])
         :format(s.title or ("quest " .. id)))
     end
   end
@@ -760,7 +761,7 @@ do
     end
     group("Rewards", info.own)
     local lq = D:Quest(info.last)
-    group("Chain ends with " .. ((lq and lq[1]) or "the last quest"), info.fin)
+    group("Chain ends with " .. ((lq and lq[1]) or L["the last quest"]), info.fin)
     for i = n + 1, #panel.icons do panel.icons[i]:Hide() end
     for i = li + 1, #panel.rows do panel.rows[i]:Hide() end
     if n == 0 then return end

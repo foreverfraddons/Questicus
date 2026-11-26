@@ -57,7 +57,7 @@ function PT:Stop(save)
     QuesticusCollect.patrol = QuesticusCollect.patrol or {}
     QuesticusCollect.patrol["c:" .. rec.npc] = { [rec.map] = rec.pts }
     D:ForgetPatrol("c" .. rec.npc)
-    Q:Print(("patrol path of %s saved (%d points) - shown on the map and sent to ForeverDB with your recordings"):format(rec.name, n))
+    Q:Print(L("patrol path of %s saved (%d points) - shown on the map and sent to ForeverDB with your recordings", rec.name, n))
     if Q.Pins and Q.Pins.RefreshWorld then Q.Pins:RefreshWorld(true) end
   elseif save then
     Q:Print(L["not enough of the path yet - follow the mob a bit longer"])
@@ -70,7 +70,7 @@ end
 function PT:Refresh()
   if not frame then return end
   if rec then
-    frame.status:SetText(("Recording %s: %d points\nFollow it all the way round, then Stop."):format(rec.name, #rec.pts / 2))
+    frame.status:SetText(L("Recording %s: %d points\nFollow it all the way round, then Stop.", rec.name, #rec.pts / 2))
   else
     frame.status:SetText(L["Target a mob that walks a path, press Start and follow it around its route."])
   end
@@ -87,13 +87,13 @@ function PT:Show()
     frame.status:SetPoint("TOPLEFT", 12, -34)
     frame.status:SetPoint("RIGHT", -12, 0)
     frame.status:SetJustifyH("LEFT")
-    frame.start = T.Button(frame, "Start", 90, 22)
+    frame.start = T.Button(frame, L["Start"], 90, 22)
     frame.start:SetPoint("BOTTOMLEFT", 12, 10)
     frame.start:SetScript("OnClick", function() PT:Start() end)
-    frame.stop = T.Button(frame, "Stop and save", 120, 22)
+    frame.stop = T.Button(frame, L["Stop and save"], 120, 22)
     frame.stop:SetPoint("BOTTOMLEFT", 12, 10)
     frame.stop:SetScript("OnClick", function() PT:Stop(true) end)
-    frame.cancel = T.Button(frame, "Cancel", 80, 22)
+    frame.cancel = T.Button(frame, L["Cancel"], 80, 22)
     frame.cancel:SetPoint("LEFT", frame.stop, "RIGHT", 6, 0)
     frame.cancel:SetScript("OnClick", function() PT:Stop(false) end)
   end

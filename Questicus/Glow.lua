@@ -19,12 +19,12 @@ local S = Q.Secret
 G.CATS = { "ore", "herb", "quest", "chest", "bobber", "other" }
 G.CAT_NAMES = { ore = "Ore", herb = "Herbs", quest = "Quest objects", chest = "Chests", bobber = "Fishing bobber", other = "Other objects" }
 G.CAT_TIPS = {
-  ore = "Mineral veins and deposits.",
-  herb = "Plants you can gather.",
-  quest = "Objects one of your quests needs.",
-  chest = "Chests, crates and other things you can loot.",
-  bobber = "The bobber of your fishing line.",
-  other = "Everyday objects: doors, mailboxes, levers...",
+  ore = L["Mineral veins and deposits."],
+  herb = L["Plants you can gather."],
+  quest = L["Objects one of your quests needs."],
+  chest = L["Chests, crates and other things you can loot."],
+  bobber = L["The bobber of your fishing line."],
+  other = L["Everyday objects: doors, mailboxes, levers..."],
 }
 G.SAMPLES = { ore = "Copper Vein", herb = "Peacebloom", quest = "Supply Crate", chest = "Battered Chest", bobber = "Fishing Bobber", other = "Mailbox" }
 local SAMPLE_CURSOR = { ore = "Mine", herb = "GatherHerbs", quest = "Quest", chest = "Pickup", bobber = "Fishing", other = "Interact" }
@@ -396,21 +396,21 @@ G.EFFECT_NAMES = {
   orbit = "Orbit", ripple = "Ripple", sparkle = "Sparkles",
 }
 G.EFFECT_TIPS = {
-  aura = "A halo with a turning ring, two comets and drifting fireflies.",
-  subtle = "Just a soft glow.",
-  sigil = "A circle of runes turns around the object.",
-  brackets = "Four corners close in and lock on once it's within reach.",
-  vortex = "Arms of light coil around the object.",
-  flame = "Tongues of fire in the object's colour.",
-  rift = "A dark hole ringed with light pulls sparks in.",
-  storm = "A cloud over the object, lightning falling from it.",
-  geyser = "Sparks burst up from the object and fall back around it.",
-  spirit = "Two wisps dance around it, each with a trail.",
-  beam = "A column of light rises from the object.",
-  beacon = "A crystal hovers over it on a thread of light.",
-  orbit = "Three wisps circle it on their own orbits.",
-  ripple = "Rings spread out on the ground around it.",
-  sparkle = "Glints twinkle around it.",
+  aura = L["A halo with a turning ring, two comets and drifting fireflies."],
+  subtle = L["Just a soft glow."],
+  sigil = L["A circle of runes turns around the object."],
+  brackets = L["Four corners close in and lock on once it's within reach."],
+  vortex = L["Arms of light coil around the object."],
+  flame = L["Tongues of fire in the object's colour."],
+  rift = L["A dark hole ringed with light pulls sparks in."],
+  storm = L["A cloud over the object, lightning falling from it."],
+  geyser = L["Sparks burst up from the object and fall back around it."],
+  spirit = L["Two wisps dance around it, each with a trail."],
+  beam = L["A column of light rises from the object."],
+  beacon = L["A crystal hovers over it on a thread of light."],
+  orbit = L["Three wisps circle it on their own orbits."],
+  ripple = L["Rings spread out on the ground around it."],
+  sparkle = L["Glints twinkle around it."],
 }
 
 local ALL = setmetatable({}, { __mode = "k" })   -- effect frame -> its textures
@@ -793,7 +793,7 @@ local function poll()
   if hiddenPlate and hiddenPlate ~= plate then gameName(hiddenPlate, true); hiddenPlate = nil end
   if want and not plate and G.cfg().debug and cur.noPlateFor ~= name then
     cur.noPlateFor = name
-    dprint(tostring(name), "-> " .. tostring(cat) .. ", but the game gave it no nameplate (no light)")
+    dprint(tostring(name), "-> " .. tostring(cat) .. L[", but the game gave it no nameplate (no light)"])
   end
   if not (want and plate) then
     if cat and plate and G.cfg().exclusive and not G.cfg().glowOnly then gameName(plate, false); hiddenPlate = plate end
@@ -961,10 +961,10 @@ function G.Ignore(name)
   local k = name:lower()
   if c.ignored[k] then
     c.ignored[k] = nil
-    Q:Print(name .. " is no longer ignored.")
+    Q:Print(name .. L[" is no longer ignored."])
   else
     c.ignored[k] = name
-    Q:Print(name .. " won't light up any more (/qc glow ignore again on it to undo).")
+    Q:Print(name .. L[" won't light up any more (/qc glow ignore again on it to undo)."])
   end
 end
 
@@ -974,7 +974,7 @@ function G.SetOn(on)
   c.on = on and true or false
   G.ApplyCVars()
   if not c.on then cur.on = false; if hiddenPlate then gameName(hiddenPlate, true); hiddenPlate = nil end end
-  Q:Print(L["highlights "] .. (c.on and "on." or "off - your own targeting settings are back."))
+  Q:Print(L["highlights "] .. (c.on and "on." or L["off - your own targeting settings are back."]))
 end
 
 Q:On("PLAYER_LOGIN", function()
@@ -986,16 +986,16 @@ Q:On("PLAYER_ENTERING_WORLD", function() Q.After(2, G.ApplyCVars) end)
 local function status()
   local c = G.cfg()
   local p = professions()
-  Q:Print(("highlights %s, effect %s, range %d, direction %d, exclusive %s, glow only %s"):format(c.on and "on" or "off",
+  Q:Print(L("highlights %s, effect %s, range %d, direction %d, exclusive %s, glow only %s", c.on and "on" or "off",
     c.effect, c.range, c.arc, tostring(c.exclusive), tostring(c.glowOnly)))
   local on = {}
   for _, k in ipairs(G.CATS) do if G.cats()[k] then on[#on + 1] = G.CAT_NAMES[k] end end
-  Q:Print(L["lit on this character: "] .. table.concat(on, ", ") .. " | herbalism " .. tostring(p.herb and true or false) .. ", mining " .. tostring(p.ore and true or false))
+  Q:Print(L["lit on this character: "] .. table.concat(on, ", ") .. L[" | herbalism "] .. tostring(p.herb and true or false) .. L[", mining "] .. tostring(p.ore and true or false))
   for _, n in ipairs(CV) do Q:Print("  " .. n .. " = " .. tostring(getc(n))) end
   local cat, st, name, cursor = G.Classify()
   if cat then
     local okW, why = G.Wanted(cat, st, name)
-    Q:Print(("in front of you: %s -> %s, %s (cursor %s), nameplate %s, %s"):format(tostring(name), cat, st, tostring(cursor),
+    Q:Print(L("in front of you: %s -> %s, %s (cursor %s), nameplate %s, %s", tostring(name), cat, st, tostring(cursor),
       plateOf() and "yes" or "NO", okW and "lit" or ("not lit: " .. tostring(why))))
   else
     Q:Print(L["nothing in front of you the game picked (soft target)."])

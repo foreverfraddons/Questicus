@@ -85,9 +85,9 @@ function GD.StepText(s, short)
     return c(gold, L["Before the dungeon: "]) .. (s.prep and L[s.prep.text or ""] or "")
   elseif s.type == "boat" then
     local what = ({ boat = L["boat"], zeppelin = L["zeppelin"], tram = L["tram"] })[s.kind or "boat"] or L[s.kind or "boat"]
-    local to = c(gold, s.toName or L["the other continent"])
+    local to = c(gold, s.toName and L[s.toName] or L["the other continent"])
     return short and L("Take the %s to %s", what, to)
-      or L("Take the %s to %s - at %s", what, to, c(white, s.from and s.from.place or L["the docks"]))
+      or L("Take the %s to %s - at %s", what, to, c(white, s.from and s.from.place and L[s.from.place] or L["the docks"]))
   elseif s.type == "complete" then
     local t = {}
     for i, title in ipairs(s.titles or {}) do
@@ -402,68 +402,68 @@ local function menuItems(index)
     return items
   end
   local ids = s.quests or {}
-  add("Details", "Everything about this step", function() if Q.Details then Q.Details:Show(index) end end)
-  add("Point the arrow here", "Make this the step the arrow and map follow", function() GD.focus = index; GD:Refresh() end)
+  add(L["Details"], L["Everything about this step"], function() if Q.Details then Q.Details:Show(index) end end)
+  add(L["Point the arrow here"], L["Make this the step the arrow and map follow"], function() GD.focus = index; GD:Refresh() end)
   if #ids > 0 then
-    add("Do this next", "Put this quest first in the route", function()
+    add(L["Do this next"], L["Put this quest first in the route"], function()
       wipe(P.prefer); wipe(P.later)
       for _, id in ipairs(ids) do P.prefer[id] = true end
       GD.focus = 1; P:Build()
     end)
-    add("Skip for now", "Move it to the back of the route for this session", function()
+    add(L["Skip for now"], L["Move it to the back of the route for this session"], function()
       for _, id in ipairs(ids) do P.later[id] = true; P.prefer[id] = nil end
       GD.focus = 1; P:Build()
     end)
-    add("Remove from route", "Never route this quest again (/qc unskip brings it back)", function()
+    add(L["Remove from route"], L["Never route this quest again (/qc unskip brings it back)"], function()
       for _, id in ipairs(ids) do Q.char.skipped[id] = true end
       GD.focus = 1; P:SkipQuest(ids[1])
       Q:Print(L["removed from the route: "] .. (s.title or (s.titles and table.concat(s.titles, ", ")) or ""))
     end)
   elseif s.type == "hearth" then
-    add("Don't hearth this time", "Leave the hearthstone out of the route for 30 minutes", function()
+    add(L["Don't hearth this time"], L["Leave the hearthstone out of the route for 30 minutes"], function()
       Q.Flight.noHearthUntil = (GetTime and GetTime() or 0) + 1800
       GD.focus = 1; P:Build()
     end)
-    add("Never hearth in routes", "Turn the hearthstone off in the route (Options to turn back on)", function()
+    add(L["Never hearth in routes"], L["Turn the hearthstone off in the route (Options to turn back on)"], function()
       Q.prefs.hearth = false
       GD.focus = 1; P:Build()
     end)
   elseif s.type == "fly" then
-    add("Don't fly this time", "Run instead for the next 10 minutes", function()
+    add(L["Don't fly this time"], L["Run instead for the next 10 minutes"], function()
       Q.Flight.noFlyUntil = (GetTime and GetTime() or 0) + 600
       GD.focus = 1; P:Build()
     end)
-    add("Never fly in routes", "Turn flight paths off in the route (Options to turn back on)", function()
+    add(L["Never fly in routes"], L["Turn flight paths off in the route (Options to turn back on)"], function()
       Q.prefs.flights = false
       GD.focus = 1; P:Build()
     end)
   elseif s.type == "explore" then
-    add("Skip for now", "Leave this area for later", function()
+    add(L["Skip for now"], L["Leave this area for later"], function()
       P.later["explore" .. s.area.key] = true; GD.focus = 1; P:Build()
     end)
-    add("No exploring in routes", "Completionist without the map exploration (/qc explore to turn back on)", function()
+    add(L["No exploring in routes"], L["Completionist without the map exploration (/qc explore to turn back on)"], function()
       Q.char.noExplore = true; GD.focus = 1; P:Build()
     end)
   elseif s.type == "fp" then
-    add("Skip for now", "Leave this flight path for later", function()
+    add(L["Skip for now"], L["Leave this flight path for later"], function()
       P.later["fp" .. s.node.id] = true; GD.focus = 1; P:Build()
     end)
-    add("Remove from route", "Never send me to this flight master", function()
+    add(L["Remove from route"], L["Never send me to this flight master"], function()
       Q.char.noFP = Q.char.noFP or {}
       Q.char.noFP[s.node.id] = true
       GD.focus = 1; P:Build()
     end)
   elseif s.type == "buy" then
-    add("Remove from route", "Not worth going for - don't suggest this item again", function()
+    add(L["Remove from route"], L["Not worth going for - don't suggest this item again"], function()
       Q.Gear:Deny(s.item, "trip"); GD.focus = 1; P:Build()
     end)
   end
   if Q.Author then Q.Author:MenuItems(s, index, add) end
   if Q.char.dmode then
-    add("Leave dungeon mode", "Back to your normal route", function() P:DungeonMode(nil); GD.focus = 1 end)
+    add(L["Leave dungeon mode"], L["Back to your normal route"], function() P:DungeonMode(nil); GD.focus = 1 end)
   end
   if next(P.prefer) or next(P.later) then
-    add("Back to the normal order", "Forget \"do this next\" / \"skip for now\"", function()
+    add(L["Back to the normal order"], L["Forget \"do this next\" / \"skip for now\""], function()
       wipe(P.prefer); wipe(P.later); GD.focus = 1; P:Build()
     end)
   end
@@ -714,8 +714,8 @@ local function build()
   cur.up = T.Text(cur, 11, T.c.good)
   cur.up:SetPoint("TOPLEFT", cur.info, "BOTTOMLEFT", 0, -3)
   cur.up:SetPoint("RIGHT", -8, 0)
-  cur.skip = T.Button(cur, "Skip", 46, 18)
-  cur.skip.tip = "Skip this quest - it won't be routed again (/qc unskip brings skipped quests back)."
+  cur.skip = T.Button(cur, L["Skip"], 46, 18)
+  cur.skip.tip = L["Skip this quest - it won't be routed again (/qc unskip brings skipped quests back)."]
   cur.skip:SetScript("OnClick", function()
     local s = P.steps[GD.focus]
     if s and s.quests and s.quests[1] then
@@ -727,29 +727,29 @@ local function build()
       P:Build()
     end
   end)
-  cur.map = T.Button(cur, "Map", 46, 18)
+  cur.map = T.Button(cur, L["Map"], 46, 18)
   -- a dungeon run: the game's group finder (LFG.lua lays a secure button over this one)
-  cur.lfg = T.Button(cur, "Group finder", 84, 18)
-  cur.lfg.tip = "Open the game's group finder to look for or list a group for this dungeon"
+  cur.lfg = T.Button(cur, L["Group finder"], 84, 18)
+  cur.lfg.tip = L["Open the game's group finder to look for or list a group for this dungeon"]
   if Q.LFG and Q.LFG.Overlay then Q.LFG.Overlay(cur.lfg) end
   cur.lfg:Hide()
   -- a hearth step: use the hearthstone (a secure button: only a real click may use an item)
-  cur.hs = T.Button(cur, "Hearthstone", 90, 18)
-  cur.hs.tip = "Use your Hearthstone"
+  cur.hs = T.Button(cur, L["Hearthstone"], 90, 18)
+  cur.hs.tip = L["Use your Hearthstone"]
   if Q.SecureOverlay then
     Q.SecureOverlay(cur.hs, "QuesticusHearthButton", function() return "/use item:" .. (Q.Flight.HS_ITEM or 6948) end,
       "Can't use it from here in combat - use your Hearthstone from your bags.")
   end
   cur.hs:Hide()
   -- a dungeon run folds away to one line; this opens / closes the quest list under it
-  cur.fold = T.Button(cur, "Expand", 64, 18)
-  cur.fold.tip = "Show or hide the dungeon's quests and what's left of each"
+  cur.fold = T.Button(cur, L["Expand"], 64, 18)
+  cur.fold.tip = L["Show or hide the dungeon's quests and what's left of each"]
   cur.fold:SetScript("OnClick", function()
     Q.db.guide.dunOpen = not Q.db.guide.dunOpen or nil
     GD:Refresh()
   end)
   cur.fold:Hide()
-  cur.map.tip = "Pin this objective on the map and open the map there"
+  cur.map.tip = L["Pin this objective on the map and open the map there"]
   cur.map:SetScript("OnClick", function()
     local p = GD:Target()
     if not p then return end
@@ -861,19 +861,19 @@ local function build()
   frame.foot = T.Text(frame, 10, T.c.dim)
   frame.foot:SetPoint("BOTTOMLEFT", 10, 9)
   frame.foot:SetWordWrap(false)
-  frame.opt = T.Button(frame, "Options", 64, 18)
+  frame.opt = T.Button(frame, L["Options"], 64, 18)
   frame.opt:SetPoint("BOTTOMRIGHT", -20, 6)
   frame.opt:SetScript("OnClick", function() if Q.ShowOptions then Q:ShowOptions() end end)
-  frame.list = T.Button(frame, "Hide list", 70, 18)
+  frame.list = T.Button(frame, L["Hide list"], 70, 18)
   frame.list:SetPoint("RIGHT", frame.opt, "LEFT", -4, 0)
-  frame.list.tip = "Hide or show the route list below the current step"
+  frame.list.tip = L["Hide or show the route list below the current step"]
   frame.list:SetScript("OnClick", function()
     g.hideList = not g.hideList
     GD:Refresh()
   end)
-  frame.more = T.Button(frame, "More", 50, 18)
+  frame.more = T.Button(frame, L["More"], 50, 18)
   frame.more:SetPoint("RIGHT", frame.list, "LEFT", -4, 0)
-  frame.more.tip = "Show more of the route (or drag the corner to make the window bigger and scroll)"
+  frame.more.tip = L["Show more of the route (or drag the corner to make the window bigger and scroll)"]
   frame.more:SetScript("OnClick", function()
     g.next = (g.next or 3) >= 12 and 3 or 12
     GD:Refresh()
@@ -917,9 +917,9 @@ function GD:RefreshDistance()
   local d = D.Dist(here, p)
   local z = zoneName(p)
   if d >= D.FAR then
-    cur.info:SetText((z and (z .. " - ") or "") .. "another continent")
+    cur.info:SetText((z and (z .. " - ") or "") .. L["another continent"])
   else
-    cur.info:SetText(("%d yd"):format(math.floor(d)) .. (z and ("  -  " .. z) or ""))
+    cur.info:SetText(L("%d yd", math.floor(d)) .. (z and ("  -  " .. z) or ""))
   end
 end
 
@@ -1014,8 +1014,8 @@ function GD:Refresh()
       T.SetBorderColor(cur, T.c.accent[1], T.c.accent[2], T.c.accent[3], 0.45)
     end
     if s.type == "boat" then
-      lines[#lines + 1] = c(dim, "  " .. L("Board at %s - it lands at %s", c(white, (s.from and s.from.place) or L["the docks"]) .. "|cff" .. dim,
-        c(white, (s.to and s.to.place) or s.toName or "")))
+      lines[#lines + 1] = c(dim, "  " .. L("Board at %s - it lands at %s", c(white, (s.from and s.from.place and L[s.from.place]) or L["the docks"]) .. "|cff" .. dim,
+        c(white, L[(s.to and s.to.place) or s.toName or ""])))
       lines[#lines + 1] = c(dim, "  " .. L["Wait on the platform / dock until it arrives, then get on; the route carries on where it lands."])
     end
     -- items you put together for a quest (qx 21): "Combine A + B -> C"
@@ -1069,7 +1069,7 @@ function GD:Refresh()
   cur.lfg:ClearAllPoints()
   cur.lfg:SetPoint("RIGHT", cur.skip, "LEFT", -4, 0)
   cur.fold:SetShown(runStep ~= nil)
-  cur.fold:SetText(Q.db.guide.dunOpen and "Collapse" or "Expand")
+  cur.fold:SetText(Q.db.guide.dunOpen and L["Collapse"] or L["Expand"])
   cur.fold:ClearAllPoints()
   cur.fold:SetPoint("RIGHT", cur.lfg:IsShown() and cur.lfg or cur.skip, "LEFT", -4, 0)
   -- the route list: every step after the current one when the window was sized by hand (it
@@ -1108,10 +1108,10 @@ function GD:Refresh()
   GD.shownRows = shown
   local foot = ""
   if #steps > 0 then
-    foot = ("%d steps - about level %d by the end"):format(#steps, P.endLevel or lv)
+    foot = L("%d steps - about level %d by the end", #steps, P.endLevel or lv)
   end
   frame.foot:SetText(foot)
-  frame.list:SetText(hide and "Show list" or "Hide list")
+  frame.list:SetText(hide and L["Show list"] or L["Hide list"])
   frame.more:SetShown(not hide and not g.h)
   GD:Layout()
   GD:RefreshDistance()

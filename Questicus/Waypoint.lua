@@ -188,7 +188,7 @@ watch:SetScript("OnUpdate", function(_, el)
   if not (man and man.wx) then return end
   local here = D:PlayerPos()
   if here and here.i == man.i and D.Dist(here, { x = man.wx, y = man.wy }) <= math.max(5, (cfg().hideAt or 4) + 2) then
-    Q:Print(("Reached %s."):format(man.name or "your waypoint"))
+    Q:Print(L("Reached %s.", man.name or L["your waypoint"]))
     W:NextUser()
   end
 end)

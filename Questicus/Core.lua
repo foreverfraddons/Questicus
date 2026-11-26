@@ -61,6 +61,7 @@ Q.Send = Q.Fire
 
 -- ------------------------------------------------------------------ output
 function Q:Print(msg)
+  if Q.T and Q.T.Translate then msg = Q.T.Translate(msg) end   -- a message that is one phrase: its translation
   DEFAULT_CHAT_FRAME:AddMessage("|cff3fd0c9Questicus|r: " .. tostring(msg))
 end
 function Q:Debug(msg)

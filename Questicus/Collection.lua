@@ -140,6 +140,6 @@ Q:On("QC_READY", function() if Q.CollectOnly() then hideGuiding(); Q.After(1, CM
 Q:Command("collectonly", "collection mode: only record (routes, quests, XP, rewards), no guiding - on / off", function()
   CM:Set(not Q.CollectOnly())
   local n = CM:Counts()
-  Q:Print(("collected so far: %d quest rewards, %d route entries, %d quests with objective spots, %d loot sources, %d NPC spots")
+  Q:Print((L["collected so far: %d quest rewards, %d route entries, %d quests with objective spots, %d loot sources, %d NPC spots"])
     :format(n.rewards, n.route, n.spots, n.sources, n.npcs))
 end)

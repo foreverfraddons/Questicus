@@ -395,7 +395,7 @@ local function build()
     local menu
     local rows = {}
     local note = T.Text(p, 11, T.c.dim)
-    local reload = T.Button(p, "Reload now", 110, 24)
+    local reload = T.Button(p, L["Reload now"], 110, 24)
     reload:SetScript("OnClick", function() if C_UI and C_UI.Reload then C_UI.Reload() elseif ReloadUI then ReloadUI() end end)
     reload:Hide()
     local function usable(code)
@@ -484,11 +484,11 @@ local function build()
     note:SetJustifyH("LEFT")
     note:SetText(L["A greyed-out language needs its language pack. Language packs are on the Questicus files page on CurseForge, next to each Questicus download: install the pack for your language, then pick it here. Spot a translation that needs correcting? Leave a comment on the Questicus page or contact me."])
     p.y = p.y - 64
-    local link = T.Button(p, "Questicus files page", 170, 24)
+    local link = T.Button(p, L["Questicus files page"], 170, 24)
     link:SetPoint("TOPLEFT", 8, p.y)
     link:SetScript("OnClick", function() Q.CopyBox(L["Questicus files page"], Q.LANG_URL) end)
     reload:SetPoint("LEFT", link, "RIGHT", 8, 0)
-    reload.tip = "A new language takes effect after a reload."
+    reload.tip = L["A new language takes effect after a reload."]
     p.y = p.y - 32
     refresh[#refresh + 1] = refreshLang
   end
@@ -515,9 +515,9 @@ local function build()
   local ver = T.Text(frame, 10, T.c.dim)
   ver:SetPoint("BOTTOMLEFT", 16, 16)
   ver:SetText(L("Questicus %s  -  /qc help: all commands", Q.version))
-  local news = T.Button(frame, "What's new", 100, 24)
+  local news = T.Button(frame, L["What's new"], 100, 24)
   news:SetPoint("BOTTOMRIGHT", -14, 10)
-  news.tip = "The patch notes for this version (also /qc news)"
+  news.tip = L["The patch notes for this version (also /qc news)"]
   news:SetScript("OnClick", function() Q.News:Show(nil) end)
 
   frame:SetScript("OnShow", function() for _, f in ipairs(refresh) do f() end end)
@@ -532,7 +532,7 @@ function Q.MapSettings()
   local M = _G.QuesticusMap
   if M and M.OpenOptions then M.OpenOptions(); return end
   if SlashCmdList and SlashCmdList.OPENMAP then SlashCmdList.OPENMAP(""); return end   -- (the standalone OpenMap addon)
-  Q:Print("Questicus Maps isn't running")
+  Q:Print(L["Questicus Maps isn't running"])
 end
 
 function Q:ShowOptions(pageTitle)
@@ -551,10 +551,10 @@ Q:On("QC_READY", function()
   local t = T.Text(panel, 16, T.c.gold)
   t:SetPoint("TOPLEFT", 16, -16)
   t:SetText("Questicus")
-  local b = T.Button(panel, "Open Questicus options", 180, 24)
+  local b = T.Button(panel, L["Open Questicus options"], 180, 24)
   b:SetPoint("TOPLEFT", 16, -48)
   b:SetScript("OnClick", function() Q:ShowOptions() end)
-  local mb = T.Button(panel, "Questicus Maps settings", 180, 24)
+  local mb = T.Button(panel, L["Questicus Maps settings"], 180, 24)
   mb:SetPoint("TOPLEFT", 16, -80)
   mb:SetScript("OnClick", function() if SettingsPanel and HideUIPanel then HideUIPanel(SettingsPanel) end; Q.MapSettings() end)
   local ok, cat = pcall(Settings.RegisterCanvasLayoutCategory, panel, "Questicus")

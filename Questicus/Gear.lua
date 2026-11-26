@@ -36,12 +36,12 @@ local W = {
 }
 G.WEIGHTS = W
 G.STAT_NAMES = { STR = "Strength", AGI = "Agility", STA = "Stamina", INT = "Intellect", SPI = "Spirit", ARMOR = "Armor",
-  AP = "Attack power", RAP = "Ranged attack power", SP = "Spell power", HEAL = "Healing", CRIT = "Crit", HIT = "Hit",
-  MP5 = "Mana per 5", DEF = "Defense", DODGE = "Dodge", BLOCK = "Block", DPS = "Weapon damage",
+  AP = L["Attack power"], RAP = L["Ranged attack power"], SP = L["Spell power"], HEAL = "Healing", CRIT = "Crit", HIT = "Hit",
+  MP5 = L["Mana per 5"], DEF = "Defense", DODGE = "Dodge", BLOCK = "Block", DPS = L["Weapon damage"],
   RDPS = "Ranged weapon damage", WDPS = "Weapon damage (casters)" }
 G.STAT_ORDER = { "STR", "AGI", "STA", "INT", "SPI", "AP", "SP", "HEAL", "CRIT", "HIT", "MP5", "ARMOR", "DEF", "DODGE", "BLOCK", "DPS" }
 G.WEAPON_NAMES = { [0] = "One-hand axes", [1] = "Two-hand axes", [2] = "Bows", [3] = "Guns", [4] = "One-hand maces",
-  [5] = "Two-hand maces", [6] = "Polearms", [7] = "One-hand swords", [8] = "Two-hand swords", [10] = "Staves",
+  [5] = L["Two-hand maces"], [6] = "Polearms", [7] = L["One-hand swords"], [8] = L["Two-hand swords"], [10] = "Staves",
   [13] = "Fist weapons", [15] = "Daggers", [16] = "Thrown", [18] = "Crossbows", [19] = "Wands" }
 G.ARMOR_NAMES = { [1] = "Cloth", [2] = "Leather", [3] = "Mail", [4] = "Plate", [6] = "Shields" }
 
@@ -432,11 +432,11 @@ function G:Explain(item)
   if not gain then return out end
   if gain == 0 then
     local id = type(item) == "number" and item or tonumber(tostring(item):match("item:(%d+)"))
-    if id and learned().deny[id] then out[#out + 1] = "You turned it down: " .. learned().deny[id] end
+    if id and learned().deny[id] then out[#out + 1] = L["You turned it down: "] .. learned().deny[id] end
     return out
   end
   local rname = replaced and (Q.GetItemInfo(replaced)) or "nothing"
-  out[#out + 1] = ("%+d%% over %s"):format(math.floor(pct + 0.5), rname)
+  out[#out + 1] = L("%+d%% over %s", math.floor(pct + 0.5), rname)
   local role = G:Role()
   local w = G:Weights(role)
   local st = stats(it.link)
@@ -451,7 +451,7 @@ function G:Explain(item)
     local p = parts[i]
     t[#t + 1] = ("%s %s"):format(p.k == "DPS" and ("%.1f"):format(p.v) or ("+" .. p.v), Q.L[G.STAT_NAMES[p.k] or p.k])
   end
-  if #t > 0 then out[#out + 1] = "Mostly from " .. table.concat(t, ", ") .. " (" .. (G.ROLE_NAMES[role] or role) .. ")" end
+  if #t > 0 then out[#out + 1] = L["Mostly from "] .. table.concat(t, ", ") .. " (" .. (G.ROLE_NAMES[role] or role) .. ")" end
   local prio = Q.prefs.statPrio
   if type(prio) == "table" and parts[1] then
     for i, k in ipairs(prio) do
@@ -514,7 +514,7 @@ Q:Command("gear", "gear you turned down (/qc gear reset forgets them)", function
   for id, why in pairs(lg.deny) do n = n + 1; Q:Print((Q.GetItemInfo(id) or ("item " .. id)) .. ": " .. why) end
   for sub in pairs(lg.armor) do Q:Print(L["never: "] .. (G.ARMOR_NAMES[sub] or sub)) end
   for sub in pairs(lg.weapon) do Q:Print(L["never: "] .. (G.WEAPON_NAMES[sub] or sub)) end
-  for k, f in pairs(lg.stat) do Q:Print(("%s counts x%.2f"):format(G.STAT_NAMES[k] or k, f)) end
+  for k, f in pairs(lg.stat) do Q:Print(L("%s counts x%.2f", G.STAT_NAMES[k] or k, f)) end
   if n == 0 and not next(lg.armor) and not next(lg.weapon) then Q:Print(L["nothing turned down yet"]) end
 end)
 function G.ClassWeapons() return WEAPONS[Q.player.class] or {} end

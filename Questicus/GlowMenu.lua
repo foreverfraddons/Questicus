@@ -180,7 +180,7 @@ local function buildPreview(parent)
     name:SetTextColor(rgb[1] * 0.4 + 0.6, rgb[2] * 0.4 + 0.6, rgb[3] * 0.4 + 0.6)
     ic:SetShown(G.Look(cat, "icon") and not c.glowOnly)
     ic:SetTexture("Interface\\Cursor\\" .. ((st == "locked" and "Unable" or "") .. (({ ore = "Mine", herb = "GatherHerbs", quest = "Quest", chest = "Pickup", bobber = "Fishing", other = "Interact" })[cat])))
-    stl:SetText(st == "far" and "out of reach" or st == "ready" and "within reach" or "unusable for now")
+    stl:SetText(st == "far" and L["out of reach"] or st == "ready" and L["within reach"] or L["unusable for now"])
   end)
   return p
 end
@@ -222,7 +222,7 @@ local function build()
   scopeBar:SetPoint("TOPLEFT", x2, -34)
   refreshers[#refreshers + 1] = function() scopeBar:Refresh() end
 
-  local eh = header(win, "Effect")
+  local eh = header(win, L["Effect"])
   eh:SetPoint("TOPLEFT", x2, -66)
   local grid = {}
   for i, k in ipairs(G.EFFECT_ORDER) do
@@ -253,14 +253,14 @@ local function build()
   n2:SetPoint("TOPLEFT", x2 + 260, -246)
   local n3 = check(win, "Fade with the nameplate", function() return getLook("follow") end, function(v) setLook("follow", v) end, "The light fades with the object's nameplate (when the scenery hides it, say).")
   n3:SetPoint("TOPLEFT", x2, -268)
-  local shared = T.Button(win, "Same as all objects", 140, 20)
+  local shared = T.Button(win, L["Same as all objects"], 140, 20)
   shared:SetPoint("TOPLEFT", x2 + 260, -268)
-  shared.tip = "Takes away this category's own look: it goes back to everyone's."
+  shared.tip = L["Takes away this category's own look: it goes back to everyone's."]
   shared:SetScript("OnClick", function() if scope ~= "all" then G.cfg().own[scope] = nil; refreshAll() end end)
   refreshers[#refreshers + 1] = function() shared:SetShown(scope ~= "all") end
 
   -- left column under the preview: categories + colours
-  local ch = header(win, "Light up (this character)")
+  local ch = header(win, L["Light up (this character)"])
   ch:SetPoint("TOPLEFT", 14, -266)
   for i, k in ipairs(G.CATS) do
     local sw = swatch(win, k)
@@ -269,20 +269,20 @@ local function build()
     cb:SetPoint("TOPLEFT", 38, -285 - (i - 1) * 22)
     cb:SetWidth(180)
   end
-  local ign = T.Button(win, "Ignore the object in front of me", 210, 22)
+  local ign = T.Button(win, L["Ignore the object in front of me"], 210, 22)
   ign:SetPoint("TOPLEFT", 14, -424)
-  ign.tip = "Never lights it (or anything of the same name). On an ignored one: stops ignoring it. /qc glow ignore list names them."
+  ign.tip = L["Never lights it (or anything of the same name). On an ignored one: stops ignoring it. /qc glow ignore list names them."]
   ign:SetScript("OnClick", function() G.Ignore(); refreshAll() end)
   local ignN = T.Text(win, 10, T.c.dim)
   ignN:SetPoint("TOPLEFT", 14, -450)
   refreshers[#refreshers + 1] = function()
     local n = 0
     for _ in pairs(G.cfg().ignored) do n = n + 1 end
-    ignN:SetText(L["Ignored objects: "] .. n .. "   (/qc glow ignore clear forgets them)")
+    ignN:SetText(L["Ignored objects: "] .. n .. L["   (/qc glow ignore clear forgets them)"])
   end
 
   -- column 2 lower: hide / detection
-  local hh = header(win, "Hide the light")
+  local hh = header(win, L["Hide the light"])
   hh:SetPoint("TOPLEFT", x2, -300)
   check(win, "In combat", function() return G.cfg().hideCombat end, function(v) G.cfg().hideCombat = v end):SetPoint("TOPLEFT", x2, -318)
   check(win, "In dungeons, raids and battlegrounds", function() return G.cfg().hideInstance end, function(v) G.cfg().hideInstance = v end):SetPoint("TOPLEFT", x2, -340)
@@ -290,7 +290,7 @@ local function build()
     "Skill too low, locked... the game only says so once you're within reach."):SetPoint("TOPLEFT", x2, -362)
   check(win, "Herbs / ore without the profession", function() return G.cfg().hideUntrained end, function(v) G.cfg().hideUntrained = v end):SetPoint("TOPLEFT", x2, -384)
 
-  local dh = header(win, "Detection")
+  local dh = header(win, L["Detection"])
   dh:SetPoint("TOPLEFT", x2 + 260, -300)
   local rg = slider(win, "Range", 5, 15, 1, function() return G.cfg().range end, function(v) G.cfg().range = v; G.ApplyCVars() end, "%d yd", "How far away the game may pick an object.")
   rg:SetPoint("TOPLEFT", x2 + 260, -318)
@@ -304,11 +304,11 @@ local function build()
     "Questicus doesn't write the name and icon; the game (or another addon) keeps its own."):SetPoint("TOPLEFT", x2 + 260, -410)
 
   -- interact key
-  local kb = T.Button(win, "Interact key", 200, 22)
+  local kb = T.Button(win, L["Interact key"], 200, 22)
   kb:SetPoint("TOPLEFT", x2 + 260, -436)
   kb:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-  kb.tip = "The game's interact key: gathers, loots or uses the lit object once it's within reach (it works on NPCs too). Left-click: choose a key, right-click: remove it."
-  local function kbShow() kb.label:SetText(L["Interact key: "] .. (G.InteractKey() or "not bound")) end
+  kb.tip = L["The game's interact key: gathers, loots or uses the lit object once it's within reach (it works on NPCs too). Left-click: choose a key, right-click: remove it."]
+  local function kbShow() kb.label:SetText(L["Interact key: "] .. (G.InteractKey() or L["not bound"])) end
   kb:SetScript("OnClick", function(s, btn)
     if btn == "RightButton" then G.SetInteractKey(nil); kbShow() return end
     s.label:SetText(L["Press a key (Escape: cancel)"])
@@ -326,7 +326,7 @@ local function build()
   refreshers[#refreshers + 1] = kbShow
 
   -- bottom: cut-out, tracking, general
-  local sh = header(win, "Pass behind my character")
+  local sh = header(win, L["Pass behind my character"])
   sh:SetPoint("TOPLEFT", 14, -476)
   check(win, "Cut the light out around my character", function() return G.cfg().silhouette end, function(v) G.cfg().silhouette = v end,
     "The light seems to pass behind you instead of covering you."):SetPoint("TOPLEFT", 14, -494)
@@ -336,12 +336,12 @@ local function build()
   cs:SetPoint("TOPLEFT", 14, -518)
   local cy = slider(win, "Cut-out height", -100, 100, 5, function() return cut().shift or 0 end, function(v) cut().shift = v; showOutline(win.outlineOn) end, "%d%%")
   cy:SetPoint("TOPLEFT", 14, -556)
-  local so = T.Button(win, "Show the cut-out", 120, 20)
+  local so = T.Button(win, L["Show the cut-out"], 120, 20)
   so:SetPoint("TOPLEFT", 270, -496)
-  so.tip = "Outlines the cut-out in red: it should hug your character. Goes away when this window closes."
+  so.tip = L["Outlines the cut-out in red: it should hug your character. Goes away when this window closes."]
   so:SetScript("OnClick", function() win.outlineOn = not win.outlineOn; showOutline(win.outlineOn) end)
 
-  local th = header(win, "Two gathering professions")
+  local th = header(win, L["Two gathering professions"])
   th:SetPoint("TOPLEFT", x2 + 260, -476)
   check(win, "Alternate Find Herbs / Find Minerals", function() return G.cfg().switch end, function(v) G.cfg().switch = v end,
     "The game shows one tracking at a time; Questicus switches to the other each time you've moved far enough."):SetPoint("TOPLEFT", x2 + 260, -494)
@@ -351,9 +351,9 @@ local function build()
   local en = check(win, "Highlights on", function() return G.cfg().on end, function(v) G.SetOn(v) end,
     "Off: Questicus gives the game back your own targeting settings.")
   en:SetPoint("BOTTOMLEFT", 14, 12)
-  local df = T.Button(win, "Defaults", 90, 22)
+  local df = T.Button(win, L["Defaults"], 90, 22)
   df:SetPoint("BOTTOMRIGHT", -14, 10)
-  df.tip = "Puts the effect, look and detection settings back (click twice)."
+  df.tip = L["Puts the effect, look and detection settings back (click twice)."]
   df:SetScript("OnClick", function(s)
     if not s.armed then s.armed = true; s.label:SetText(L["Sure?"]); Q.After(3, function() s.armed = false; s.label:SetText(L["Defaults"]) end) return end
     local cc = G.cfg()

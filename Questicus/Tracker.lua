@@ -339,7 +339,7 @@ function TR:OpenLog(id)
 end
 function TR:Focus(id)
   if Q.char.focus == id then Q.char.focus = nil; Q:Print(L["focus off - back to the normal route"])
-  else Q.char.focus = id; local i = QS:Info(id); Q:Print(L["focus: "] .. ((i and i.title) or id) .. " - the route goes there first") end
+  else Q.char.focus = id; local i = QS:Info(id); Q:Print(L["focus: "] .. ((i and i.title) or id) .. L[" - the route goes there first"]) end
   P:BuildAsync()
   TR:Refresh()
 end
@@ -426,17 +426,17 @@ function TR:Menu(id, anchor)
   local function add(text, fn) items[#items + 1] = { L[text], fn } end
   add(Q.char.focus == id and "Stop focusing" or "Focus (go here first)", function() TR:Focus(id) end)
   local forced = Q.char.forced and Q.char.forced[id]
-  if forced then add("Take off my route", function() TR:Force(id, false) end)
-  else add("Add to my route", function() TR:Force(id, true) end) end
-  if Q.char.skipped[id] then add("Back on the route", function() Q.char.skipped[id] = nil; QS:BuildPool(); P:BuildAsync() end)
-  else add("Skip (leave off the route)", function() if P.SkipQuest then P:SkipQuest(id) end end) end
-  if inLog then add("Open in the quest log", function() TR:OpenLog(id) end) end
-  add("Fold / unfold", function() TR:Fold(id) end)
-  add("Show on map", function() TR:ShowOnMap(id) end)
-  add("Link in chat", function() TR:Link(id) end)
-  if inLog and IsInGroup and IsInGroup() then add("Share with group", function() TR:Share(id) end) end
-  add("Wowhead link", function() TR:Wowhead(id) end)
-  if inLog then add("Abandon", function() TR:Abandon(id) end) end
+  if forced then add(L["Take off my route"], function() TR:Force(id, false) end)
+  else add(L["Add to my route"], function() TR:Force(id, true) end) end
+  if Q.char.skipped[id] then add(L["Back on the route"], function() Q.char.skipped[id] = nil; QS:BuildPool(); P:BuildAsync() end)
+  else add(L["Skip (leave off the route)"], function() if P.SkipQuest then P:SkipQuest(id) end end) end
+  if inLog then add(L["Open in the quest log"], function() TR:OpenLog(id) end) end
+  add(L["Fold / unfold"], function() TR:Fold(id) end)
+  add(L["Show on map"], function() TR:ShowOnMap(id) end)
+  add(L["Link in chat"], function() TR:Link(id) end)
+  if inLog and IsInGroup and IsInGroup() then add(L["Share with group"], function() TR:Share(id) end) end
+  add(L["Wowhead link"], function() TR:Wowhead(id) end)
+  if inLog then add(L["Abandon"], function() TR:Abandon(id) end) end
   local i = QS:Info(id)
   menu.title:SetText((i and i.title) or (QS.log[id] and QS.log[id].title) or L("Quest %d", id))
   for k, it in ipairs(items) do

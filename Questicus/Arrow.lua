@@ -81,8 +81,8 @@ end
 
 local function shortText(s)
   if not s then return "" end
-  if s.type == "accept" then return "Accept: " .. (s.title or "")
-  elseif s.type == "turnin" then return "Turn in: " .. (s.title or "")
+  if s.type == "accept" then return L["Accept: "] .. (s.title or "")
+  elseif s.type == "turnin" then return L["Turn in: "] .. (s.title or "")
   elseif s.type == "complete" then
     -- name what the arrow points at: the objective and its quest ("Young Paletusk - Drive Them Back")
     local t = Q.Guide.targetOf
@@ -135,19 +135,19 @@ function A:Update()
   if body then p, s = body, nil end
   if not p or not here or not Q.db.arrow.shown or (Q.CollectOnly and Q.CollectOnly()) then frame:Hide(); return end
   frame:Show()
-  frame.label:SetText(body and "Your corpse" or shortText(s))
+  frame.label:SetText(body and L["Your corpse"] or shortText(s))
   -- on a flight: where to and how long is left - no arrow (the bird does the flying)
   if Q.OnTaxi and Q.OnTaxi() then
     local to, left = Q.Flight and Q.Flight.InFlight and Q.Flight:InFlight()
     frame.arrow:Hide(); frame.skull:Hide(); frame.here:Hide()
     frame.label:SetText(L["In flight"] .. (to and (" to " .. (to.name:match("^(.-),") or to.name)) or ""))
-    frame.dist:SetText(left and (left >= 60 and ("about %dm %02ds left"):format(math.floor(left / 60), math.floor(left % 60))
-      or ("about %ds left"):format(math.floor(left))) or ("then: " .. shortText(s)))
+    frame.dist:SetText(left and (left >= 60 and L("about %dm %02ds left", math.floor(left / 60), math.floor(left % 60))
+      or L("about %ds left", math.floor(left))) or (L["then: "] .. shortText(s)))
     return
   end
   if p.i ~= here.i then
     frame.arrow:Hide(); frame.here:Hide(); frame.skull:Hide()
-    frame.dist:SetText(body and "corpse is in another zone or instance" or "other continent")
+    frame.dist:SetText(body and L["corpse is in another zone or instance"] or L["other continent"])
     return
   end
   local d = D.Dist(here, p)
@@ -157,7 +157,7 @@ function A:Update()
     -- in view (its nameplate carries the skull): no direction - the game won't tell an addon where a
     -- mob stands, and the nearest spawn marker is often not the one it's on, so an arrow would lead away
     frame.arrow:Hide(); frame.here:Hide(); frame.skull:Show()
-    frame.dist:SetText((D:Name(v.src) or "target") .. (v.close and " - right here" or " in view - go for the skull"))
+    frame.dist:SetText((D:Name(v.src) or "target") .. (v.close and L[" - right here"] or L[" in view - go for the skull"]))
     return
   end
   frame.skull:Hide()
@@ -182,7 +182,7 @@ function A:Update()
   local facing = GetPlayerFacing and GetPlayerFacing()
   if not facing then
     frame.arrow:SetRotation(0)
-    frame.dist:SetText(("%d yd"):format(math.floor(d)))
+    frame.dist:SetText(L("%d yd", math.floor(d)))
     return
   end
   local rel = atan2(dy, dx) - facing
@@ -192,7 +192,7 @@ function A:Update()
   local f = a / math.pi
   if f < 0.5 then frame.arrow:SetVertexColor(0.3 + f * 1.4, 1, 0.45 - f * 0.5)
   else frame.arrow:SetVertexColor(1, 1 - (f - 0.5) * 1.4, 0.2) end
-  frame.dist:SetText(("%d yd"):format(math.floor(d)))
+  frame.dist:SetText(L("%d yd", math.floor(d)))
 end
 
 function A:Refresh()

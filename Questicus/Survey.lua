@@ -47,7 +47,7 @@ end
 -- ------------------------------------------------------------------ pages
 -- the language (first page): one needs its language pack, a separate download
 local function pageLanguage(p)
-  header(p, "Language", "Pick the language Questicus speaks. English is built in; every other language is a small language pack you download separately.")
+  header(p, L["Language"], L["Pick the language Questicus speaks. English is built in; every other language is a small language pack you download separately."])
   local items = {}
   local opts = { { code = "auto" } }
   for _, l in ipairs(Q.LANGS) do opts[#opts + 1] = l end
@@ -57,7 +57,7 @@ local function pageLanguage(p)
     for _, l in ipairs(Q.LANGS) do if l.code == Q.GameLang() then return L("Automatic (the game's language: %s)", l.name) end end
     return L["Automatic (the game's language)"]
   end
-  local reload = T.Button(p, "Reload now and continue", 200, 24)
+  local reload = T.Button(p, L["Reload now and continue"], 200, 24)
   reload:SetScript("OnClick", function() if C_UI and C_UI.Reload then C_UI.Reload() elseif ReloadUI then ReloadUI() end end)
   reload:Hide()
   local function refresh()
@@ -84,7 +84,7 @@ local function pageLanguage(p)
   note:SetPoint("TOPLEFT", 24, -84 - math.ceil(#opts / 2) * 26 - 8)
   note:SetWidth(W - 48)
   note:SetText(L["Greyed out: that language's pack isn't installed. Language packs are on the Questicus files page on CurseForge, next to each Questicus download - install the one for your language, then pick it here. Spot a translation that needs correcting? Leave a comment on the Questicus page or contact me."])
-  local link = T.Button(p, "Questicus files page", 170, 24)
+  local link = T.Button(p, L["Questicus files page"], 170, 24)
   link:SetPoint("TOPLEFT", note, "BOTTOMLEFT", 0, -10)
   link:SetScript("OnClick", function() Q.CopyBox(L["Questicus files page"], Q.LANG_URL) end)
   reload:SetPoint("LEFT", link, "RIGHT", 8, 0)
@@ -92,7 +92,7 @@ local function pageLanguage(p)
 end
 
 local function pageStyle(p)
-  header(p, "Welcome to Questicus", "A few quick questions so the route fits how you like to play. You can change any of this later.")
+  header(p, L["Welcome to Questicus"], L["A few quick questions so the route fits how you like to play. You can change any of this later."])
   local cards = {}
   local opts = {
     { "speed", "Interface\\Icons\\Ability_Rogue_Sprint", "Speedrun",
@@ -125,36 +125,36 @@ local function pageStyle(p)
 end
 
 local function pageRoute(p)
-  header(p, "Your route", "How far ahead to push, what kind of content, and what matters most.")
+  header(p, L["Your route"], L["How far ahead to push, what kind of content, and what matters most."])
   local w = {}
-  label(p, "Quests up to this many levels above you", 24, -84)
+  label(p, L["Quests up to this many levels above you"], 24, -84)
   w[1] = T.Segments(p, { { 1, "+1" }, { 2, "+2" }, { 3, "+3" }, { 4, "+4" } }, getter("levelRange"), setter("levelRange"), 60)
   w[1]:SetPoint("TOPLEFT", 24, -104)
-  label(p, "And this many levels below you", 330, -84)
+  label(p, L["And this many levels below you"], 330, -84)
   w[7] = T.Segments(p, { { 0, "Any XP", "Everything that still gives experience." }, { 2, "-2" }, { 3, "-3" },
     { 5, "-5" }, { 8, "-8" } }, function() return pr().levelBelow or 0 end, setter("levelBelow"), 56)
   w[7]:SetPoint("TOPLEFT", 330, -104)
-  label(p, "Group content", 24, -144)
+  label(p, L["Group content"], 24, -144)
   w[2] = T.Segments(p, { { "solo", "Solo only", "Skip quests with elite targets or elites around the objectives." },
     { "some", "Easy elites", "Elite quests you can solo or duo near your level." },
     { "group", "Group quests", "Include elite group quests." } }, getter("elite"), setter("elite"), 120)
   w[2]:SetPoint("TOPLEFT", 24, -164)
-  label(p, "Experience", 24, -204)
+  label(p, L["Experience"], 24, -204)
   w[3] = T.Segments(p, { { 1, "Low" }, { 2, "Normal" }, { 3, "Top priority" } }, getter("xp"), setter("xp"), 110)
   w[3]:SetPoint("TOPLEFT", 24, -224)
-  label(p, "Gold", 24, -264)
+  label(p, L["Gold"], 24, -264)
   w[4] = T.Segments(p, { { 1, "Low" }, { 2, "Normal" }, { 3, "High" } }, getter("gold"), setter("gold"), 110)
   w[4]:SetPoint("TOPLEFT", 24, -284)
-  w[5] = T.Check(p, "Dungeon quests (pick them up on the way, do them with a group)", getter("dungeons"), setter("dungeons"))
+  w[5] = T.Check(p, L["Dungeon quests (pick them up on the way, do them with a group)"], getter("dungeons"), setter("dungeons"))
   w[5]:SetPoint("TOPLEFT", 24, -326); w[5]:SetWidth(560)
-  w[6] = T.Check(p, "Use my hearthstone in routes", getter("hearth"), setter("hearth"))
+  w[6] = T.Check(p, L["Use my hearthstone in routes"], getter("hearth"), setter("hearth"))
   w[6]:SetPoint("TOPLEFT", 24, -350)
   function p:Refresh() for _, x in ipairs(w) do x:Refresh() end end
 end
 
 local function pageComplete(p)
-  header(p, "Completionist", "What to include beyond the main levelling route.")
-  label(p, "Breadcrumb quests (the ones that send you to a new place)", 24, -84)
+  header(p, L["Completionist"], L["What to include beyond the main levelling route."])
+  label(p, L["Breadcrumb quests (the ones that send you to a new place)"], 24, -84)
   local w = {}
   w[1] = T.Segments(p, { { "skip", "Skip" }, { "useful", "When useful", "Take them when the route goes there anyway." },
     { "all", "All of them" } }, getter("breadcrumbs"), setter("breadcrumbs"), 120)
@@ -186,8 +186,8 @@ local function pageComplete(p)
 end
 
 local function pageGear(p)
-  header(p, "Gear", "Questicus compares every reward and vendor item with what you wear and routes you to the upgrades.")
-  label(p, "Your role", 24, -84)
+  header(p, L["Gear"], L["Questicus compares every reward and vendor item with what you wear and routes you to the upgrades."])
+  label(p, L["Your role"], 24, -84)
   local roles = Q.Gear.ROLES[Q.player.class] or { "melee" }
   local opts = {}
   for _, r in ipairs(roles) do opts[#opts + 1] = { r, Q.Gear.ROLE_NAMES[r] } end
@@ -195,25 +195,25 @@ local function pageGear(p)
   local w = {}
   w[1] = T.Segments(p, opts, getter("role"), setter("role"), 136)
   w[1]:SetPoint("TOPLEFT", 24, -104)
-  label(p, "Upgrades", 24, -146)
+  label(p, L["Upgrades"], 24, -146)
   w[2] = T.Segments(p, { { "route", "Route me to them", "Quests and vendors with upgrades get a higher priority." },
     { "onway", "Only on the way", "Show upgrades, but never detour for them." },
     { "off", "Don't bother" } }, getter("gear"), setter("gear"), 140)
   w[2]:SetPoint("TOPLEFT", 24, -166)
-  w[3] = T.Check(p, "Suggest the best quest reward (I confirm it)", getter("autoReward"), setter("autoReward"),
+  w[3] = T.Check(p, L["Suggest the best quest reward (I confirm it)"], getter("autoReward"), setter("autoReward"),
     "Takes the biggest upgrade, or the reward that sells for the most if none is an upgrade. Hold Shift to choose yourself.")
   w[3]:SetPoint("TOPLEFT", 24, -212); w[3]:SetWidth(500)
   local sp = T.Text(p, 11, T.c.dim)
   sp:SetPoint("TOPLEFT", 24, -246)
   sp:SetWidth(W - 48)
-  sp:SetText("Stat weights are tuned for levelling (weapon damage counts a lot early on). Armor you will outgrow at 40 counts a little less.")
+  sp:SetText(L["Stat weights are tuned for levelling (weapon damage counts a lot early on). Armor you will outgrow at 40 counts a little less."])
   function p:Refresh() for _, x in ipairs(w) do x:Refresh() end end
 end
 
 local function pageStats(p)
-  header(p, "Stats and weapons", "Which stats matter most to you, and the weapon types you actually use. Upgrades and quest rewards follow this.")
+  header(p, L["Stats and weapons"], L["Which stats matter most to you, and the weapon types you actually use. Upgrades and quest rewards follow this."])
   local G = Q.Gear
-  label(p, "Stat priority (click to pick, right-click to clear)", 24, -84)
+  label(p, L["Stat priority (click to pick, right-click to clear)"], 24, -84)
   local opts = G.STAT_ORDER
   local rows = {}
   local function prio()
@@ -300,11 +300,11 @@ local function pageStats(p)
   local hint = T.Text(p, 11, T.c.dim)
   hint:SetPoint("TOPLEFT", 240, -108)
   hint:SetWidth(W - 270)
-  hint:SetText("Empty = Questicus uses the usual weights for your role. Your 1st stat counts most; stats you leave out count a bit less.")
-  label(p, "Weapon types I use (untick the ones you never want)", 24, -256)
+  hint:SetText(L["Empty = Questicus uses the usual weights for your role. Your 1st stat counts most; stats you leave out count a bit less."])
+  label(p, L["Weapon types I use (untick the ones you never want)"], 24, -256)
   local checks = {}
   for i, sub in ipairs(G.ClassWeapons()) do
-    local c = T.Check(p, G.WEAPON_NAMES[sub] or ("Type " .. sub), function()
+    local c = T.Check(p, G.WEAPON_NAMES[sub] or (L["Type "] .. sub), function()
       local w = pr().weapons
       return type(w) ~= "table" or not next(w) or w[sub] == true
     end, function(v)
@@ -328,7 +328,7 @@ local function pageStats(p)
 end
 
 local function pageHelpers(p)
-  header(p, "Helpers", "Things Questicus can do for you while you play.")
+  header(p, L["Helpers"], L["Things Questicus can do for you while you play."])
   local w = {}
   local list = {
     { pr, "autoAccept", "Accept route quests automatically", "Hold Shift when talking to skip it once. Escort quests always ask first." },
@@ -350,7 +350,7 @@ local function pageHelpers(p)
 end
 
 local function pageDone(p)
-  header(p, "All set", "")
+  header(p, L["All set"], "")
   local txt = T.Text(p, 13, T.c.text)
   txt:SetPoint("TOPLEFT", 24, -84)
   txt:SetWidth(W - 48)
@@ -399,10 +399,10 @@ local function build()
     p:Hide()
     pages[i] = p
   end
-  frame.back = T.Button(frame, "Back", 90, 26)
+  frame.back = T.Button(frame, L["Back"], 90, 26)
   frame.back:SetPoint("BOTTOMLEFT", 16, 12)
   frame.back:SetScript("OnClick", function() show(page - 1) end)
-  frame.next = T.Button(frame, "Next", 140, 26)
+  frame.next = T.Button(frame, L["Next"], 140, 26)
   frame.next:SetPoint("BOTTOMRIGHT", -16, 12)
   frame.next:SetScript("OnClick", function()
     if page < #pages then show(page + 1) else SV:Finish() end

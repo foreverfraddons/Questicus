@@ -25,7 +25,7 @@ function CL:QuestReason(id, inRoute)
   if not e then return end
   if inRoute[id] then return end
   local info = QS:Info(id)
-  if Q.char.skipped[id] then return "you removed it from the route", true end
+  if Q.char.skipped[id] then return L["you removed it from the route"], true end
   local ex = P.Excluded and not e.complete and P.Excluded(id)
   if ex then return ex, true end
   if P.OptedOut and P.OptedOut(id) and P.Kind(id) then
@@ -33,16 +33,16 @@ function CL:QuestReason(id, inRoute)
     return (k == "pvp" and "PvP quest" or k == "escort" and "escort quest" or "cooking / recipe quest") .. " - turned off in your settings", true
   end
   local lvl = (info and info.level) or e.level
-  if lvl and lvl <= QS.GreyLevel(Q.player.level) then return "grey - gives almost no XP", true end
+  if lvl and lvl <= QS.GreyLevel(Q.player.level) then return L["grey - gives almost no XP"], true end
   if lvl and (Q.prefs.levelBelow or 0) > 0 and lvl < Q.player.level - Q.prefs.levelBelow and not e.complete then
-    return ("more than %d levels below you"):format(Q.prefs.levelBelow), true
+    return L("more than %d levels below you", Q.prefs.levelBelow), true
   end
   if e.complete then return end                                   -- finished: hand it in, don't throw it away
   local m = info and P.Meta(id)
-  if m and m.dungeon then return "dungeon quest - not in the route (needs a group)", false end
-  if info and info.level > Q.player.level + (Q.prefs.levelRange or 2) + 2 then return "too high for now", false end
-  if not info then return "not in the database - Questicus can't route it", false end
-  return "not in your route", true
+  if m and m.dungeon then return L["dungeon quest - not in the route (needs a group)"], false end
+  if info and info.level > Q.player.level + (Q.prefs.levelRange or 2) + 2 then return L["too high for now"], false end
+  if not info then return L["not in the database - Questicus can't route it"], false end
+  return L["not in your route"], true
 end
 
 -- bag items: { bag, slot, item, count }
@@ -102,11 +102,11 @@ function CL:ItemReason(item, need)
   local rec = D:Item(item)
   local q = starts(item)
   if q then
-    if QS.done[q] then return "starts a quest you already did" end
-    if Q.char.skipped[q] then return "starts a quest you removed from the route" end
+    if QS.done[q] then return L["starts a quest you already did"] end
+    if Q.char.skipped[q] then return L["starts a quest you removed from the route"] end
     return                                                       -- starts a quest you may still want
   end
-  if rec and rec[5] == 12 then return "quest item no quest in your log needs" end
+  if rec and rec[5] == 12 then return L["quest item no quest in your log needs"] end
 end
 
 function CL:Scan()
@@ -115,7 +115,7 @@ function CL:Scan()
   for id, e in pairs(QS.log) do
     local why, default = CL:QuestReason(id, inRoute)
     if why then
-      quests[#quests + 1] = { id = id, title = e.title or ((QS:Info(id) or {}).title) or ("Quest " .. id), why = why, on = default }
+      quests[#quests + 1] = { id = id, title = e.title or ((QS:Info(id) or {}).title) or (L["Quest "] .. id), why = why, on = default }
     else
       keep[id] = true
     end
@@ -137,7 +137,7 @@ function CL:Scan()
         for _, it in ipairs(xx[21] or {}) do if it == b.item then q = x end end
         if xx[18] == b.item then q = x end
       end
-      if q then why = "for " .. q.title .. " (goes if that quest goes)" end
+      if q then why = "for " .. q.title .. L[" (goes if that quest goes)"] end
       local name = Q.GetItemInfo(b.item) or D:Name("i" .. b.item)
       items[#items + 1] = { bag = b.bag, slot = b.slot, item = b.item, count = b.count, name = name, why = why, on = true, quest = q }
       seen[b.item] = true
@@ -192,8 +192,8 @@ function CL:Apply(quests, items)
     -- an item for a quest you kept stays
     if it.on and (not it.quest or dropped[it.quest.id]) then left[#left + 1] = it end
   end
-  Q:Print(("clean-up: abandoned %d quest(s)%s"):format(gone,
-    #left > 0 and (", " .. #left .. " item(s) to delete - click each one's button") or ""))
+  Q:Print(L("clean-up: abandoned %d quest(s)%s", gone,
+    #left > 0 and (", " .. #left .. L[" item(s) to delete - click each one's button"]) or ""))
   P:Replan(0.5)
   return gone, left
 end
@@ -209,7 +209,7 @@ local function row(i)
     r.check = T.Check(r, "", function() local d = rowData[r] return d and d.on end, function(v) local d = rowData[r] if d then d.on = v end end)
     r.check:SetPoint("LEFT", 0, 0)
     r.check:SetWidth(380)
-    r.pick = T.Button(r, "Pick up", 76, 18)
+    r.pick = T.Button(r, L["Pick up"], 76, 18)
     r.pick:SetPoint("RIGHT", -2, 0)
     r.pick:Hide()
     r.pick:SetScript("OnClick", function()
@@ -236,13 +236,13 @@ function CL:Show()
     frame.list:SetPoint("TOPLEFT", 14, -52)
     frame.list:SetPoint("RIGHT", -14, 0)
     frame.list:SetHeight(1)
-    frame.go = T.Button(frame, "Clean up", 110, 24)
+    frame.go = T.Button(frame, L["Clean up"], 110, 24)
     frame.go:SetPoint("BOTTOMRIGHT", -14, 12)
     frame.go:SetScript("OnClick", function()
       local _, left = CL:Apply(frame.quests or {}, frame.items or {})
       if #left > 0 then CL:ShowItems(left) else frame:Hide() end
     end)
-    frame.cancel = T.Button(frame, "Cancel", 90, 24)
+    frame.cancel = T.Button(frame, L["Cancel"], 90, 24)
     frame.cancel:SetPoint("RIGHT", frame.go, "LEFT", -8, 0)
     frame.cancel:SetScript("OnClick", function() frame:Hide() end)
   end

@@ -6,6 +6,7 @@
 -- the recordings sync can send it to ForeverDB, where it helps every player. Used right away too:
 -- a quest with no map spot gets one as soon as anyone (you included) made progress on it.
 local Q = Questicus
+local L = Q.L
 local D, QS = Q.Data, Q.Quests
 local C = {}
 Q.Collect = C
@@ -197,6 +198,6 @@ Q:Command("recorded", "what Questicus has recorded for the database", function()
   for _ in pairs(c.qsp) do nq = nq + 1 end
   for _ in pairs(c.qsrc) do ns = ns + 1 end
   for _ in pairs(c.qst) do ng = ng + 1 end
-  Q:Print(("recorded objective areas for %d quests, item sources for %d, givers/enders for %d. Recording is %s.")
+  Q:Print((L["recorded objective areas for %d quests, item sources for %d, givers/enders for %d. Recording is %s."])
     :format(nq, ns, ng, C.On() and "on" or "off"))
 end)

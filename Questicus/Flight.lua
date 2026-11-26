@@ -332,7 +332,7 @@ local function noteLanding()
   paths[f.from.id][f.to.id] = secs
   F.cache = {}
   F.version = F.version + 1
-  Q:Print(("flight %s -> %s took %d:%02d (recorded for the route)"):format(f.from.name, f.to.name, math.floor(secs / 60), secs % 60))
+  Q:Print(L("flight %s -> %s took %d:%02d (recorded for the route)", f.from.name, f.to.name, math.floor(secs / 60), secs % 60))
 end
 F.NoteLanding = noteLanding
 
@@ -444,7 +444,7 @@ watch:SetScript("OnUpdate", function(_, el)
       QuesticusCollect.nofp = QuesticusCollect.nofp or {}
       QuesticusCollect.nofp[s.node.id] = true
     end
-    Q:Print(L["no flight master at "] .. s.node.name .. " - left out of routes from now on")
+    Q:Print(L["no flight master at "] .. s.node.name .. L[" - left out of routes from now on"])
     if Q.Planner then Q.Planner:Replan(0.2) end
   end
 end)

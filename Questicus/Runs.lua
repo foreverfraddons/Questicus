@@ -354,8 +354,8 @@ end
 function R.Money(cp)
   cp = math.floor(cp or 0)
   local g, s, c = math.floor(cp / 10000), math.floor(cp / 100) % 100, cp % 100
-  if g > 0 then return ("%dg %ds"):format(g, s) end
-  if s > 0 then return ("%ds %dc"):format(s, c) end
+  if g > 0 then return L("%dg %ds", g, s) end
+  if s > 0 then return L("%ds %dc", s, c) end
   return c .. "c"
 end
 function R.Clock(sec)
@@ -426,7 +426,7 @@ function R:ShowHistory(area)
   local seen, order = {}, {}
   for _, r in ipairs(runs) do if not seen[r.area] then seen[r.area] = r.name; order[#order + 1] = r.area end end
   for k, a in ipairs(order) do
-    if k > 4 then lines[#lines + 1] = Q.Color(T.HEX.dim, ("... and %d more dungeons"):format(#order - 4)); break end
+    if k > 4 then lines[#lines + 1] = Q.Color(T.HEX.dim, L("... and %d more dungeons", #order - 4)); break end
     local av = R:Averages(a)
     lines[#lines + 1] = Q.Color(T.HEX.gold, seen[a]) .. Q.Color(T.HEX.dim, "  " .. (av.runs == 1 and L["1 run - average "] or L("%d runs - average ", av.runs)))
       .. (av.time and (R.Clock(av.time) .. Q.Color(T.HEX.dim, L[" to clear, "])) or "")
@@ -443,7 +443,7 @@ function R:ShowHistory(area)
     for _ in pairs(r.kills or {}) do kills = kills + 1 end
     local when = date and date("%b %d %H:%M", r.start) or tostring(r.start)
     row.top:SetText(("%s  %s"):format(Q.Color(T.HEX.gold, r.name), Q.Color(T.HEX.dim, when)))
-    row.sub:SetText(("%s%s   %s   %s XP   %d/%d bosses   %d item%s"):format(
+    row.sub:SetText(L("%s%s   %s   %s XP   %d/%d bosses   %d item%s", 
       r.done and "" or Q.Color(T.HEX.dim, L["unfinished "]), R.Clock(r.done or ((r.ended or now()) - r.start)), R.Money(r.money), r.xp or 0,
       kills, r.bosses or 0, #(r.loot or {}), #(r.loot or {}) == 1 and "" or "s"))
     row:ClearAllPoints(); row:SetPoint("TOPLEFT", 0, -y); row:SetPoint("RIGHT", 0, 0); row:Show()
@@ -473,7 +473,7 @@ function R:ShowRun(run)
   local out = {}
   out[#out + 1] = Q.Color(T.HEX.dim, L["Time: "]) .. R.Clock(run.done or ((run.ended or now()) - run.start)) .. (run.done and "" or Q.Color(T.HEX.dim, L["  (not every boss was killed)"]))
   out[#out + 1] = Q.Color(T.HEX.dim, L["Gold: "]) .. R.Money(run.money) .. Q.Color(T.HEX.dim, "    XP: ") .. (run.xp or 0)
-    .. Q.Color(T.HEX.dim, ("    level %d"):format(run.level or 0))
+    .. Q.Color(T.HEX.dim, L("    level %d", run.level or 0))
   out[#out + 1] = " "
   out[#out + 1] = Q.Color(T.HEX.gold, L["Bosses"])
   local ks = {}

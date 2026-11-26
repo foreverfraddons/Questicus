@@ -13,7 +13,7 @@ local function register()
   if registered or not (CC and CC.RegisterTool) then return end
   registered = CC:RegisterTool({
     label = "Questicus",
-    desc = "Step-by-step questing: route, arrow, map pins and gear upgrades",
+    desc = L["Step-by-step questing: route, arrow, map pins and gear upgrades"],
     icon = Q.MEDIA .. "i_questicus",
     tint = true,
     window = "QuesticusGuide",
@@ -80,7 +80,7 @@ local function openMap()
       end
       if #lines == 0 then return nil end
       lines[#lines + 1] = "|cff9d9d9d/qc dungeons - Get all quests routes you to them|r"
-      return "Questicus quests", lines
+      return L["Questicus quests"], lines
     end)
   end
   PN:RefreshWorld()

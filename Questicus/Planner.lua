@@ -618,7 +618,7 @@ function P.Excluded(id)
   if not pr.dungeons then
     local sort = x[11]
     if (info and info.dungeon) or (m and m.dungeon) or (sort and sort > 0 and D:Dungeon(sort)) then
-      return "dungeon quest - dungeon quests are off in your settings"
+      return L["dungeon quest - dungeon quests are off in your settings"]
     end
   end
   if pr.elite ~= "group" then
@@ -626,13 +626,13 @@ function P.Excluded(id)
       for _, c in ipairs(x[8] or {}) do
         local n = D:NPC(c)
         if n and (n[5] or 0) >= 1 and (n[5] or 0) ~= 4 then
-          return ("elite target (%s) - you picked solo only"):format(n[1] or "elite")
+          return L("elite target (%s) - you picked solo only", n[1] or "elite")
         end
       end
     end
     if m and m.eliteNear then
       local n = D:NPC(m.eliteNear.nid)
-      return ("elites where the objectives are (%s, level %d) - you picked %s"):format(n and n[1] or "elite",
+      return L("elites where the objectives are (%s, level %d) - you picked %s", n and n[1] or "elite",
         m.eliteNear.lvl or 0, pr.elite == "solo" and "solo only" or "easy elites")
     end
   end
@@ -773,10 +773,10 @@ function neededFor(id)
     local info = QS:Info(q)
     if not info then break end
     if q ~= id then
-      if info.dungeon and Q.prefs.dungeons then return ("leads to %s (dungeon)"):format(info.title) end
+      if info.dungeon and Q.prefs.dungeons then return L("leads to %s (dungeon)", info.title) end
       if Q.prefs.gear ~= "off" then
         local ok, up = pcall(G.QuestUpgrade, G, q)
-        if ok and up then return ("leads to %s (a gear upgrade for you)"):format(info.title) end
+        if ok and up then return L("leads to %s (a gear upgrade for you)", info.title) end
       end
     else
       local ok, up = pcall(G.QuestUpgrade, G, q)
@@ -805,7 +805,7 @@ function optedOut(id)
   -- (an escort you add yourself - tracker "+", a dungeon's "Get all quests" - still goes on the route)
   local need = P.NeededFor(id)
   if need then
-    P.keepWhy[id] = KIND_NAMES[kind] .. " - kept because the chain needs it: " .. need
+    P.keepWhy[id] = KIND_NAMES[kind] .. L[" - kept because the chain needs it: "] .. need
     return false
   end
   return true
@@ -1010,11 +1010,11 @@ end
 function P.ExploreTargets(map)
   if exploreCache[map] then return exploreCache[map] end
   local out = {}
-  local L = D.db and D.db.legacy
-  local zone = L and L.zones and L.zones[map]
+  local lgc = D.db and D.db.legacy
+  local zone = lgc and lgc.zones and lgc.zones[map]
   if zone then
     local names = {}
-    for _, a in ipairs((L.completion and L.completion[map] and L.completion[map].areas) or {}) do if a.key then names[a.key] = a.name end end
+    for _, a in ipairs((lgc.completion and lgc.completion[map] and lgc.completion[map].areas) or {}) do if a.key then names[a.key] = a.name end end
     local got = exploredKeys(map)
     for _, e in ipairs(zone) do
       if e.kind == "explore" and e.key and e.x and not got[e.key] and not (Q.char.explored and Q.char.explored[map .. ":" .. e.key]) then
@@ -1026,7 +1026,7 @@ function P.ExploreTargets(map)
         if not done then
           local i, x, y = D:WorldPos(map, e.x, e.y)
           if i then
-            out[#out + 1] = { key = map .. ":" .. e.key, name = names[e.key] or "an unexplored area", map = map,
+            out[#out + 1] = { key = map .. ":" .. e.key, name = names[e.key] or L["an unexplored area"], map = map,
               point = { i = i, x = x, y = y, m = map, mx = e.x, my = e.y } }
           end
         end
@@ -1479,11 +1479,11 @@ end
 local function short(a)
   if not a then return nil end
   local title = a.id and QS:Info(a.id) and QS:Info(a.id).title or ""
-  if a.type == "accept" then return "accept " .. title end
-  if a.type == "turnin" then return "turn in " .. title end
-  if a.type == "complete" then return "do " .. title end
-  if a.type == "buy" then return "buy " .. D:Name("i" .. (a.item or 0)) end
-  if a.type == "fp" then return "get the flight path at " .. a.node.name end
+  if a.type == "accept" then return L("accept %s", title) end
+  if a.type == "turnin" then return L("turn in %s", title) end
+  if a.type == "complete" then return L("do %s", title) end
+  if a.type == "buy" then return L("buy %s", D:Name("i" .. (a.item or 0))) end
+  if a.type == "fp" then return L("get the flight path at %s", a.node.name) end
   if a.type == "explore" then return "explore " .. a.area.name end
   if a.type == "prep" then return a.prep.text end
   return a.type
@@ -1497,13 +1497,13 @@ local function reasons(a, alt, st)
   if a.type == "complete" then
     local m = questMeta(a.id)
     if a.unknown then
-      why[#why + 1] = "No map spots for these objectives yet - left for last (the game's quest marker is used)"
+      why[#why + 1] = L["No map spots for these objectives yet - left for last (the game's quest marker is used)"]
     else
       local n = #(a.bundle or {})
       if n > 1 then
         local learned
         for _, how in pairs(a.together or {}) do if how == "learned" then learned = true end end
-        why[#why + 1] = ("%d quests have objectives here - done in one go"):format(n) ..
+        why[#why + 1] = L("%d quests have objectives here - done in one go", n) ..
           (learned and " (you did some of them together before)" or "")
       end
       if a.partial then
@@ -1514,35 +1514,35 @@ local function reasons(a, alt, st)
           for _, x in ipairs(g.lines) do if x == li then found = true end end
           if not found and m.lines[li] then rest[#rest + 1] = m.lines[li].name end
         end
-        why[#why + 1] = "Only " .. lineNames(m, g.lines) .. " here now" ..
-          (#rest > 0 and (" - " .. table.concat(rest, ", ") .. " is elsewhere and comes later in the route") or "")
+        why[#why + 1] = L["Only "] .. lineNames(m, g.lines) .. L[" here now"] ..
+          (#rest > 0 and (" - " .. table.concat(rest, ", ") .. L[" is elsewhere and comes later in the route"]) or "")
       end
-      if a.inArea then why[#why + 1] = "You're right where these objectives are - finish them before leaving" end
-      if (a.back or 0) > 20 then why[#why + 1] = "Avoids walking away from objectives that are still waiting nearby" end
+      if a.inArea then why[#why + 1] = L["You're right where these objectives are - finish them before leaving"] end
+      if (a.back or 0) > 20 then why[#why + 1] = L["Avoids walking away from objectives that are still waiting nearby"] end
     end
   elseif a.type == "turnin" then
-    why[#why + 1] = "Finished - hand it in while you're close"
-    if (a.back or 0) > 20 then why[#why + 1] = "Still worth it although objectives are waiting nearby" end
+    why[#why + 1] = L["Finished - hand it in while you're close"]
+    if (a.back or 0) > 20 then why[#why + 1] = L["Still worth it although objectives are waiting nearby"] end
   elseif a.type == "accept" then
-    if a.item then why[#why + 1] = "You have the item that starts it"
-    elseif a.here then why[#why + 1] = "Right here - take it before leaving"
+    if a.item then why[#why + 1] = L["You have the item that starts it"]
+    elseif a.here then why[#why + 1] = L["Right here - take it before leaving"]
     elseif a.overlap then
-      why[#why + 1] = "Its objectives are where " .. ((QS:Info(a.overlap) or {}).title or "another quest") .. " takes you anyway"
+      why[#why + 1] = L["Its objectives are where "] .. ((QS:Info(a.overlap) or {}).title or L["another quest"]) .. L[" takes you anyway"]
     end
-    if P.keptTogether and P.keptTogether[a.id] then why[#why + 1] = "Low value alone, but done together with quests in the same area" end
+    if P.keptTogether and P.keptTogether[a.id] then why[#why + 1] = L["Low value alone, but done together with quests in the same area"] end
     if P.keepWhy[a.id] then why[#why + 1] = P.keepWhy[a.id] end
   elseif a.type == "buy" then
-    why[#why + 1] = ("%d%% better than what you wear, on the way"):format(math.floor(a.pct or 0))
+    why[#why + 1] = L("%d%% better than what you wear, on the way", math.floor(a.pct or 0))
   elseif a.type == "explore" then
-    why[#why + 1] = "Completionist: an area of the map you haven't explored yet - exploration XP and the zone's Explorer achievement"
+    why[#why + 1] = L["Completionist: an area of the map you haven't explored yet - exploration XP and the zone's Explorer achievement"]
   elseif a.type == "fp" then
-    why[#why + 1] = "A flight path you don't have yet, a few seconds away - later routes can fly from here"
+    why[#why + 1] = L["A flight path you don't have yet, a few seconds away - later routes can fly from here"]
   end
-  if a.t and a.t > 0 then why[#why + 1] = "About " .. mins(a.t + (a.back or 0)) end
+  if a.t and a.t > 0 then why[#why + 1] = L["About "] .. mins(a.t + (a.back or 0)) end
   if alt and alt.score and a.score and a.score > 0 then
     local x = a.score / math.max(1e-6, alt.score)
-    why[#why + 1] = ("Next best was to %s: %s"):format(short(alt) or "?",
-      x >= 1.05 and ("this is %.1fx more XP per minute"):format(x) or "about as good, this one is closer")
+    why[#why + 1] = L("Next best was to %s: %s", short(alt) or "?",
+      x >= 1.05 and L("this is %.1fx more XP per minute", x) or L["about as good, this one is closer"])
   end
   return why
 end
@@ -1689,12 +1689,12 @@ P.DUNGEON_PREP = {
   -- Gahz'rilla (2770): the Mallet of Zul'Farrak rings the gong that summons him
   { quest = 2770, stages = {
     { key = "zf-mallet-1", has = { 9241, 9240 }, work = 60,
-      text = "Kill Qiaga the Keeper (Jintha'Alor, The Hinterlands) for the Sacred Mallet",
-      why = "Gahz'rilla only comes when you ring the gong in Zul'Farrak with the Mallet of Zul'Farrak: it starts as the Sacred Mallet Qiaga the Keeper drops",
+      text = L["Kill Qiaga the Keeper (Jintha'Alor, The Hinterlands) for the Sacred Mallet"],
+      why = L["Gahz'rilla only comes when you ring the gong in Zul'Farrak with the Mallet of Zul'Farrak: it starts as the Sacred Mallet Qiaga the Keeper drops"],
       points = function() return D:Points("c7996") end },
     { key = "zf-mallet-2", has = { 9240 }, work = 15,
-      text = "Use the Sacred Mallet at the altar of Jintha'Alor (59, 77) - it becomes the Mallet of Zul'Farrak",
-      why = "The Mallet of Zul'Farrak rings the gong that summons Gahz'rilla",
+      text = L["Use the Sacred Mallet at the altar of Jintha'Alor (59, 77) - it becomes the Mallet of Zul'Farrak"],
+      why = L["The Mallet of Zul'Farrak rings the gong that summons Gahz'rilla"],
       points = function()
         local i, x, y = D:WorldPos(1425, 0.59, 0.77)
         if i then return { { i = i, x = x, y = y, key = "altar" } } end
@@ -1819,7 +1819,7 @@ function P:Build()
     P.dset = P.DungeonTargets(Q.char.dmode)
     if not next(P.dset) then
       local d = D:Dungeon(Q.char.dmode)
-      Q:Print(("dungeon mode: every quest for %s is done - back to the normal route"):format(d and d[1] or "the dungeon"))
+      Q:Print(L("dungeon mode: every quest for %s is done - back to the normal route", d and d[1] or L["the dungeon"]))
       Q.char.dmode = nil
       P.dset = nil
       wipe(meta)
@@ -1853,7 +1853,7 @@ function P:Build()
       local via = F.HEARTH_T + travel(hs, a.point, st.level)
       if via < normal - 90 then
         steps[#steps + 1] = { type = "hearth", point = st.pos, to = hs, level = st.level, quests = {}, t = F.HEARTH_T,
-          key = "hearth", why = { ("Hearthing to %s saves about %s (%s instead of %s)"):format(hs.name or "your inn",
+          key = "hearth", why = { L("Hearthing to %s saves about %s (%s instead of %s)", hs.name or L["your inn"],
             mins(normal - via), mins(via), mins(normal)) } }
         st.pos = { i = hs.i, x = hs.x, y = hs.y }
         hs = nil
@@ -1872,7 +1872,7 @@ function P:Build()
       steps[#steps + 1] = { type = "boat", point = cross.from, from = cross.from, to = cross.to, route = cross.route,
         toName = cross.toName, kind = cross.route.kind, level = st.level, quests = {}, t = cross.ride,
         key = "boat:" .. cross.route.id .. ":" .. cross.to.i,
-        why = { ("The next step is on another continent: take the %s to %s"):format(cross.route.kind, cross.toName) } }
+        why = { L("The next step is on another continent: take the %s to %s", L[cross.route.kind or "boat"], L[cross.toName or ""]) } }
       st.pos = cross.to
     end
     -- the way there is a flight: a step for it first
@@ -1880,7 +1880,7 @@ function P:Build()
     if leg and #steps < P.MAX_STEPS - 1 then
       steps[#steps + 1] = { type = "fly", point = leg.from, from = leg.from, to = leg.to, level = st.level, quests = {},
         t = leg.t, key = "fly:" .. leg.to.id, npc = leg.from.name,
-        why = { ("Flying saves about %s over running (%s instead of %s)"):format(mins(leg.walk - leg.t), mins(leg.t), mins(leg.walk)) } }
+        why = { L("Flying saves about %s over running (%s instead of %s)", mins(leg.walk - leg.t), mins(leg.t), mins(leg.walk)) } }
     end
     steps[#steps + 1] = makeStep(a, st, alt)
     for k = #steps, 1, -1 do if steps[k].counted then break end; elapsed = elapsed + (steps[k].t or 0); steps[k].counted = true end

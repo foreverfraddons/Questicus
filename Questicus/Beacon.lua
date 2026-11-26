@@ -46,7 +46,7 @@ function B.Context()
   if W and W.onCorpse then return { kind = "corpse", name = "Your corpse", sub = "Run back here to resurrect" } end
   local man = W and W.manual
   if man then
-    return { kind = "pin", name = man.name or "Map pin", sub = coordText(man.m, man.x, man.y) }
+    return { kind = "pin", name = man.name or L["Map pin"], sub = coordText(man.m, man.x, man.y) }
   end
   if W and W.IsOurs and W:IsOurs() then
     local _, s = Q.Guide:Target()
@@ -66,7 +66,7 @@ function B.Context()
   if wp then
     local x, y = wp.position.x, wp.position.y
     if wp.position.GetXY then x, y = wp.position:GetXY() end
-    return { kind = "pin", name = "Map pin", sub = coordText(wp.uiMapID, x, y) }
+    return { kind = "pin", name = L["Map pin"], sub = coordText(wp.uiMapID, x, y) }
   end
   return { kind = "pin", name = "Waypoint" }
 end
@@ -81,16 +81,16 @@ end
 local function distText(d)
   if cfg().meters then
     d = d * 0.9144
-    if d >= 1000 then return ("%.1f km"):format(d / 1000) end
+    if d >= 1000 then return L("%.1f km", d / 1000) end
     return ("%d m"):format(math.floor(d + 0.5))
   end
-  return ("%d yd"):format(math.floor(d + 0.5))
+  return L("%d yd", math.floor(d + 0.5))
 end
 B.DistText = distText
 local function etaText(s)
   if not s or s ~= s or s > 5940 then return nil end
   s = math.floor(s + 0.5)
-  if s >= 60 then return ("%dm %02ds"):format(math.floor(s / 60), s % 60) end
+  if s >= 60 then return L("%dm %02ds", math.floor(s / 60), s % 60) end
   return ("%ds"):format(s)
 end
 B.EtaText = etaText
@@ -223,7 +223,7 @@ local function build()
       if not cfg().rightClear then return end
       GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
       local c = B.Context()
-      GameTooltip:AddLine(c.name or "Waypoint", 1, 0.82, 0.3)
+      GameTooltip:AddLine(c.name or L["Waypoint"], 1, 0.82, 0.3)
       if c.sub then GameTooltip:AddLine(c.sub, 0.9, 0.9, 0.9) end
       GameTooltip:AddLine(L["Right-click: clear"], 0.6, 0.6, 0.6)
       GameTooltip:Show()

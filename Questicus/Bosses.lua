@@ -393,18 +393,18 @@ function BT:Show(e)
     bar:SetFrameStrata("MEDIUM")
     bar.count = T.Text(bar.bar, 11, T.c.dim)
     bar.count:SetPoint("RIGHT", bar.close, "LEFT", -6, 0)
-    bar.reset = T.Button(bar, "New run", 70, 18)
+    bar.reset = T.Button(bar, L["New run"], 70, 18)
     bar.reset:SetPoint("BOTTOMRIGHT", -8, 6)
-    bar.reset.tip = "Start a new run (the current one goes into the history)"
+    bar.reset.tip = L["Start a new run (the current one goes into the history)"]
     bar.reset:SetScript("OnClick", function()
       Q.char.bossRun = nil
       if Q.Runs then Q.Runs:NewRun() end
       BT:Refresh()
     end)
     -- history of runs (averages, loot, times)
-    bar.hist = T.Button(bar, "History", 70, 18)
+    bar.hist = T.Button(bar, L["History"], 70, 18)
     bar.hist:SetPoint("RIGHT", bar.reset, "LEFT", -6, 0)
-    bar.hist.tip = "Your runs: completion time, gold, XP, loot (and who got it) and the averages"
+    bar.hist.tip = L["Your runs: completion time, gold, XP, loot (and who got it) and the averages"]
     bar.hist:SetScript("OnClick", function() if Q.Runs then Q.Runs:ShowHistory(bar.e and bar.e.area) end end)
     -- this run: time, gold and XP
     bar.stats = T.Text(bar, 11, T.c.text)
@@ -432,7 +432,7 @@ function BT:Show(e)
     bar.mode:SetScript("OnClick", function() Q.db.bossLow = not Q.db.bossLow; BT:Refresh() end)
     bar.mode:SetScript("OnEnter", function(self)
       GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-      GameTooltip:AddLine(Q.db.bossLow and "Show portraits" or "Low profile: just a list of names", 1, 1, 1)
+      GameTooltip:AddLine(Q.db.bossLow and L["Show portraits"] or L["Low profile: just a list of names"], 1, 1, 1)
       GameTooltip:Show()
     end)
     bar.mode:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -509,7 +509,7 @@ function BT:Stats()
     bar.stats:SetText((cur.done and c(T.HEX.good, L["Cleared "]) or "") .. Q.Runs:Summary(cur))
   else
     local av = Q.Runs and bar.e and Q.Runs:Averages(bar.e.area)
-    bar.stats:SetText(av and c(DIM, ("avg %s  %s  %d XP"):format(av.time and Q.Runs.Clock(av.time) or "-", Q.Runs.Money(av.gold), math.floor(av.xp))) or "")
+    bar.stats:SetText(av and c(DIM, L("avg %s  %s  %d XP", av.time and Q.Runs.Clock(av.time) or "-", Q.Runs.Money(av.gold), math.floor(av.xp))) or "")
   end
 end
 Q:On("QC_RUN_CHANGED", function() if bar and bar:IsShown() then BT:Refresh() end end)
@@ -710,9 +710,9 @@ function BT:ShowBoss(e, b)
     card.pos = T.Text(card, 10, T.c.dim)
     if card.EnableMouseWheel then card:EnableMouseWheel(true) end
     card:SetScript("OnMouseWheel", function(_, d) BT:ScrollLoot(d) end)
-    card.edit = T.Button(card, "Edit fight notes", 120, 20)
+    card.edit = T.Button(card, L["Edit fight notes"], 120, 20)
     card.edit:SetPoint("BOTTOMRIGHT", -12, 10)
-    card.kill = T.Button(card, "Killed", 80, 20)
+    card.kill = T.Button(card, L["Killed"], 80, 20)
     card.kill:SetPoint("RIGHT", card.edit, "LEFT", -8, 0)
   end
   if bar and bar:IsShown() and card.ClearAllPoints then
@@ -787,12 +787,12 @@ function BT:ShowBoss(e, b)
       local sub
       if cat == "quest" and qs then
         local qi = QS:Info(qs[1][1])
-        local title = (qi and qi.title) or (D:Quest(qs[1][1]) or {})[1] or "a quest"
+        local title = (qi and qi.title) or (D:Quest(qs[1][1]) or {})[1] or L["a quest"]
         if qs[1][2] == "part" then
           local x = D:QuestExtra(qs[1][1]) or {}
           local other = {}
           for _, it in ipairs(x[21] or {}) do if it ~= id then other[#other + 1] = "[" .. iname(it) .. "]" end end
-          sub = "Put together" .. (#other > 0 and (" with " .. table.concat(other, " + ")) or "") .. " for " .. title
+          sub = L["Put together"] .. (#other > 0 and (" with " .. table.concat(other, " + ")) or "") .. " for " .. title
         else
           sub = "For " .. title
         end
@@ -809,7 +809,7 @@ function BT:ShowBoss(e, b)
   local y = 104 + h + 10
   card.lootHead:ClearAllPoints()
   card.lootHead:SetPoint("TOPLEFT", 14, -y)
-  card.lootHead:SetText(#items > 0 and "Loot" or "Loot: nothing blue or better known yet")
+  card.lootHead:SetText(#items > 0 and L["Loot"] or L["Loot: nothing blue or better known yet"])
   y = y + 20
   if card.b ~= b then card.lootOff = 0; BT.lootCat = nil end
   -- category tabs
@@ -841,7 +841,7 @@ function BT:ShowBoss(e, b)
   local shownItems = {}
   for _, it in ipairs(items) do if it.cat == BT.lootCat then shownItems[#shownItems + 1] = it end end
   y = y + 4
-  card.lootHead:SetText(#items > 0 and "Loot" or "Loot: nothing known yet")
+  card.lootHead:SetText(#items > 0 and L["Loot"] or L["Loot: nothing known yet"])
   items = shownItems
   card.items, card.lootY = items, y
   BT:DrawLoot()
@@ -851,7 +851,7 @@ function BT:ShowBoss(e, b)
   card.edit:SetShown(author == true)
   card.edit:SetScript("OnClick", function() Q.Author:Edit("boss:" .. b.name:lower(), b.name .. " - fight notes") end)
   local dead = BT:Killed(e.area, b.name)
-  card.kill:SetText(dead and "Not killed" or "Killed")
+  card.kill:SetText(dead and L["Not killed"] or L["Killed"])
   card.kill:SetScript("OnClick", function() BT:SetKilled(e.area, b.name, not BT:Killed(e.area, b.name)); BT:ShowBoss(e, b) end)
   card.b, card.e = b, e
   BT.Front(card)
@@ -896,7 +896,7 @@ function BT:DrawLoot()
     card.thumb:SetPoint("TOP", card.sb, "TOP", 0, -(h - math.max(14, h * size)) * frac)
     card.pos:ClearAllPoints()
     card.pos:SetPoint("TOPRIGHT", -12, -(y + LOOT_ROWS * 44))
-    card.pos:SetText(("%d-%d of %d - scroll for more"):format(off + 1, math.min(#items, off + LOOT_ROWS), #items))
+    card.pos:SetText(L("%d-%d of %d - scroll for more", off + 1, math.min(#items, off + LOOT_ROWS), #items))
   end
 end
 function BT:ScrollLoot(delta)

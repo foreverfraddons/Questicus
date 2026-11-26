@@ -76,7 +76,7 @@ local function wayTo(w, quiet)
   local info = C_Map.GetMapInfo and C_Map.GetMapInfo(w.m)
   local label = w.name or ("%s %.1f, %.1f"):format(info and info.name or "", w.x * 100, w.y * 100)
   if W:PinUser(w.m, w.x, w.y, label, quiet) and not quiet then
-    Q:Print(("Waypoint: %s"):format(label))
+    Q:Print(L("Waypoint: %s", label))
   end
 end
 
@@ -98,7 +98,7 @@ function WY.Command(msg)
     return
   end
   local w, err = WY.Parse(msg)
-  if not w then Q:Print(err or "Use: /way [zone] x y [name]"); return end
+  if not w then Q:Print(err or L["Use: /way [zone] x y [name]"]); return end
   W.queue = {}
   wayTo(w)
 end
@@ -120,7 +120,7 @@ function WY.Many(text)
       name = w.name or ("%s %.1f, %.1f"):format(info and info.name or "", w.x * 100, w.y * 100) }
   end
   wayTo(list[1], true)
-  Q:Print(("%d waypoint%s - followed one after the other."):format(#list, #list == 1 and "" or "s"))
+  Q:Print(#list == 1 and L["1 waypoint - followed one after the other."] or L("%d waypoints - followed one after the other.", #list))
   return #list
 end
 
@@ -141,10 +141,10 @@ function WY.ShowPaste()
     eb:SetScript("OnEscapePressed", function() paste:Hide() end)
     sf:SetScrollChild(eb)
     paste.eb = eb
-    local go = T.Button(paste, "Follow these", 120, 24)
+    local go = T.Button(paste, L["Follow these"], 120, 24)
     go:SetPoint("BOTTOMRIGHT", -14, 12)
     go:SetScript("OnClick", function() if WY.Many(eb:GetText()) > 0 then paste:Hide() end end)
-    local cancel = T.Button(paste, "Cancel", 90, 24)
+    local cancel = T.Button(paste, L["Cancel"], 90, 24)
     cancel:SetPoint("RIGHT", go, "LEFT", -8, 0)
     cancel:SetScript("OnClick", function() paste:Hide() end)
   end

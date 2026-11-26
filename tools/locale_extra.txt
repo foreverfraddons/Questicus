@@ -1,0 +1,241 @@
+# phrases that live in data tables and are shown through a translating label (tools/locales.py)
+Quest objects
+Fishing bobber
+Other objects
+Mineral veins and deposits.
+Plants you can gather.
+Objects one of your quests needs.
+Chests, crates and other things you can loot.
+The bobber of your fishing line.
+Everyday objects: doors, mailboxes, levers...
+Aura
+Subtle
+Sigil
+Brackets
+Vortex
+Flame
+Rift
+Storm
+Geyser
+Spirit
+Beam
+Beacon
+Orbit
+Ripple
+Sparkles
+A halo with a turning ring, two comets and drifting fireflies.
+Just a soft glow.
+A circle of runes turns around the object.
+Four corners close in and lock on once it's within reach.
+Arms of light coil around the object.
+Tongues of fire in the object's colour.
+A dark hole ringed with light pulls sparks in.
+A cloud over the object, lightning falling from it.
+Sparks burst up from the object and fall back around it.
+Two wisps dance around it, each with a trail.
+A column of light rises from the object.
+A crystal hovers over it on a thread of light.
+Three wisps circle it on their own orbits.
+Rings spread out on the ground around it.
+Glints twinkle around it.
+Speedrun
+Fastest way to max level. Only the quests worth the walk.
+Balanced
+Efficient levelling that keeps your gear and gold up as you go.
+Every quest you can do: breadcrumbs, chains, reputation, dungeons.
+Custom
+Start from Balanced and set every option yourself on the next pages.
+Gray (low level) quests too
+Finish a zone's quests before moving on
+Repeatable quests and reputation turn-ins
+Prefer quests with reputation rewards
+Class quests (spells, class items)
+Profession quests
+Escort quests
+Off: never on your route (unless you add one yourself, or it's a dungeon quest in dungeon mode).
+Cooking and recipe quests
+Off: skipped unless a chain needs them for gear or a dungeon (the step says why).
+PvP and battleground quests
+Warsong Gulch, Arathi Basin, Alterac Valley, Darkspear Islands and other PvP quests. Off by default.
+Holiday / seasonal quests
+WoW Forever's new zones and quests
+Classic (legacy) zones and routes
+Show rares and notable drops on the map
+Hold Shift when talking to skip it once. Escort quests always ask first.
+Turn in finished quests automatically
+Step-by-step guide window
+Waypoint arrow
+Pins on the world map
+Pins on the minimap
+Every quest you can pick up on the map (not just the route)
+solo only
+easy elites
+group quests
+route to upgrades
+upgrades on the way
+Elite
+Rare elite
+Boss
+Rare
+Boss loot
+Quest items
+Recipes
+World drops
+The Hall of Thanes
+Beneath Ironforge, Dun Morogh
+Ruins of Lordaeron
+Ruins above the Undercity, Tirisfal Glades
+Excavation Site: Wetlands
+Above Whelgar's Excavation, Wetlands
+City of Dalaran
+Alterac Mountains
+The Drowned City
+The Vile Reef, Stranglethorn Vale
+Krol'dok Stronghold
+The Riverglades
+Alcaz Prison
+Alcaz Island, Dustwallow Marsh
+Blackmaw Hold
+Azshara
+Shaper's Terrace
+Un'Goro Crater
+First Aid
+Blacksmithing
+Leatherworking
+Alchemy
+Herbalism
+Cooking
+Mining
+Tailoring
+Engineering
+Enchanting
+Fishing
+Skinning
+Jewelcrafting
+Lockpicking
+Hated
+Hostile
+Unfriendly
+Neutral
+Friendly
+Honored
+Revered
+Exalted
+the zeppelin tower outside Orgrimmar (Durotar 50.8, 13.7)
+the zeppelin tower in Tirisfal Glades (Undercity)
+Orgrimmar
+Undercity
+the zeppelin tower outside Orgrimmar (Durotar 50.6, 12.7)
+the zeppelin tower at Grom'gol (Stranglethorn Vale)
+Grom'gol
+the docks of Booty Bay (Stranglethorn Vale)
+the docks of Ratchet (The Barrens)
+Booty Bay
+Ratchet
+the docks of Menethil Harbor (Wetlands)
+the docks of Theramore (Dustwallow Marsh)
+Menethil Harbor
+Theramore
+the docks of Auberdine (Darkshore)
+Auberdine
+Melee (Strength)
+Melee (Agility)
+Ranged
+Caster
+Healer
+Tank
+Strength
+Agility
+Stamina
+Intellect
+Armor
+Attack power
+Ranged attack power
+Spell power
+Healing
+Crit
+Hit
+Mana per 5
+Defense
+Dodge
+Block
+Weapon damage
+Ranged weapon damage
+Weapon damage (casters)
+One-hand axes
+Two-hand axes
+Bows
+Guns
+One-hand maces
+Two-hand maces
+Polearms
+One-hand swords
+Two-hand swords
+Staves
+Fist weapons
+Daggers
+Thrown
+Crossbows
+Wands
+Cloth
+Leather
+Mail
+Plate
+Shields
+Wrong armor / weapon type for me
+Wrong stats for me
+I'm keeping what I have
+Not worth going for
+Maximize
+Minimize
+Damage
+Changed
+Fixed
+Setup questions again
+Answer the setup questions again: play style, quests, gear, helpers.
+Rebuild route
+Works the route out again now.
+Unskip all
+Brings back every quest and step you skipped.
+Icon size
+The stitched world map's own settings (also /qc map).
+Tracker settings
+Size, what it shows, folding (also the cog in its title).
+Run history
+Every dungeon run: time, gold, XP and loot (also /qc runs).
+Back to defaults
+Forget your own weights for this role and use the defaults again.
+Put in a list of /way lines: followed one after the other.
+Clear my waypoints
+Back to the route.
+Pick colour
+The marker's colour
+Beam colour
+The beam's colour
+Highlight settings
+Effects, colours, what lights up and when (also /qc glow).
+Record a patrol
+Record the path of a mob that walks around (target it, then follow it). Shown as a line on the map.
+Rare, level %s
+ patrols along this line
+ - step 
+ of your route
+Hand in to 
+Finished
+Objective
+Now
+After that
+Kill for: 
+Current step
+Explore the area
+Cooking quest
+Recipe quest
+PvP quest
+On the way to the 
+: flying is faster
+rebuild the route now
+ steps planned
+Linked pin
+out of reach
+within reach
+unusable for now

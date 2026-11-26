@@ -881,11 +881,11 @@ Q:Command("recorded", "what Questicus has recorded for the database", function()
   local n = R.Counts()
   local parts = {}
   for _, k in ipairs(KEYS) do if n[k] and n[k] > 0 then parts[#parts + 1] = k .. " " .. n[k] end end
-  Q:Print(L["recorded: "] .. (#parts > 0 and table.concat(parts, ", ") or "nothing yet") ..
+  Q:Print(L["recorded: "] .. (#parts > 0 and table.concat(parts, ", ") or L["nothing yet"]) ..
     (ccRecords() and " (loot and npcs: Command Center records those)" or ""))
   local lt = R.lastTrainer
   if lt then
-    Q:Print(lt.err and ("last trainer: not read (" .. lt.err .. ")") or
+    Q:Print(lt.err and (L["last trainer: not read ("] .. lt.err .. ")") or
       ("last trainer: npc %d, %d abilities, %s"):format(lt.id or 0, lt.n or 0, lt.saved and "saved" or "nothing to save"))
   end
 end)

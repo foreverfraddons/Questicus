@@ -644,9 +644,9 @@ local function buildPop()
   pop.text:SetSpacing(2)
   pop.timer = T.Text(pop, 13, T.c.gold)
   pop.timer:SetPoint("BOTTOMLEFT", 16, 46)
-  pop.yes = T.Button(pop, "I'll wait here", 130, 24)
+  pop.yes = T.Button(pop, L["I'll wait here"], 130, 24)
   pop.yes:SetPoint("BOTTOMLEFT", 16, 14)
-  pop.no = T.Button(pop, "Not now", 100, 24)
+  pop.no = T.Button(pop, L["Not now"], 100, 24)
   pop.no:SetPoint("BOTTOMRIGHT", -16, 14)
   pop.yes:SetScript("OnClick", function()
     if SP.calib then
@@ -660,7 +660,7 @@ local function buildPop()
   pop:SetScript("OnUpdate", function()
     local c = SP.calib
     if not c then pop:Hide() return end
-    pop.timer:SetText(c.waiting and ("Waiting: " .. fmt(now() - c.t0)) or "")
+    pop.timer:SetText(c.waiting and (L["Waiting: "] .. fmt(now() - c.t0)) or "")
   end)
 end
 
@@ -673,8 +673,10 @@ function SP.MaybeCalibrate(p)
   asked()[src] = time()
   SP.calib = { p = p, key = SP.Key(p), src = src, t0 = now() }
   if not pop then buildPop() end
-  local name = (D.Name and D:Name(src)) or "This object"
-  pop.text:SetText(("|cffe0b04a%s|r's respawn timer isn't in the database yet.\n\nPlease stand here and wait for it to respawn to calibrate Questicus to this quest. Keep facing the spot - Questicus sees it come back and saves the time.\n\nThis only happens once, ever, and you're helping everyone else never have to do it."):format(name))
+  local name = (D.Name and D:Name(src)) or L["This object"]
+  pop.text:SetText(L("%s's respawn timer isn't in the database yet.", "|cffe0b04a" .. name .. "|r") .. "\n\n"
+    .. L["Please stand here and wait for it to respawn to calibrate Questicus to this quest. Keep facing the spot - Questicus sees it come back and saves the time."]
+    .. "\n\n" .. L["This only happens once, ever, and you're helping everyone else never have to do it."])
   pop:SetHeight(math.max(178, (pop.text:GetStringHeight() or 100) + 110))
   pop.yes:Show(); pop.no.label:SetText(L["Not now"])
   pop:Show()
@@ -697,7 +699,7 @@ function SP.Calibrated(how)
   SP.calib = nil
   if pop then pop:Hide() end
   local name = (D.Name and D:Name(c.src)) or "it"
-  Q:Print(("%s respawns in %s - saved for everyone. Thank you!"):format(name, fmt(secs)))
+  Q:Print(L("%s respawns in %s - saved for everyone. Thank you!", name, fmt(secs)))
   -- (the spot was just collected again: it's on cooldown for the time measured)
   if how == "collected" then SP.Cool(c.p, "used", secs) end
   SP.changed = true
@@ -774,8 +776,8 @@ Q:Command("respawn", "objective spots on cooldown and respawn times (/qc respawn
   local n = 0
   for k, c in pairs(cds()) do
     n = n + 1
-    if n <= 10 then Q:Print(("%s: %s, back in %ds"):format(k, c.why or "?", math.max(0, c.untl - now()))) end
+    if n <= 10 then Q:Print(L("%s: %s, back in %ds", k, c.why or "?", math.max(0, c.untl - now()))) end
   end
   local src = current and source(current.p)
-  Q:Print(("%d spots on cooldown%s"):format(n, src and (" - this spot respawns in about %ds"):format(math.floor(SP.Respawn(src))) or ""))
+  Q:Print(L("%d spots on cooldown%s", n, src and L(" - this spot respawns in about %ds", math.floor(SP.Respawn(src))) or ""))
 end)

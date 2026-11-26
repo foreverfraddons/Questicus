@@ -144,7 +144,7 @@ function Z:Show()
       local max = math.max(0, (win.body:GetHeight() or 0) - (self:GetHeight() or 0))
       self:SetVerticalScroll(math.max(0, math.min(max, (self:GetVerticalScroll() or 0) - d * 40)))
     end)
-    win.all = T.Button(win, "All zones on", 110, 20)
+    win.all = T.Button(win, L["All zones on"], 110, 20)
     win.all:SetPoint("BOTTOMRIGHT", -12, 10)
     win.all:SetScript("OnClick", function()
       Q.char.zoneOff = {}

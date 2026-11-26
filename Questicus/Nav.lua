@@ -981,6 +981,6 @@ Q:Command("zone", "the zone / sub-zone ForeverDB's borders put you in, and the b
   local mine, all = 0, 0
   for _, l in pairs(QuesticusCollect and QuesticusCollect.zcross and QuesticusCollect.zcross[pos.i] or {}) do mine = mine + #l / 2 end
   for _, l in pairs(D.db.zcross and D.db.zcross[pos.i] or {}) do all = all + #l / 2 end
-  Q:Print(("zone %s%s. Border crossings on this continent: %d you walked, %d from ForeverDB."):format(
+  Q:Print(L("zone %s%s. Border crossings on this continent: %d you walked, %d from ForeverDB.", 
     z == 0 and "none (outside every zone)" or nm(z), s and (", sub-zone " .. nm(s)) or "", mine, all))
 end)

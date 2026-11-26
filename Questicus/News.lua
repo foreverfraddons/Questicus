@@ -56,8 +56,9 @@ function N.Text(entries)
     for _, s in ipairs(SECTIONS) do
       local list = it.e[s[1]]
       if list and #list > 0 then
-        lines[#lines + 1] = Q.Color(s[3], s[2])
-        for _, l in ipairs(list) do lines[#lines + 1] = Q.Color(T.HEX.dim, "  - ") .. Q.Color(T.HEX.white, l) end
+        lines[#lines + 1] = Q.Color(s[3], L[s[2]])
+        -- each line in the chosen language when its language pack has it (packs carry the patch notes too)
+        for _, l in ipairs(list) do lines[#lines + 1] = Q.Color(T.HEX.dim, "  - ") .. Q.Color(T.HEX.white, L[l]) end
       end
     end
   end
@@ -66,7 +67,7 @@ end
 
 local win
 local function build()
-  win = T.Window("QuesticusNews", 460, 400, "What's new in Questicus", Q.db.news or {})
+  win = T.Window("QuesticusNews", 460, 400, L["What's new in Questicus"], Q.db.news or {})
   win:SetFrameStrata("DIALOG")
   win.head = T.Text(win, 11, T.c.dim)
   win.head:SetPoint("TOPLEFT", 14, -32)
@@ -90,7 +91,7 @@ local function build()
     local max = math.max(0, (win.body:GetHeight() or 0) - (self:GetHeight() or 0))
     self:SetVerticalScroll(math.max(0, math.min(max, (self:GetVerticalScroll() or 0) - d * 40)))
   end)
-  local ok = T.Button(win, "Got it", 90, 24)
+  local ok = T.Button(win, L["Got it"], 90, 24)
   ok:SetPoint("BOTTOMRIGHT", -14, 12)
   ok:SetScript("OnClick", function() win:Hide() end)
   win.update = T.Text(win, 11, T.c.gold)
@@ -110,13 +111,13 @@ function N:Show(since, title)
     entries = N.Entries(since)
   end
   if #entries == 0 then entries = N.Entries(nil) end
-  win.head:SetText(title or ("You're on version " .. Q.version .. "."))
+  win.head:SetText(title or (L["You're on version "] .. Q.version .. "."))
   win.text:SetText(N.Text(entries))
   win.body:SetHeight(math.max(1, (win.text:GetStringHeight() or 0) + 8))
   win.scroll:SetVerticalScroll(0)
   local newest = Q.db.newestSeen
   win.update:SetText(newest and N.Newer(newest, Q.version)
-    and ("Version " .. newest .. " is out - update on CurseForge.") or "")
+    and ("Version " .. newest .. L[" is out - update on CurseForge."]) or "")
   win:Show()
 end
 
@@ -133,9 +134,9 @@ local function afterLogin()
   Q.db.newsSeen = Q.version
   if Q.db.newsOff then return end
   if not seen then
-    N:Show("only", "Thanks for using Questicus! Here's what's new in version " .. Q.version .. ".")
+    N:Show("only", L("Thanks for using Questicus! Here's what's new in version %s.", Q.version))
   elseif N.Newer(Q.version, seen) then
-    N:Show(seen, "Questicus was updated to " .. Q.version .. ". Here's what changed since " .. seen .. ".")
+    N:Show(seen, L("Questicus was updated to %s. Here's what changed since %s.", Q.version, seen))
   end
 end
 
@@ -144,10 +145,10 @@ local told = false
 local function tell(v)
   if told then return end
   told = true
-  Q:Print(Q.Color(T.HEX.gold, L["A new version of Questicus is out: "] .. v .. " (you have " .. Q.version .. ").")
-    .. " Update it on CurseForge.")
+  Q:Print(Q.Color(T.HEX.gold, L["A new version of Questicus is out: "] .. v .. " " .. L("(you have %s).", Q.version))
+    .. " " .. L["Update it on CurseForge."])
   if UIErrorsFrame and UIErrorsFrame.AddMessage then
-    pcall(UIErrorsFrame.AddMessage, UIErrorsFrame, "Questicus " .. v .. " is available - update on CurseForge", 0.88, 0.69, 0.29)
+    pcall(UIErrorsFrame.AddMessage, UIErrorsFrame, L("Questicus %s is available - update on CurseForge", v), 0.88, 0.69, 0.29)
   end
 end
 
@@ -220,5 +221,5 @@ end)
 Q:Command("news", "what's new in this version (patch notes)", function() N:Show(nil) end)
 Q:Command("newsoff", "don't open the patch notes by themselves after an update (toggle)", function()
   Q.db.newsOff = not Q.db.newsOff
-  Q:Print(L["patch notes after an update: "] .. (Q.db.newsOff and "off (type /qc news to read them)" or "on"))
+  Q:Print(L["patch notes after an update: "] .. (Q.db.newsOff and L["off (type /qc news to read them)"] or "on"))
 end)

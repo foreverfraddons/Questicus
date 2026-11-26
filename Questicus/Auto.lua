@@ -127,13 +127,13 @@ function Q.ConfirmEscort(id)
     escCard.text:SetPoint("TOPLEFT", 14, -32)
     escCard.text:SetPoint("RIGHT", -14, 0)
     escCard.text:SetJustifyH("LEFT")
-    escCard.go = T.Button(escCard, "Start escort", 104, 22)
+    escCard.go = T.Button(escCard, L["Start escort"], 104, 22)
     escCard.go:SetPoint("BOTTOMLEFT", 14, 12)
     escCard.go:SetScript("OnClick", function()
       escCard:Hide()
       if QuestFrame and QuestFrame:IsShown() and AcceptQuest then AcceptQuest() end
     end)
-    escCard.no = T.Button(escCard, "Not now", 90, 22)
+    escCard.no = T.Button(escCard, L["Not now"], 90, 22)
     escCard.no:SetPoint("LEFT", escCard.go, "RIGHT", 8, 0)
     escCard.no:SetScript("OnClick", function()
       escCard:Hide()
@@ -143,7 +143,7 @@ function Q.ConfirmEscort(id)
     escCard:SetScript("OnEvent", function(self) self:Hide() end)
   end
   local info = QS:Info(id)
-  escCard.text:SetText(Q.Color("5cff6a", (info and info.title) or "This escort") .. "\n" ..
+  escCard.text:SetText(Q.Color("5cff6a", (info and info.title) or L["This escort"]) .. "\n" ..
     Q.Color("c0c0c0", L["Starts as soon as you accept: follow them and keep them alive. Ready?"]))
   escCard:ClearAllPoints()
   if QuestFrame and QuestFrame:IsShown() then
@@ -238,14 +238,14 @@ function Q.ConfirmReward(i, isUpgrade, pct)
     confirm.text:SetPoint("TOPLEFT", confirm.item, "TOPRIGHT", 8, 0)
     confirm.text:SetPoint("RIGHT", -14, 0)
     confirm.text:SetJustifyH("LEFT")
-    confirm.take = T.Button(confirm, "Take it", 96, 22)
+    confirm.take = T.Button(confirm, L["Take it"], 96, 22)
     confirm.take:SetPoint("BOTTOMLEFT", 14, 12)
     confirm.take:SetScript("OnClick", function()
       local idx = confirm.index
       confirm:Hide()
       if idx and QuestFrame and QuestFrame:IsShown() then GetQuestReward(idx) end
     end)
-    confirm.mine = T.Button(confirm, "I'll choose", 96, 22)
+    confirm.mine = T.Button(confirm, L["I'll choose"], 96, 22)
     confirm.mine:SetPoint("LEFT", confirm.take, "RIGHT", 8, 0)
     confirm.mine:SetScript("OnClick", function() confirm:Hide() end)
     -- (gone with the quest window)
@@ -256,8 +256,8 @@ function Q.ConfirmReward(i, isUpgrade, pct)
   local name, tex = GetQuestItemInfo("choice", i)
   local link = GetQuestItemLink("choice", i)
   confirm.item.tex:SetTexture(tex or 134400)
-  confirm.text:SetText((link or name or "This reward") .. "\n" ..
-    (isUpgrade and Q.Color("40ff40", ("An upgrade (+%d%%)"):format(math.floor(pct or 0)))
+  confirm.text:SetText((link or name or L["This reward"]) .. "\n" ..
+    (isUpgrade and Q.Color("40ff40", L("An upgrade (+%d%%)", math.floor(pct or 0)))
       or Q.Color("c0c0c0", L["No upgrade among the rewards - this one sells for the most"])))
   confirm:ClearAllPoints()
   if QuestFrame and QuestFrame:IsShown() then

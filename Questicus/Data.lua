@@ -137,7 +137,7 @@ end
 function D:Name(key)
   if key:sub(1, 4) == "taxi" then
     local n = Q.Flight and Q.Flight:Node(tonumber(key:sub(5)))
-    return n and (n.name .. " (flight master)") or "Flight master"
+    return n and (n.name .. L[" (flight master)"]) or L["Flight master"]
   end
   if not D.ENGLISH then
     local ln = D:LocalName(key)
@@ -351,7 +351,7 @@ function D:RemoveSpot(key, p)
   undo[#undo + 1] = key
   pointCache[key] = nil
   if D.ForgetPatrol then D:ForgetPatrol(key) end
-  Q:Print(("removed a spot of %s - gone from your map and routes, and from ForeverDB once your recordings are synced (/qc spots undo puts it back)"):format(D:Name(key)))
+  Q:Print(L("removed a spot of %s - gone from your map and routes, and from ForeverDB once your recordings are synced (/qc spots undo puts it back)", D:Name(key)))
   if Q.Planner then Q.Planner:Reset(); Q.Planner:Replan(0.2) end
   if Q.Pins and Q.Pins.RefreshWorld then Q.Pins:RefreshWorld(true) end
   return true
@@ -398,7 +398,7 @@ function D:AddSpawn(key, p)
   list[#list + 1] = { i = p.i, x = math.floor(p.x + 0.5), y = math.floor(p.y + 0.5), t = time and time() or 0,
     m = m, mx = mx and math.floor(mx * 1000 + 0.5), my = my and math.floor(my * 1000 + 0.5) }
   pointCache[key] = nil
-  Q:Print(("found a new spawn point of %s - added to your map and routes, and to ForeverDB with your recordings"):format(D:Name(key)))
+  Q:Print(L("found a new spawn point of %s - added to your map and routes, and to ForeverDB with your recordings", D:Name(key)))
   Q.Throttle("newspawn", 3, function()
     if Q.Planner then Q.Planner:Reset(); Q.Planner:Replan(1) end
     if Q.Pins and Q.Pins.RefreshWorld then Q.Pins:RefreshWorld(true) end
@@ -414,7 +414,7 @@ Q:Command("spots", "spots you removed with Ctrl-click (/qc spots undo puts the l
     if key and r[key] then table.remove(r[key]); if #r[key] == 0 then r[key] = nil end end
     pointCache[key or ""] = nil
     if Q.Planner then Q.Planner:Reset(); Q.Planner:Replan(0.2) end
-    Q:Print(key and ("put back a spot of " .. D:Name(key)) or "nothing to undo")
+    Q:Print(key and (L["put back a spot of "] .. D:Name(key)) or L["nothing to undo"])
     return
   elseif arg == "reset" then
     if QuesticusCollect then QuesticusCollect.removed = nil end
@@ -424,7 +424,7 @@ Q:Command("spots", "spots you removed with Ctrl-click (/qc spots undo puts the l
     return
   end
   local n = 0
-  for k, list in pairs(r) do n = n + #list; Q:Print(("%s: %d spot(s) removed"):format(D:Name(k), #list)) end
+  for k, list in pairs(r) do n = n + #list; Q:Print(L("%s: %d spot(s) removed", D:Name(k), #list)) end
   if n == 0 then Q:Print(L["no spots removed - Ctrl-click a wrong map or minimap icon to remove it"]) end
 end)
 

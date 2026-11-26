@@ -98,7 +98,7 @@ function M:Kind(unit)
   if not id then return end
   -- attackable or not: some objectives are friendly NPCs (heal the Injured Deathguard)
   local dead = UnitIsDead and UnitIsDead(unit)
-  if main[id] and not dead then return SKULL, main[id] .. " (current step)" end
+  if main[id] and not dead then return SKULL, main[id] .. L[" (current step)"] end
   if need[id] and not dead then return CROSS, need[id] end
   if givers[id] and not (UnitCanAttack and UnitCanAttack("player", unit)) then return STAR, givers[id] end
 end
@@ -201,7 +201,7 @@ local function mobInfo(tt, unit)
   if not db then return end
   local g = db.gold and db.gold[npc]
   if g and g[1] and g[1] > 0 then
-    tt:AddLine(L["Questicus: about "] .. money(g[1]) .. " per kill", 0.25, 0.82, 0.79)
+    tt:AddLine(L["Questicus: about "] .. money(g[1]) .. L[" per kill"], 0.25, 0.82, 0.79)
   end
   local sk = canSkin() and skinsOf(npc)
   if sk and #sk > 0 then
@@ -222,7 +222,7 @@ local function tipLine(tt)
   local ok, _, unit = pcall(tt.GetUnit, tt)
   if not ok or type(unit) ~= "string" then return end
   local ok2, kind, why = pcall(M.Kind, M, unit)
-  if ok2 and kind then tt:AddLine("|T" .. ICON[kind] .. ":12|t Questicus: " .. why, 0.25, 0.82, 0.79) end
+  if ok2 and kind then tt:AddLine("|T" .. ICON[kind] .. L[":12|t Questicus: "] .. why, 0.25, 0.82, 0.79) end
   pcall(mobInfo, tt, unit)
 end
 Q:Command("mobinfo", "money per kill and skinning on mob tooltips on / off", function()

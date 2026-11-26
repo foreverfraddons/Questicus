@@ -2,6 +2,7 @@
 -- an item a quest in your log needs ("Rot-Covered Harpoon 1/1"), and a bigger one when a quest is
 -- complete. Up to four stack under each other; Shift-drag one to move them all.
 local Q = Questicus
+local L = Q.L
 local T, D, QS = Q.T, Q.Data, Q.Quests
 local PU = {}
 Q.Popup = PU
@@ -162,7 +163,7 @@ function PU:Check()
   local now = GetTime and GetTime() or 0
   for id, e in pairs(QS.log) do
     local s = snapshot[id]
-    local title = e.title or (QS:Info(id) and QS:Info(id).title) or ("Quest " .. id)
+    local title = e.title or (QS:Info(id) and QS:Info(id).title) or (L["Quest "] .. id)
     if s and ready then
       for i, o in ipairs(e.objectives or {}) do
         local before = s.obj[i]
@@ -185,7 +186,7 @@ function PU:Check()
         local info = QS:Info(id)
         local ender = info and info.enders and info.enders[1]
         PU:Show({ key = "done" .. id, title = title, icon = DONE_ICON, complete = true,
-          text = "Quest complete" .. (ender and (" - turn in to " .. D:Name(ender)) or "") })
+          text = L["Quest complete"] .. (ender and (L[" - turn in to "] .. D:Name(ender)) or "") })
       end
     end
     local obj = {}
@@ -233,8 +234,8 @@ Q:On("CHAT_MSG_LOOT", function(msg)
   if counted then return end              -- the progress card follows with this icon
   local link = msg:match("(|c%x+|Hitem:.-|h.-|h|r)") or D:Name("i" .. itemID)
   local info = QS:Info(qid)
-  PU:Show({ key = "item" .. itemID, icon = icon, title = info and info.title or ("Quest " .. qid),
-    text = (starts and "Starts a quest: " or "Quest item: ") .. link })
+  PU:Show({ key = "item" .. itemID, icon = icon, title = info and info.title or (L["Quest "] .. qid),
+    text = (starts and L["Starts a quest: "] or L["Quest item: "]) .. link })
 end)
 
 Q:On("QC_QUESTS_CHANGED", function() PU:Check() end)
@@ -243,6 +244,6 @@ Q:On("QC_READY", function()
   PU:Check()
 end)
 Q:Command("popuptest", "show a sample quest pop-up", function()
-  PU:Show({ key = "test", title = "WANTED: Old Rot-Chum", icon = 134400, text = "Rot-Covered Harpoon: 1/1",
+  PU:Show({ key = "test", title = L["WANTED: Old Rot-Chum"], icon = 134400, text = L["Rot-Covered Harpoon: 1/1"],
     have = 1, need = 1, prev = 0, plus = "+1", done = true })
 end)

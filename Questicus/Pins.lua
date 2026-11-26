@@ -40,7 +40,7 @@ local function pool(parent, size)
         local qs = (not tip.hasId) and (s.quests or (s.quest and { s.quest })) or {}
         for k, qid in ipairs(qs) do
           if k > 3 then break end
-          if #qs > 1 then local i = QS:Info(qid); GameTooltip:AddLine(i and i.title or ("Quest " .. qid), 1, 0.82, 0.3, true) end
+          if #qs > 1 then local i = QS:Info(qid); GameTooltip:AddLine(i and i.title or (L["Quest "] .. qid), 1, 0.82, 0.3, true) end
           for _, l in ipairs(QS:TipExtra(qid)) do GameTooltip:AddLine(l, 0.9, 0.9, 0.9, true) end
         end
         if s.spot or s.spotK then GameTooltip:AddLine(L["Ctrl-click: wrong spot? Remove it from the database"], 0.6, 0.6, 0.6, true) end
@@ -266,7 +266,7 @@ function PN:RefreshWorld(force)
         local NAMES = { "map", "width", "height", "size", "world", "objectives", "others", "areas", "areasNext",
           "collectibles", "db", "survey", "log", "collect", "taxi", "focus" }
         for j = 1, math.max(#a, #b) do if a[j] ~= b[j] then i = j break end end
-        why = (NAMES[i] or ("step part " .. i)) .. " " .. tostring(a[i]) .. " -> " .. tostring(b[i])
+        why = (NAMES[i] or (L["step part "] .. i)) .. " " .. tostring(a[i]) .. " -> " .. tostring(b[i])
       end
       Q.Trace("redraw: " .. why)
     end
@@ -739,7 +739,7 @@ function PN:Objectives(mapID, size, place)
   local n = 0
   for id, e in pairs(QS.log or {}) do
     local info = QS:Info(id)
-    local title = (e.title or (info and info.title) or ("Quest " .. id))
+    local title = (e.title or (info and info.title) or (L["Quest "] .. id))
     if e.complete then
       for _, k in ipairs((info and info.enders) or {}) do
         for _, pt in ipairs(D:Points(k)) do
@@ -820,7 +820,7 @@ local function hit()
       if info then GameTooltip:AddLine(L["For: "] .. info.title, 0.9, 0.9, 0.9, true) end
       if e.label then GameTooltip:AddLine(e.label, 0.6, 0.6, 0.6) end
       local own = QuesticusCollect and QuesticusCollect.patrol and QuesticusCollect.patrol["c:" .. e.key:sub(2)]
-      GameTooltip:AddLine(own and "Path: your recording" or "Path: from the database (record a better one with /qc patrol)", 0.6, 0.6, 0.6, true)
+      GameTooltip:AddLine(own and L["Path: your recording"] or L["Path: from the database (record a better one with /qc patrol)"], 0.6, 0.6, 0.6, true)
       GameTooltip:Show()
     end)
     b:SetScript("OnLeave", function() GameTooltip:Hide(); PN:HidePatrolTop() end)

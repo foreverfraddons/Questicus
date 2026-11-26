@@ -259,11 +259,11 @@ end
 
 function DG:QuestStatus(id, lv)
   if QS.done[id] then return "done", 0 end
-  if QS.log[id] then return QS.log[id].complete and "ready to hand in" or "in your log", 1 end
+  if QS.log[id] then return QS.log[id].complete and L["ready to hand in"] or L["in your log"], 1 end
   local i = QS:Info(id)
-  if i and lv < (i.min or 1) then return ("needs level %d"):format(i.min), 3 end
-  if QS:Available(id) then return "can get now", 2 end
-  return "needs an earlier quest", 2
+  if i and lv < (i.min or 1) then return L("needs level %d", i.min), 3 end
+  if QS:Available(id) then return L["can get now"], 2 end
+  return L["needs an earlier quest"], 2
 end
 
 -- ------------------------------------------------------------------ pictures
@@ -394,8 +394,8 @@ end
 function DG.MoneyText(cp)
   cp = math.floor(cp or 0)
   local g, si, co = math.floor(cp / 10000), math.floor(cp / 100) % 100, cp % 100
-  if g > 0 then return ("%dg %ds"):format(g, si) end
-  if si > 0 then return ("%ds %dc"):format(si, co) end
+  if g > 0 then return L("%dg %ds", g, si) end
+  if si > 0 then return L("%ds %dc", si, co) end
   return co .. "c"
 end
 
@@ -408,7 +408,7 @@ function DG:QuestState(id, lv)
   if QS:Available(id) then return "can", "can get now" end
   if i and lv < (i.min or 1) then
     -- too low, but is the chain open?
-    return "locked", ("needs level %d"):format(i.min)
+    return "locked", L("needs level %d", i.min)
   end
   return "locked", "needs an earlier quest"
 end
@@ -428,8 +428,8 @@ local function repText(v)
   -- QuestieDB's requiredMinRep value: reputation points from Neutral (0); show the standing it means
   if type(v) ~= "number" then return "" end
   local tiers = { { 42000, "Exalted" }, { 21000, "Revered" }, { 9000, "Honored" }, { 3000, "Friendly" }, { 0, "Neutral" } }
-  for _, t in ipairs(tiers) do if v >= t[1] then return t[2] end end
-  return "Unfriendly"
+  for _, t in ipairs(tiers) do if v >= t[1] then return L[t[2]] end end
+  return L["Unfriendly"]
 end
 DG.STANDING = STANDING
 -- where a locked quest's chain starts: the earliest quests of it you can't skip, with giver, zone,
@@ -451,7 +451,7 @@ function DG:ChainStart(id)
   for _, q in ipairs(starts) do
     local inf = QS:Info(q)
     local dq = D:Quest(q)
-    local title = (inf and inf.title) or (dq and dq[1]) or ("Quest " .. q)
+    local title = (inf and inf.title) or (dq and dq[1]) or (L["Quest "] .. q)
     local giver, zone = "", ""
     local gk = inf and inf.givers and inf.givers[1]
     if gk then
@@ -465,12 +465,12 @@ function DG:ChainStart(id)
     local extra = {}
     if x[19] and x[19][1] then extra[#extra + 1] = factionName(x[19][1]) .. " " .. repText(x[19][2]) end
     if x[14] and x[14][1] then
-      extra[#extra + 1] = ("%s %d"):format(DG.SKILL[x[14][1]] or ("skill " .. x[14][1]), x[14][2] or 0)
+      extra[#extra + 1] = ("%s %d"):format(L[DG.SKILL[x[14][1]] or ("skill " .. x[14][1])], x[14][2] or 0)
     end
     local avail = QS:Available(q)
-    lines[#lines + 1] = { id = q, text = ("%s%s%s, level %d%s"):format(
-      title, giver ~= "" and (" - from " .. giver) or "", zone ~= "" and (" in " .. zone) or "", minLv,
-      #extra > 0 and (", needs " .. table.concat(extra, ", ")) or ""), can = avail }
+    lines[#lines + 1] = { id = q, text = L("%s%s%s, level %d%s", 
+      title, giver ~= "" and (" - " .. L("from %s", giver)) or "", zone ~= "" and (" " .. L("in %s", zone)) or "", minLv,
+      #extra > 0 and (", " .. L("needs %s", table.concat(extra, ", "))) or ""), can = avail }
   end
   return lines, need
 end
@@ -548,8 +548,8 @@ function DG:Show()
     r.done:SetShown(complete)
     r.lv:SetText(e.lo and (e.lo == e.hi and tostring(e.lo) or (e.lo .. "-" .. (e.hi or e.lo))) or "?")
     -- done of all, and how many you're carrying now
-    r.q:SetText(total > 0 and (complete and c(T.HEX.good, ("%d/%d quests"):format(doneN, total))
-      or (("%d/%d done"):format(doneN, total) .. (logN > 0 and c(T.HEX.white, ("  %d in log"):format(logN)) or ""))) or "")
+    r.q:SetText(total > 0 and (complete and c(T.HEX.good, L("%d/%d quests", doneN, total))
+      or (L("%d/%d done", doneN, total) .. (logN > 0 and c(T.HEX.white, L("  %d in log", logN)) or ""))) or "")
     r:ClearAllPoints(); r:SetPoint("TOPLEFT", 0, -y); r:SetPoint("RIGHT", 0, 0); r:Show()
     y = y + 34
   end
@@ -596,7 +596,7 @@ local function qrow(i)
   r.chain:SetPoint("RIGHT", -74, 0)
   r.chain:SetJustifyH("LEFT")
   r.chain:SetWordWrap(false)                 -- one line (the tooltip has all of it)
-  r.add = T.Button(r, "+ Route", 66, 18)
+  r.add = T.Button(r, L["+ Route"], 66, 18)
   r.add:SetPoint("TOPRIGHT", -2, 0)
   r:SetScript("OnEnter", function(self)
     local d = DG.qdata[self]
@@ -619,7 +619,7 @@ local function qrow(i)
     if d.starts and #d.starts > 0 then
       GameTooltip:AddLine(" ")
       GameTooltip:AddLine(L["Start the chain with:"], 1, 0.25, 0.25)
-      for _, st in ipairs(d.starts) do GameTooltip:AddLine(st.text .. (st.can and "  (you can get it now)" or ""), 0.9, 0.9, 0.9, true) end
+      for _, st in ipairs(d.starts) do GameTooltip:AddLine(st.text .. (st.can and L["  (you can get it now)"] or ""), 0.9, 0.9, 0.9, true) end
     end
     GameTooltip:Show()
   end)
@@ -704,14 +704,14 @@ function DG:QuestRows(e, lv, textH)
       r.icon:SetAlpha(st == "locked" and 0.5 or 1)
       r.text:SetText(c(DG.STATUS_COLOR[st], inf.title) .. c(DIM, ("  %d"):format(inf.level)))
       -- eligible or not (why not: on hover, and the chain's start under it)
-      r.status:SetText(st == "locked" and c("ff6060", L["Not eligible"]) or SHORT[word] or word)
+      r.status:SetText(st == "locked" and c("ff6060", L["Not eligible"]) or L[SHORT[word] or word])
       d.reason = st == "locked" and word or nil
       local hgt = 20
       if st == "locked" then
         local starts = DG:ChainStart(id)
         d.starts = starts
         local first = starts[1]
-        r.chain:SetText(first and (c("ff8080", L["Starts with "]) .. first.text .. (#starts > 1 and c(DIM, ("  +%d more"):format(#starts - 1)) or "")) or "")
+        r.chain:SetText(first and (c("ff8080", L["Starts with "]) .. first.text .. (#starts > 1 and c(DIM, L("  +%d more", #starts - 1)) or "")) or "")
         r.chain:Show()
         if first then hgt = 36 end
       else
@@ -719,7 +719,7 @@ function DG:QuestRows(e, lv, textH)
       end
       local forced = Q.char.forced and Q.char.forced[id]
       r.add:SetShown(st ~= "done" and st ~= "log")
-      r.add:SetText(forced and "On route" or "+ Route")
+      r.add:SetText(forced and L["On route"] or L["+ Route"])
       r.add.tip = forced and "Take this quest (and its chain) off your route" or "Put this quest on your route, with every earlier quest of its chain it needs"
       r.add:SetScript("OnClick", function()
         if Q.Tracker then Q.Tracker:Force(id, not (Q.char.forced and Q.char.forced[id])) end
@@ -740,7 +740,7 @@ function DG:QuestRows(e, lv, textH)
   else
     local dn, ln = 0, 0
     for _, id in ipairs(e.quests) do if QS.done[id] then dn = dn + 1 elseif QS.log[id] then ln = ln + 1 end end
-    heading(c(GOLD, L["Quests"]) .. c(DIM, ("     %d of %d done"):format(dn, total)) .. (ln > 0 and c(T.HEX.white, ("     %d in your log"):format(ln)) or ""))
+    heading(c(GOLD, L["Quests"]) .. c(DIM, L("     %d of %d done", dn, total)) .. (ln > 0 and c(T.HEX.white, L("     %d in your log", ln)) or ""))
     if #inside > 0 then
       if #outside > 0 then
         heading(c(T.HEX.white, L["Picked up outside"]) .. c(DIM, ("   %d"):format(#outside)))
@@ -749,7 +749,7 @@ function DG:QuestRows(e, lv, textH)
       end
       -- the ones you can only get in there, in their own tinted box
       local top = y
-      local h = heading(c("c080ff", L["Picked up inside the dungeon"]) .. c(DIM, ("   %d  -  you get these on the run"):format(#inside)), DG.INSIDE_ICON)
+      local h = heading(c("c080ff", L["Picked up inside the dungeon"]) .. c(DIM, L("   %d  -  you get these on the run", #inside)), DG.INSIDE_ICON)
       rows(inside, true)
       h.box:ClearAllPoints()
       h.box:SetPoint("TOPLEFT", h, "TOPLEFT", -2, 2)
@@ -805,17 +805,17 @@ function DG:ShowDungeon(e)
       local max = math.max(0, (detail.qbody:GetHeight() or 0) - (self:GetHeight() or 0))
       self:SetVerticalScroll(math.max(0, math.min(max, (self:GetVerticalScroll() or 0) - d * 36)))
     end)
-    detail.go = T.Button(detail, "Get all quests", 140, 24)
+    detail.go = T.Button(detail, L["Get all quests"], 140, 24)
     detail.go:SetPoint("BOTTOMRIGHT", -14, 12)
-    detail.back = T.Button(detail, "All dungeons", 110, 24)
+    detail.back = T.Button(detail, L["All dungeons"], 110, 24)
     detail.back:SetPoint("RIGHT", detail.go, "LEFT", -8, 0)
-    detail.bosses = T.Button(detail, "Bosses", 80, 24)
+    detail.bosses = T.Button(detail, L["Bosses"], 80, 24)
     detail.bosses:SetPoint("RIGHT", detail.back, "LEFT", -8, 0)
     detail.bosses:SetScript("OnClick", function() if Q.Bosses and detail.e then Q.Bosses:Show(detail.e) end end)
     detail.back:SetScript("OnClick", function() detail:Hide(); DG:Show() end)
-    detail.hist = T.Button(detail, "Runs", 60, 24)
+    detail.hist = T.Button(detail, L["Runs"], 60, 24)
     detail.hist:SetPoint("RIGHT", detail.bosses, "LEFT", -8, 0)
-    detail.hist.tip = "Your runs of this dungeon: times, gold, XP, loot and averages"
+    detail.hist.tip = L["Your runs of this dungeon: times, gold, XP, loot and averages"]
     detail.hist:SetScript("OnClick", function() if Q.Runs and detail.e then Q.Runs:ShowHistory(detail.e.area) end end)
   end
   if list and list:IsShown() and detail.ClearAllPoints then
@@ -863,21 +863,21 @@ function DG:ShowDungeon(e)
   local function note(s) return c(DIM, s) end   -- (s is put together already)
   local ent = D:Entrance(e.area)[1]
   local mi = ent and ent.m and C_Map and C_Map.GetMapInfo and C_Map.GetMapInfo(ent.m)
-  if e.forever then row("New", c(T.HEX.good, L["in WoW Forever"]) .. (e.where and note("  -  " .. e.where) or "")) end
-  if mi then row("Entrance", mi.name .. (ent.mx and note(("   %.1f, %.1f"):format(ent.mx * 100, ent.my * 100)) or "")) end
+  if e.forever then row(L["New"], c(T.HEX.good, L["in WoW Forever"]) .. (e.where and note("  -  " .. e.where) or "")) end
+  if mi then row(L["Entrance"], mi.name .. (ent.mx and note(("   %.1f, %.1f"):format(ent.mx * 100, ent.my * 100)) or "")) end
   if e.lo then row(e.forever and "Levels" or "Mob levels", e.lo == e.hi and tostring(e.lo) or (e.lo .. " - " .. e.hi)) end
   local qlo, qhi = 999, 0
   for _, id in ipairs(e.quests) do local i = QS:Info(id); if i then qlo, qhi = math.min(qlo, i.min or 1), math.max(qhi, i.level) end end
-  if qhi > 0 then row("Quests", L("level %d - %d", qlo, qhi) .. note("   " .. L("you can pick them up from level %d", qlo))) end
+  if qhi > 0 then row(L["Quests"], L("level %d - %d", qlo, qhi) .. note("   " .. L("you can pick them up from level %d", qlo))) end
   local m = e.mobs
-  if m and m.fromSpawns and m.spawns > 0 then row("Mobs", m.spawns .. note("   " .. L("%d elite", m.elites))) end
+  if m and m.fromSpawns and m.spawns > 0 then row(L["Mobs"], m.spawns .. note("   " .. L("%d elite", m.elites))) end
   local bossNames = DG.BossNames(e)
   if bossNames then
-    row("Bosses", table.concat(bossNames, ", "))
+    row(L["Bosses"], table.concat(bossNames, ", "))
   elseif m and #m.bosses > 0 then
     local b = {}
     for i = 1, math.min(6, #m.bosses) do b[i] = m.bosses[i] end
-    row("Named elites", table.concat(b, ", ") .. (#m.bosses > 6 and (" +%d"):format(#m.bosses - 6) or ""))
+    row(L["Named elites"], table.concat(b, ", ") .. (#m.bosses > 6 and (" +%d"):format(#m.bosses - 6) or ""))
   end
   local ct, runs = DG:ClearTime(e)
   if ct then
@@ -893,10 +893,10 @@ function DG:ShowDungeon(e)
     end
   end
   local function num(n) n = math.floor(n + 0.5); local s2 = tostring(n); while true do local r2, k2 = s2:gsub("^(%d+)(%d%d%d)", "%1,%2"); s2 = r2; if k2 == 0 then break end end return s2 end
-  if mx and mx >= 1 then row("XP per clear", "~" .. num(mx) .. note("   " .. L["each, group of 5, from mobs"])) end
+  if mx and mx >= 1 then row(L["XP per clear"], "~" .. num(mx) .. note("   " .. L["each, group of 5, from mobs"])) end
   if qxp > 0 then row("Quest XP left", num(qxp) .. note("   " .. (todo == 1 and L("1 quest, %d you can do now", can) or L("%d quests, %d you can do now", todo, can)))) end
   if ct and ct > 0 and ((mx or 0) + qxp) > 0 then
-    row("XP per hour", "~" .. num(((mx or 0) + qxp) / ct * 3600) .. note("   " .. L["one run plus its quests"]))
+    row(L["XP per hour"], "~" .. num(((mx or 0) + qxp) / ct * 3600) .. note("   " .. L["one run plus its quests"]))
   end
   local gold, gruns, coins, goods, missing = DG:GoldPerRun(e)
   if gold and gold > 0 then
@@ -905,7 +905,7 @@ function DG:ShowDungeon(e)
     else
       local est = "   " .. ((goods or 0) > 0 and L("estimate: %s coin + %s in drops", DG.MoneyText(coins), DG.MoneyText(goods))
         or L["estimate, coin only"])
-      row("Gold per run", c(GOLD, "~" .. DG.MoneyText(gold)) .. note(est .. ((missing or 0) > 0 and (" " .. L["(more once items load)"]) or "")))
+      row(L["Gold per run"], c(GOLD, "~" .. DG.MoneyText(gold)) .. note(est .. ((missing or 0) > 0 and (" " .. L["(more once items load)"]) or "")))
     end
   end
   detail.text:SetText(table.concat(labels, "\n"))
@@ -921,7 +921,7 @@ function DG:ShowDungeon(e)
   detail.qscroll:SetVerticalScroll(0)
   detail:SetHeight(34 + 98 + h + math.min(qh, 300) + 8 + 48)
   local active = Q.char.dmode == e.area
-  detail.go:SetText(active and "Stop dungeon mode" or "Get all quests")
+  detail.go:SetText(active and L["Stop dungeon mode"] or L["Get all quests"])
   detail.go:SetShown(active or todo > 0)
   detail.go.tip = active and "Back to your normal route" or
     "Dungeon mode: routes you to every quest of this dungeon (and the chains that unlock them), then into it"
@@ -931,7 +931,7 @@ function DG:ShowDungeon(e)
       Q:Print(L["dungeon mode off"])
     else
       P:DungeonMode(e.area)
-      Q:Print(("dungeon mode: getting every quest for %s"):format(e.name))
+      Q:Print(L("dungeon mode: getting every quest for %s", e.name))
     end
     DG:ShowDungeon(e)
     if list and list:IsShown() then DG:Show() end
