@@ -83,6 +83,7 @@ WorldMap\Data\Forever\DungeonMaps.lua
 WorldMap\Data\Forever\DungeonDrawn.lua
 WorldMap\Data\Forever\DungeonMinimap.lua
 WorldMap\Data\Forever\DungeonBosses.lua
+WorldMap\Data\Forever\Battlegrounds.lua
 WorldMap\Data\Forever\Grade.lua
 WorldMap\Data\Forever\Levels.lua
 WorldMap\Data\Forever\Fishing.lua
@@ -116,6 +117,7 @@ WorldMap\Map\Townsfolk.lua
 WorldMap\Map\Quests.lua
 WorldMap\Map\DungeonJournal.lua
 WorldMap\Map\Dungeons.lua
+WorldMap\Map\Battlegrounds.lua
 WorldMap\Map\Paint.lua
 WorldMap\Map\Sketch.lua
 WorldMap\Map\Debug.lua

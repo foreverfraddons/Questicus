@@ -1,6 +1,6 @@
 {
   "repo": "openmap-world/openmap",
-  "tag": "v0.8.13",
-  "commit": "6c2299f6e1f9bdce1bbd92145f84a05b0c6c05a7",
+  "tag": "v0.8.14",
+  "commit": "216ca6e0babc5f8f2f7c52e23f9457d7ef4b8c0a",
   "note": "Questicus Maps is built from this OpenMap release (tools/sync_maps.py). Updated by .github/workflows/maps.yml."
 }

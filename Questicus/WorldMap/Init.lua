@@ -47,7 +47,7 @@ local function Slash(msg)
 	msg = raw:lower()
 	local mod = ns:GetModule("worldmap")
 	local word, rest = msg:match("^(%S+)%s+(.+)$")
-	local takes = { bench = true, entrance = true }  -- (/qc map bench 16: at that zoom; /qc map entrance Dire Maul - East)
+	local takes = { bench = true, entrance = true, bisect = true }  -- (/qc map bench 16: at that zoom; /qc map entrance Dire Maul - East)
 	if takes[word] then msg, rest = word, raw:match("^%S+%s+(.+)$") end
 	local run = {
 		status = "Diag", paint = "TogglePaint", notes = "TogglePaint", debug = "ToggleDebugOverlay",
@@ -55,8 +55,11 @@ local function Slash(msg)
 		welcome = "ShowWelcome", highlights = "Highlights", warm = "ToggleWarm",
 		reset = "ResetWindow",   -- (reset: the windowed map's size and place, for one off the screen)
 		combatcheck = "CombatCheck",   -- (the map in a fight, OwnView.lua: where its frames are, saved for a report)
+		bg = "BattlegroundDiag",   -- (a battleground's map: its zoom steps and minimap detail, Battlegrounds.lua)
 	}
 	-- (the controller view's diagnostics: it runs while Questicus Maps' usual map is off, PadView.lua)
+	-- (a test build's: parts of Questicus Maps' map left out at login, WorldMap.lua's mod.Bisect; works with the map off too)
+	if msg == "bisect" and mod.Bisect then return mod:Bisect(rest) end
 	if msg == "padview" and mod.PadViewDiag then return mod.PadViewDiag() end
 	-- the controller view's map (PadView.lua): what works on it, its status its own
 	if run[msg] and mod.padWaits and mod.PadViewOn and mod.PadViewOn() then

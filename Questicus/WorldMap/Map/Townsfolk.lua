@@ -143,7 +143,9 @@ local function Build(kinds, done)
 	-- a kind's pins at each of its spawns ({ [areaID] = { { x, y }, ... } }, as Questie keeps them);
 	-- `walker`: one NPC's, a path walked taken as one place (Middle)
 	local function Pins(k, spawns, info, walker)
-		local set = S.PinSet("tf_" .. k.key, k.zoom, 3)
+		-- (the lowest of Questicus Maps' icons, with the route lines: under quests' icons, Questicus Maps' and Questie's, a pin
+		-- of yours, a dungeon, a flight master, your group's dots and your arrow)
+		local set = S.PinSet("tf_" .. k.key, k.zoom, 1)
 		for areaID, coords in pairs(spawns) do
 			if walker and #coords > WANDER then coords = Middle(coords) end
 			local uiMapID = ZoneDB:GetUiMapIdByAreaId(areaID)

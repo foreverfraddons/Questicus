@@ -3,6 +3,7 @@
 	</Binding>
 	<!-- >>> Questicus Maps bindings (tools/sync_maps.py) >>> -->
 	<Binding name="QUESTICUSMAP_FIND" category="Questicus Maps">QuesticusMap_Binding("find")</Binding>
+	<Binding name="QUESTICUSMAP_SEARCH" category="Questicus Maps">QuesticusMap_Binding("search")</Binding>
 	<Binding name="QUESTICUSMAP_PIN" category="Questicus Maps">QuesticusMap_Binding("pin")</Binding>
 	<Binding name="QUESTICUSMAP_PINS" category="Questicus Maps">QuesticusMap_Binding("pins")</Binding>
 	<Binding name="QUESTICUSMAP_QUILL" category="Questicus Maps">QuesticusMap_Binding("quill")</Binding>
